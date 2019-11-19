@@ -5,6 +5,8 @@ Created on Wed Aug 28 09:16:03 2019
 @author: zhe
 """
 
+__version__ = '0.0.1'
+
 import os, pickle, random, time
 
 class Archive:
