@@ -5,7 +5,7 @@ Created on Wed Aug 28 09:16:03 2019
 @author: zhe
 """
 
-import os, pickle, random
+import os, pickle, random, time
 
 class Archive:
     r'''data structure for storing records
@@ -48,6 +48,7 @@ class Archive:
                     records = pickle.load(f)
             except:
                 count += 1
+                time.sleep(self.pause)
             else:
                 break
         if count==self.max_try:
@@ -65,6 +66,7 @@ class Archive:
                     pickle.dump(records, f)
             except:
                 count += 1
+                time.sleep(self.pause)
             else:
                 break
         if count==self.max_try:
