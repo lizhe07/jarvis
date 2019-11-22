@@ -36,6 +36,9 @@ class Archive:
         self.max_try = max_try
         self.pause = pause
     
+    def __repr__(self):
+        return 'Archive object saved in {}\nfile name length is {}'.format(self.save_dir, self.f_name_len)
+    
     def __len__(self):
         return self.record_num()
     
