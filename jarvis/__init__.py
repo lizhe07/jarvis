@@ -10,7 +10,7 @@ __version__ = '0.0.1'
 import os, pickle, random, time
 
 class Archive:
-    r'''data structure for storing records
+    r"""Data structure for storing records.
     
     An Archive object stores records in a dictionary manner, but using multiple
     files to save data separately according to the record ID prefix.
@@ -25,7 +25,7 @@ class Archive:
         max_try (int): maximum number of tries to read or write file via pickle.
         pause (float): pause time between each try.
     
-    '''
+    """
     def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=10, pause=0.1):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -43,9 +43,9 @@ class Archive:
         return self.record_num()
     
     def _safe_read(self, r_file):
-        r'''to safely write a file
+        r"""Safely writes a file.
         
-        '''
+        """
         count = 0
         while count<self.max_try:
             try:
@@ -61,9 +61,9 @@ class Archive:
         return records
     
     def _safe_write(self, records, r_file):
-        r'''to safely write a file
+        r"""Safely writes a file.
         
-        '''
+        """
         count = 0
         while count<self.max_try:
             try:
@@ -78,21 +78,21 @@ class Archive:
             raise RuntimeError('max number ({}) of writing tried and failed'.format(count))
     
     def _random_id(self):
-        r'''to generate a random ID
+        r"""Generate a random ID.
         
         Returns:
             a string composed of '0'-'9' and 'A'-'F'.
         
-        '''
+        """
         return ''.join(['{:X}'.format(random.randrange(16)) for _ in range(self.r_id_len)])
     
     def _new_id(self):
-        r'''to generate a new ID
+        r"""Generate a new ID.
         
         Returns:
             a string that hasn't been used as record ID yet.
         
-        '''
+        """
         r_id = None
         while True:
             r_id = self._random_id()
@@ -101,7 +101,7 @@ class Archive:
         return r_id
     
     def _r_file(self, r_id):
-        r'''to get the path of the file
+        r"""Gets the file path.
         
         Args:
             r_id (string): record ID.
@@ -109,32 +109,32 @@ class Archive:
         Returns:
             a string of the file path.
         
-        '''
+        """
         return os.path.join(self.save_dir, r_id[:self.f_name_len]+'.axv')
     
     def _r_file_names(self):
-        r'''to get the names of all files
+        r"""Gets the names of all files.
         
         Returns:
             a list of strings, containing names of all files.
         
-        '''
+        """
         return [f for f in os.listdir(self.save_dir) \
                 if f.endswith('.axv') and len(f)==(self.f_name_len+4)]
     
     def _r_files(self):
-        r'''to get the paths of all files
+        r"""Gets the paths of all files.
         
         Returns:
             a list of strings, containing paths of all files.
         
-        '''
+        """
         return [os.path.join(self.save_dir, f) for f in self._r_file_names()]
     
     def record_num(self):
-        r'''to get number of records
+        r"""Gets number of records.
         
-        '''
+        """
         count = 0
         for r_file in self._r_files():
             records = self._safe_read(r_file)
@@ -142,24 +142,24 @@ class Archive:
         return count
     
     def file_num(self):
-        r'''to get number of files
+        r"""Gets number of files.
         
-        '''
+        """
         return len(self._r_files())
     
     def clear(self):
-        r'''to delete all files
+        r"""Delete all files.
         
-        '''
+        """
         r_files = self._r_files()
         for r_file in r_files:
             os.remove(r_file)
         os.removedirs(self.save_dir)
     
     def update_files(self, new_f_name_len):
-        r'''to update files with new name length
+        r"""Updates files with new name length.
         
-        '''
+        """
         old_heads = [f[:self.f_name_len] for f in self._r_file_names()]
         if new_f_name_len<self.f_name_len:
             new_heads = list(set([h[:new_f_name_len] for h in old_heads]))
@@ -185,9 +185,9 @@ class Archive:
         self.f_name_len = new_f_name_len
     
     def remove_corrupted(self):
-        r'''to remove corrupted files
+        r"""Removes corrupted files.
         
-        '''
+        """
         count = 0
         for r_file in self._r_files():
             try:
@@ -202,9 +202,9 @@ class Archive:
             print('{} corrupted files removed.'.format(count))
     
     def has_id(self, r_id):
-        r'''to check if certain record ID exists
+        r"""Checks if certain record ID exists.
         
-        '''
+        """
         r_file = self._r_file(r_id)
         if not os.path.exists(r_file):
             return False
@@ -212,7 +212,7 @@ class Archive:
         return r_id in records
     
     def fetch_matched(self, matcher=None, mode='all'):
-        r'''to fetch matched record(s)
+        r"""Fetches matched record(s).
         
         Args:
             matcher (function): a function takes a record as inputs and returns
@@ -226,7 +226,7 @@ class Archive:
             If mode is 'random', one random record ID that fits the matcher is
             returned. If no such record exists, a `None` is returned.
         
-        '''
+        """
         def _matched_ids(records, matcher):
             if matcher is None:
                 return list(records.keys())
@@ -250,29 +250,29 @@ class Archive:
             return matched_ids
     
     def fetch_id(self, record):
-        r'''to fetch the ID of a record
+        r"""Fetches the ID of a record.
         
         ID is searched for by direct value comparison for now. Major revisions
         are needed to speed up the process.
         
-        '''
+        """
         return self.fetch_matched(lambda r: r==record, 'random')
     
     def fetch_record(self, r_id):
-        r'''to fetch the record
+        r"""Fetches the record.
         
-        '''
+        """
         r_file = self._r_file(r_id)
         records = self._safe_read(r_file)
         return records[r_id]
     
     def assign(self, r_id, record):
-        r'''to assign a record to an ID
+        r"""Assigns a record to an ID.
         
         If `r_id` already exists, old record will be replaced. If `r_id` does
         not exist, a new record will be added.
         
-        '''
+        """
         r_file = self._r_file(r_id)
         if os.path.exists(r_file):
             records = self._safe_read(r_file)
@@ -282,19 +282,19 @@ class Archive:
         self._safe_write(records, r_file)
     
     def add(self, record):
-        r'''to add a new record
+        r"""Adds a new record.
         
         Check to ensure there is no duplicate existing is not performed.
         
-        '''
+        """
         r_id = self._new_id()
         self.assign(r_id, record)
         return r_id
     
     def remove(self, r_id):
-        r'''to remove a record
+        r"""Removes a record.
         
-        '''
+        """
         if self.has_id(r_id):
             r_file = self._r_file(r_id)
             records = self._safe_read(r_file)
@@ -305,7 +305,7 @@ class Archive:
                 os.remove(r_file)
     
     def sync_from(self, master_archive):
-        r'''to synchronize from another Archive object
+        r"""Synchronizes from another Archive object.
         
         Records in the current archive will be updated from another master
         archive. For each record ID in the current archive, if it also exists
@@ -315,7 +315,7 @@ class Archive:
         Args:
             master_archive (Archive): the archive to sync from.
         
-        '''
+        """
         r_file_names = self._r_file_names()
         if self.f_name_len==master_archive.f_name_len:
             for r_file_name in r_file_names:
