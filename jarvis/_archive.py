@@ -261,8 +261,13 @@ class Archive:
         
         """
         r_file = self._r_file(r_id)
+        if not os.path.exists(r_file):
+            raise RuntimeError('{} does not exist'.format(r_id))
         records = self._safe_read(r_file)
-        return records[r_id]
+        if r_id in records:
+            return records[r_id]
+        else:
+            raise RuntimeError('{} does not exist'.format(r_id))
     
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
