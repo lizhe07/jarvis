@@ -17,9 +17,26 @@ class Job:
     archives. When being processed, a work is selected and executed by the
     function provided.
     
+    Args:
+        search_spec (dict): specification of search space. Each combination of
+            specified values corresponds to a list of argument strings.
+        get_config (function): a function that takes a list of argument strings
+            as input, and returns a dictionary of configuration.
+        work_func (function): the main function to execute. It receives work
+            configuration as keyword arguments.
+        configs (Archive): archive of work configurations.
+        stats (Archive): archive of work statuses.
+        ckpts (Archive): archive of work chekpoints.
+        custom_converter (dict): a dictionary of custom converters. The keys of
+            this dictionary are a subset of search_spec. The values of it are
+            functions that convert search_spec value to a list of argument
+            strings.
+    
     """
     def __init__(self, search_spec, get_config, work_func, configs, stats, ckpts,
                  custom_converter=None):
+        for key, val in search_spec.items():
+            assert isinstance(val, list), '{} in search_spec should be a list'.format(key)
         self.search_spec = search_spec
         self.get_config, self.work_func = get_config, work_func
         self.configs, self.stats, self.ckpts = configs, stats, ckpts
@@ -46,6 +63,9 @@ class Job:
     def init(self, disp_num=20):
         r"""Initiates the list of task IDs from search specification.
         
+        Args:
+            disp_num (int): number of displays during job initialization.
+        
         """
         assert not self.work_ids, 'work set already exists'
         arg_keys = list(self.search_spec.keys())
@@ -57,11 +77,14 @@ class Job:
             arg_strs = []
             for arg_key, arg_val in zip(arg_keys, arg_vals):
                 if arg_key in self.custom_converter:
+                    # use custom_converter if provided
                     arg_strs += self.custom_converter[arg_key](arg_val)
                 elif isinstance(arg_val, bool):
+                    # all boolean arguments are assumed to use 'store_true'
                     if arg_val:
                         arg_strs += ['--'+arg_key]
                 elif isinstance(arg_val, list):
+                    # a list of values corresponds to arguments with nargs='+'
                     if arg_val:
                         arg_strs += ['--'+arg_key]+[str(v) for v in arg_val]
                 else:
@@ -78,12 +101,21 @@ class Job:
     def process(self, process_num=0, max_wait=60., tolerance=float('inf'), **kwargs):
         r"""Processes works in random order.
         
+        Args:
+            process_num (int): number of works to process. When process_num=0,
+                the method returns when no work is pending.
+            max_wait (float): maximum wait time before start. The random wait
+                is designed to avoid conflict when deployed to servers.
+            tolerance (float): maximum allowed running time. Any work started
+                earlier than the threshold will be restarted.
+            kwargs: additional keyword arguments for work_func.
+        
         """
         def to_run(w_id, tolerance):
             if not self.stats.has_id(w_id):
                 return True
             stat = self.stats.fetch_record(w_id)
-            if not stat['finished'] and time.time()-stat['tic']>tolerance:
+            if not stat['completed'] and time.time()-stat['tic']>tolerance:
                 return True
         
         random_wait = random.random()*max_wait
@@ -98,7 +130,7 @@ class Job:
         while process_num==0 or (process_num>0 and count<process_num):
             w_id = next(work_iterator, None)
             if w_id is None:
-                print('all trainings finished or running')
+                print('all works completed or running')
                 break
             
             work_config = self.configs.fetch_record(w_id)
