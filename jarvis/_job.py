@@ -5,7 +5,7 @@ Created on Mon Nov 25 22:57:30 2019
 @author: Zhe
 """
 
-import itertools
+import itertools, random, time
 import numpy as np
 from .utils import progress_str
 
@@ -19,7 +19,7 @@ class Job:
     
     """
     def __init__(self, search_spec, get_config, work_func, configs, stats, ckpts,
-                 custom_converter=None, disp_num=20):
+                 custom_converter=None):
         self.search_spec = search_spec
         self.get_config, self.work_func = get_config, work_func
         self.configs, self.stats, self.ckpts = configs, stats, ckpts
@@ -28,12 +28,9 @@ class Job:
         else:
             assert isinstance(custom_converter, dict)
             self.custom_converter = custom_converter
-        self.disp_num = disp_num
         
-        self.works = set()
+        self.work_ids = set()
     
-    def create(self, custom_convert=None):
-        r"""Creates the list of task IDs from search specification.
     def __repr__(self):
         repr_str = 'Job object defined over'
         for key in self.search_spec:
@@ -46,8 +43,11 @@ class Job:
     def __str__(self):
         return 'Job object defined over {} search specs'.format(len(self.search_spec))
     
+    def init(self, disp_num=20):
+        r"""Initiates the list of task IDs from search specification.
         
         """
+        assert not self.work_ids, 'work set already exists'
         arg_keys = list(self.search_spec.keys())
         arg_lists = [self.search_spec[key] for key in arg_keys]
         total_num = np.prod([len(l) for l in arg_lists])
@@ -70,7 +70,37 @@ class Job:
             w_id = self.configs.fetch_id(work_config)
             if w_id is None:
                 w_id = self.configs.add(work_config)
-            self.works.add(w_id)
+            self.work_ids.add(w_id)
             
-            if idx%(-(-total_num//self.disp_num))==0 or idx==total_num:
+            if idx%(-(-total_num//disp_num))==0 or idx==total_num:
                 print('{}, ({:5.1f}%)'.format(progress_str(idx, total_num), 100.*idx/total_num))
+    
+    def process(self, process_num=0, max_wait=60., tolerance=float('inf'), **kwargs):
+        r"""Processes works in random order.
+        
+        """
+        def to_run(w_id, tolerance):
+            if not self.stats.has_id(w_id):
+                return True
+            stat = self.stats.fetch_record(w_id)
+            if not stat['finished'] and time.time()-stat['tic']>tolerance:
+                return True
+        
+        random_wait = random.random()*max_wait
+        print('random wait {:.1f}s'.format(random_wait))
+        time.sleep(random_wait)
+        
+        work_ids = list(self.work_ids)
+        random.shuffle(work_ids)
+        work_iterator = (w_id for w_id in work_ids if to_run(w_id, tolerance))
+        
+        count = 0
+        while process_num==0 or (process_num>0 and count<process_num):
+            w_id = next(work_iterator, None)
+            if w_id is None:
+                print('all trainings finished or running')
+                break
+            
+            work_config = self.configs.fetch_record(w_id)
+            self.work_func(**work_config, **kwargs)
+            count += 1
