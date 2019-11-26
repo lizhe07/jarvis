@@ -34,6 +34,18 @@ class Job:
     
     def create(self, custom_convert=None):
         r"""Creates the list of task IDs from search specification.
+    def __repr__(self):
+        repr_str = 'Job object defined over'
+        for key in self.search_spec:
+            repr_str += '\n'+key+': '+str(self.search_spec[key])
+        repr_str += '\nconfigs: '+str(self.configs)
+        repr_str += '\nstats: '+str(self.stats)
+        repr_str += '\nckpts: '+str(self.ckpts)
+        return repr_str
+    
+    def __str__(self):
+        return 'Job object defined over {} search specs'.format(len(self.search_spec))
+    
         
         """
         arg_keys = list(self.search_spec.keys())
