@@ -7,7 +7,7 @@ Created on Mon Nov 25 22:57:30 2019
 
 import itertools, random, time
 import numpy as np
-from .utils import progress_str
+from .utils import progress_str, time_str
 
 class Job:
     r"""Data structure for managing works.
@@ -25,7 +25,9 @@ class Job:
         work_func (function): the main function to execute. It receives work
             configuration as keyword arguments.
         configs (Archive): archive of work configurations.
-        stats (Archive): archive of work statuses.
+        stats (Archive): archive of work statuses. Each record within must have
+            a boolean 'completed' and two float 'tic' and 'toc' as dictionary
+            values.
         ckpts (Archive): archive of work chekpoints.
         custom_converter (dict): a dictionary of custom converters. The keys of
             this dictionary are a subset of search_spec. The values of it are
@@ -136,3 +138,22 @@ class Job:
             work_config = self.configs.fetch_record(w_id)
             self.work_func(**work_config, **kwargs)
             count += 1
+    
+    def overview(self):
+        r"""Prints overview of job progress.
+        
+        """
+        durations = []
+        r_files = self.stats._r_files()
+        for r_file in r_files:
+            records = self.stats._safe_read(r_file)
+            for w_id in records:
+                if records[w_id]['completed'] and (w_id in self.work_ids):
+                    durations.append(records[w_id]['toc']-records[w_id]['tic'])
+        if durations:
+            print('{} works completed, average duration is {}'.format(
+                    progress_str(len(durations), len(self.work_ids)),
+                    time_str(np.mean(durations))
+                    ))
+        else:
+            print('0 work completed')
