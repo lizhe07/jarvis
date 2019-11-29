@@ -250,6 +250,12 @@ class Archive:
                 matched_ids += _matched_ids(records, matcher)
             return matched_ids
     
+    def fetch_one(self):
+        r"""Fetches one random record.
+        
+        """
+        return self.fetch_record(self.fetch_matched(mode='random'))
+    
     def fetch_id(self, record):
         r"""Fetches the ID of a record.
         
