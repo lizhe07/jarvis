@@ -89,7 +89,7 @@ class Job:
                     # a list of values corresponds to arguments with nargs='+'
                     if arg_val:
                         arg_strs += ['--'+arg_key]+[str(v) for v in arg_val]
-                else:
+                elif arg_val is not None:
                     arg_strs += ['--'+arg_key, str(arg_val)]
             work_config = self.get_config(arg_strs)
             w_id = self.configs.fetch_id(work_config)
