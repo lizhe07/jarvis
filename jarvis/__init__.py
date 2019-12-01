@@ -5,7 +5,7 @@ Created on Wed Aug 28 09:16:03 2019
 @author: zhe
 """
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 
 from ._archive import Archive
 from ._job import Job

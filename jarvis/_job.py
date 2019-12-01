@@ -12,41 +12,23 @@ from .utils import progress_str, time_str
 class Job:
     r"""Data structure for managing works.
     
-    A Job object creates a list of task IDs from the specified search space,
-    and associates with the corresponding configuration, status and checkpoint
-    archives. When being processed, a work is selected and executed by the
-    function provided.
+    A Job object creates a list of task IDs from the specified search space, and is
+    associated with the corresponding configuration, status and checkpoint archives.
     
     Args:
-        search_spec (dict): specification of search space. Each combination of
-            specified values corresponds to a list of argument strings.
-        get_config (function): a function that takes a list of argument strings
-            as input, and returns a dictionary of configuration.
-        work_func (function): the main function to execute. It receives work
-            configuration as keyword arguments.
+        search_spec (dict): specification of search space. Each combination of specified
+            values corresponds to a list of argument strings.
         configs (Archive): archive of work configurations.
-        stats (Archive): archive of work statuses. Each record within must have
-            a boolean 'completed' and two float 'tic' and 'toc' as dictionary
-            values.
+        stats (Archive): archive of work statuses. Each record within must have a boolean
+            'completed' and two float 'tic' and 'toc' as dictionary values.
         ckpts (Archive): archive of work chekpoints.
-        custom_converter (dict): a dictionary of custom converters. The keys of
-            this dictionary are a subset of search_spec. The values of it are
-            functions that convert search_spec value to a list of argument
-            strings.
     
     """
-    def __init__(self, search_spec, get_config, work_func, configs, stats, ckpts,
-                 custom_converter=None):
+    def __init__(self, search_spec, configs, stats, ckpts):
         for key, val in search_spec.items():
             assert isinstance(val, list), '{} in search_spec should be a list'.format(key)
         self.search_spec = search_spec
-        self.get_config, self.work_func = get_config, work_func
         self.configs, self.stats, self.ckpts = configs, stats, ckpts
-        if custom_converter is None:
-            self.custom_converter = {}
-        else:
-            assert isinstance(custom_converter, dict)
-            self.custom_converter = custom_converter
         
         self.work_ids = set()
     
@@ -62,25 +44,41 @@ class Job:
     def __str__(self):
         return 'Job object defined over {} search specs'.format(len(self.search_spec))
     
-    def init(self, disp_num=20):
+    def init(self, get_config, custom_converter=None, disp_num=20, **kwargs):
         r"""Initiates the list of task IDs from search specification.
         
         Args:
+            get_config (function): a function that takes a list of argument strings as
+                input, and returns a dictionary of configuration.
+            custom_converter (dict): a dictionary of custom converters. The keys of this
+                dictionary are a subset of search_spec. The values of it are functions
+                that convert search_spec value to a list of argument strings.
             disp_num (int): number of displays during job initialization.
+            kwargs: additional keyword arguments for get_config, will be converted to
+                arg_strs first.
         
         """
         assert not self.work_ids, 'work set already exists'
+        
+        if custom_converter is None:
+            custom_converter = {}
+        else:
+            assert isinstance(custom_converter, dict)
+        
         arg_keys = list(self.search_spec.keys())
         arg_lists = [self.search_spec[key] for key in arg_keys]
+        for key, val in kwargs.items():
+            arg_keys.append(key)
+            arg_lists.append([val])
         total_num = np.prod([len(l) for l in arg_lists])
         search_space = itertools.product(*arg_lists)
         
         for idx, arg_vals in enumerate(search_space, 1):
             arg_strs = []
             for arg_key, arg_val in zip(arg_keys, arg_vals):
-                if arg_key in self.custom_converter:
+                if arg_key in custom_converter:
                     # use custom_converter if provided
-                    arg_strs += self.custom_converter[arg_key](arg_val)
+                    arg_strs += custom_converter[arg_key](arg_val)
                 elif isinstance(arg_val, bool):
                     # all boolean arguments are assumed to use 'store_true'
                     if arg_val:
@@ -91,7 +89,7 @@ class Job:
                         arg_strs += ['--'+arg_key]+[str(v) for v in arg_val]
                 elif arg_val is not None:
                     arg_strs += ['--'+arg_key, str(arg_val)]
-            work_config = self.get_config(arg_strs)
+            work_config = get_config(arg_strs)
             w_id = self.configs.fetch_id(work_config)
             if w_id is None:
                 w_id = self.configs.add(work_config)
@@ -100,16 +98,18 @@ class Job:
             if idx%(-(-total_num//disp_num))==0 or idx==total_num:
                 print('{}, ({:5.1f}%)'.format(progress_str(idx, total_num), 100.*idx/total_num))
     
-    def process(self, process_num=0, max_wait=60., tolerance=float('inf'), **kwargs):
+    def process(self, work_func, process_num=0, max_wait=60., tolerance=float('inf'), **kwargs):
         r"""Processes works in random order.
         
         Args:
-            process_num (int): number of works to process. When process_num=0,
-                the method returns when no work is pending.
-            max_wait (float): maximum wait time before start. The random wait
-                is designed to avoid conflict when deployed to servers.
-            tolerance (float): maximum allowed running time. Any work started
-                earlier than the threshold will be restarted.
+            work_func (function): the main function to execute. It receives work
+                configuration as keyword arguments.
+            process_num (int): number of works to process. When process_num=0, the method
+                returns when no work is pending.
+            max_wait (float): maximum wait time before start. The random wait is designed
+                to avoid conflict when deployed to servers.
+            tolerance (float): maximum allowed running time. Any work started earlier than
+                the threshold will be restarted.
             kwargs: additional keyword arguments for work_func.
         
         """
@@ -136,7 +136,7 @@ class Job:
                 break
             
             work_config = self.configs.fetch_record(w_id)
-            self.work_func(**work_config, **kwargs)
+            work_func(**work_config, **kwargs)
             count += 1
     
     def overview(self):
