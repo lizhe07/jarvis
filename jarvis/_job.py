@@ -49,13 +49,13 @@ class Job:
         
         Args:
             get_config (function): a function that takes a list of argument strings as
-                input, and returns a dictionary of configuration.
+                the first input with optional keyword arguments. This function returns a
+                dictionary of configuration.
             custom_converter (dict): a dictionary of custom converters. The keys of this
                 dictionary are a subset of search_spec. The values of it are functions
                 that convert search_spec value to a list of argument strings.
             disp_num (int): number of displays during job initialization.
-            kwargs: additional keyword arguments for get_config, will be converted to
-                arg_strs first.
+            kwargs: additional keyword arguments for get_config.
         
         """
         assert not self.work_ids, 'work set already exists'
@@ -67,9 +67,6 @@ class Job:
         
         arg_keys = list(self.search_spec.keys())
         arg_lists = [self.search_spec[key] for key in arg_keys]
-        for key, val in kwargs.items():
-            arg_keys.append(key)
-            arg_lists.append([val])
         total_num = np.prod([len(l) for l in arg_lists])
         search_space = itertools.product(*arg_lists)
         
@@ -89,7 +86,7 @@ class Job:
                         arg_strs += ['--'+arg_key]+[str(v) for v in arg_val]
                 elif arg_val is not None:
                     arg_strs += ['--'+arg_key, str(arg_val)]
-            work_config = get_config(arg_strs)
+            work_config = get_config(arg_strs, **kwargs)
             w_id = self.configs.fetch_id(work_config)
             if w_id is None:
                 w_id = self.configs.add(work_config)
