@@ -114,8 +114,10 @@ class Job:
             if not self.stats.has_id(w_id):
                 return True
             stat = self.stats.fetch_record(w_id)
-            if not stat['completed'] and time.time()-stat['tic']>tolerance:
+            if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
                 return True
+            else:
+                return False
         
         random_wait = random.random()*max_wait
         print('random wait {:.1f}s'.format(random_wait))
