@@ -19,3 +19,29 @@ def progress_str(i, total, show_percent=False):
     if show_percent:
         disp_str += ', ({:5.1f}%)'.format(100.*i/total)
     return disp_str
+
+# flatten a nested dictionary
+def flatten(nested_dict):
+    flat_dict = {}
+    for key, val in nested_dict.items():
+        if isinstance(val, dict) and isinstance(next(iter(val)), str):
+            flat_dict.update(dict((
+                    key+'::'+subkey,
+                    flatten(subval) if isinstance(subval, dict) else subval
+                    ) for subkey, subval in val.items()))
+        else:
+            flat_dict[key] = val
+    return flat_dict
+
+# nest a flat dictionary
+def nest(flat_dict):
+    keys = set([k.split('::')[0] if isinstance(k, str) and '::' in k else k for k in flat_dict])
+    nested_dict = {}
+    for key in keys:
+        if key in flat_dict:
+            nested_dict[key] = flat_dict[key]
+        else:
+            subdict = dict((key_full.replace(key+'::', '', 1), val) for key_full, val in flat_dict.items() \
+                           if key_full.startswith(key))
+            nested_dict[key] = nest(subdict)
+    return nested_dict
