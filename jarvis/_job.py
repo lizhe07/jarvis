@@ -7,7 +7,7 @@ Created on Mon Nov 25 22:57:30 2019
 
 import itertools, random, time
 import numpy as np
-from .utils import progress_str, time_str
+from .utils import progress_str, time_str, flatten, nest
 
 class Job:
     r"""Data structure for managing works.
@@ -55,7 +55,7 @@ class Job:
                 dictionary are a subset of search_spec. The values of it are functions
                 that convert search_spec value to a list of argument strings.
             disp_num (int): number of displays during job initialization.
-            kwargs: additional keyword arguments for get_config.
+            kwargs (dict): additional keyword arguments for get_config.
         
         """
         assert not self.work_ids, 'work set already exists'
@@ -107,7 +107,7 @@ class Job:
                 to avoid conflict when deployed to servers.
             tolerance (float): maximum allowed running time. Any work started earlier than
                 the threshold will be restarted.
-            kwargs: additional keyword arguments for work_func.
+            kwargs (dict): additional keyword arguments for work_func.
         
         """
         def to_run(w_id, tolerance):
@@ -156,3 +156,130 @@ class Job:
                     ))
         else:
             print('0 work completed')
+
+def grouping(work_ids, configs, stats, cond_dict=None, get_score=None, min_group=1,
+             return_nested=False, **kwargs):
+    r"""Groups completed works and sorts the resulting groups.
+    
+    All completed works in a given set with the given conditioned config values are
+    fetched. The variable part except random seeds are idendified, and all works are
+    grouped with respect to each unique configuration. Groups are sorted according to the
+    mean score of each member work, in an ascending order.
+    
+    Args:
+        work_ids (set): the set of work IDs to organize.
+        configs (Archive): archive of work configurations.
+        stats (Archive): archive of work statuses.
+        cond_dict (dict): the config values to be conditioned on, should be part of a
+            valid config.
+        get_score (function): a function that takes a stat as input and returns a scalar
+            as output. Usually this returns the test loss of a completed training.
+        min_group (int): minimum size of a group. Group with works fewer than the value
+            will not be counted.
+        return_nested (bool): whether to return nested config dict or flat one.
+        kwargs (dict): additional keyword arguments for get_score.
+    
+    Returns:
+        constant_config (dict): the config dict shared by all completed works
+        unique_configs (list): a list of unique config dict that is not constant or
+            nuisance (ends with 'seed').
+        grouped_ids (list): a list of grouped work IDs. Each element is a list of strings.
+        grouped_scores (list): a list of grouped scores, with the same structure of
+            grouped_ids.
+
+    """
+    def get_test_loss(stat):
+        return stat['losses']['test'][stat['best_idx']]
+    
+    if cond_dict is None:
+        cond_dict = {}
+    else:
+        assert isinstance(cond_dict, dict)
+    if get_score is None:
+        get_score = get_test_loss
+    
+    # gather completed works
+    for w_id in work_ids:
+        assert configs.has_id(w_id), '{} does not exist in configs'.format(w_id)
+    completed_ids, flat_configs, scores = [], [], []
+    for w_id in work_ids:
+        if stats.has_id(w_id) and stats.fetch_record(w_id)['completed']:
+            completed_ids.append(w_id)
+            flat_configs.append(flatten(configs.fetch_record(w_id)))
+            scores.append(get_score(stats.fetch_record(w_id), **kwargs))
+    
+    # verify all configs are consistent
+    full_keys = None
+    for config in flat_configs:
+        if full_keys is None:
+            full_keys = config.keys()
+        else:
+            assert full_keys==config.keys(), 'config keys inconsistent'
+    
+    # filter out works that do not match conditioned config
+    flat_cond = flatten(cond_dict)
+    assert set(flat_cond).issubset(full_keys), 'keys of conditioning dict is incompatible'
+    def match_cond(flat_config, flat_cond):
+        for key in flat_cond:
+            if flat_cond[key]!=flat_config[key]:
+                return False
+        return True
+    idxs = [i for i, flat_config in enumerate(flat_configs) if match_cond(flat_config, flat_cond)]
+    if len(idxs)==0:
+        print('no configs matching the conditions found')
+        return None, None, [], []
+    matched_ids = [completed_ids[i] for i in idxs]
+    flat_configs = [flat_configs[i] for i in idxs]
+    scores = [scores[i] for i in idxs]
+    
+    # identify constant config and varying config, all keys end with 'seed' are considered nuisance key
+    val_nums = {}
+    for key in full_keys:
+        if not key.endswith('seed'):
+            vals = [] # values may be unhashable, use list instead of set here
+            for config in flat_configs:
+                if config[key] not in vals:
+                    vals.append(config[key])
+            val_nums[key] = len(vals)
+    constant_keys, varying_keys = [], []
+    for key in val_nums:
+        if val_nums[key]==1:
+            constant_keys.append(key)
+        else:
+            varying_keys.append(key)
+    print('{} constant config keys, {} varying config keys'.format(len(constant_keys), len(varying_keys)))
+    constant_config = dict((key, flat_configs[0][key]) for key in constant_keys)
+    varying_configs = [dict((key, flat_config[key]) for key in varying_keys) for flat_config in flat_configs]
+    
+    # group all works into unique configs
+    unique_configs, grouped_ids, grouped_scores = [], [], []
+    for w_id, config, score in zip(matched_ids, varying_configs, scores):
+        if config in unique_configs:
+            idx = unique_configs.index(config)
+            grouped_ids[idx].append(w_id)
+            grouped_scores[idx].append(score)
+        else:
+            unique_configs.append(config)
+            grouped_ids.append([w_id])
+            grouped_scores.append([score])
+    print('{} unique configs found'.format(len(unique_configs)))
+    
+    # remove groups that are smaller than required size
+    idxs = [i for i, g in enumerate(grouped_ids) if len(g)>=min_group]
+    unique_configs = [unique_configs[i] for i in idxs]
+    grouped_ids = [grouped_ids[i] for i in idxs]
+    grouped_scores = [grouped_scores[i] for i in idxs]
+    print('{} configs have at least {} completed works'.format(len(unique_configs), min_group))
+    
+    # sort the group according to mean score
+    idxs = np.argsort([np.mean(s) for s in grouped_scores])
+    unique_configs = [unique_configs[i] for i in idxs]
+    grouped_ids = [grouped_ids[i] for i in idxs]
+    grouped_scores = [grouped_scores[i] for i in idxs]
+    print('results sorted in ascending order of scores')
+    
+    # nest config dicts if specified
+    if return_nested:
+        constant_config = nest(constant_config)
+        unique_configs = [nest(config) for config in unique_configs]
+    return constant_config, unique_configs, grouped_ids, grouped_scores
