@@ -157,8 +157,8 @@ class Job:
         else:
             print('0 work completed')
 
-def grouping(work_ids, configs, stats, cond_dict=None, get_score=None, min_group=1,
-             return_nested=False, **kwargs):
+def grouping(work_ids, configs, stats, cond_dict=None, nuisance=None,
+             get_score=None, min_group=1, return_nested=False, **kwargs):
     r"""Groups completed works and sorts the resulting groups.
     
     All completed works in a given set with the given conditioned config values are
@@ -172,6 +172,8 @@ def grouping(work_ids, configs, stats, cond_dict=None, get_score=None, min_group
         stats (Archive): archive of work statuses.
         cond_dict (dict): the config values to be conditioned on, should be part of a
             valid config.
+        nuisance (set): the set of config keys that should be considered as nuisance. Keys
+            are for the flat config dict.
         get_score (function): a function that takes a stat as input and returns a scalar
             as output. Usually this returns the test loss of a completed training.
         min_group (int): minimum size of a group. Group with works fewer than the value
@@ -195,6 +197,10 @@ def grouping(work_ids, configs, stats, cond_dict=None, get_score=None, min_group
         cond_dict = {}
     else:
         assert isinstance(cond_dict, dict)
+    if nuisance is None:
+        nuisance = set()
+    else:
+        assert isinstance(nuisance, set)
     if get_score is None:
         get_score = get_test_loss
     
@@ -233,9 +239,13 @@ def grouping(work_ids, configs, stats, cond_dict=None, get_score=None, min_group
     scores = [scores[i] for i in idxs]
     
     # identify constant config and varying config, all keys end with 'seed' are considered nuisance key
+    assert nuisance.issubset(full_keys)
+    for key in full_keys:
+        if key.endswith('seed'):
+            nuisance.add(key)
     val_nums = {}
     for key in full_keys:
-        if not key.endswith('seed'):
+        if key not in nuisance:
             vals = [] # values may be unhashable, use list instead of set here
             for config in flat_configs:
                 if config[key] not in vals:
