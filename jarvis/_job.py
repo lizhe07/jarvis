@@ -205,6 +205,8 @@ def grouping(work_ids, configs, stats, cond_dict=None, nuisance=None,
         get_score = get_test_loss
     
     # gather completed works
+    print('gathering completed works...')
+    tic = time.time()
     for w_id in work_ids:
         assert configs.has_id(w_id), '{} does not exist in configs'.format(w_id)
     completed_ids, flat_configs, scores = [], [], []
@@ -213,6 +215,8 @@ def grouping(work_ids, configs, stats, cond_dict=None, nuisance=None,
             completed_ids.append(w_id)
             flat_configs.append(flatten(configs.fetch_record(w_id)))
             scores.append(get_score(stats.fetch_record(w_id), **kwargs))
+    toc = time.time()
+    print('{} elapsed'.format(time_str(toc-tic)))
     
     # verify all configs are consistent
     full_keys = None
