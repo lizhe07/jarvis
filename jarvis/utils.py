@@ -24,7 +24,7 @@ def progress_str(i, total, show_percent=False):
 def flatten(nested_dict):
     flat_dict = {}
     for key, val in nested_dict.items():
-        if isinstance(val, dict) and isinstance(next(iter(val)), str):
+        if isinstance(val, dict) and val and isinstance(next(iter(val)), str):
             flat_dict.update(dict((
                     key+'::'+subkey,
                     flatten(subval) if isinstance(subval, dict) else subval
