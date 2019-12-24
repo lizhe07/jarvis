@@ -95,7 +95,7 @@ class Job:
             if idx%(-(-total_num//disp_num))==0 or idx==total_num:
                 print('{}, ({:5.1f}%)'.format(progress_str(idx, total_num), 100.*idx/total_num))
     
-    def process(self, work_func, process_num=0, max_wait=60., tolerance=float('inf'), **kwargs):
+    def process(self, work_func, process_num=0, tolerance=float('inf'), **kwargs):
         r"""Processes works in random order.
         
         Args:
@@ -103,8 +103,6 @@ class Job:
                 configuration as keyword arguments.
             process_num (int): number of works to process. When process_num=0, the method
                 returns when no work is pending.
-            max_wait (float): maximum wait time before start. The random wait is designed
-                to avoid conflict when deployed to servers.
             tolerance (float): maximum allowed running time. Any work started earlier than
                 the threshold will be restarted.
             kwargs (dict): additional keyword arguments for work_func.
@@ -118,10 +116,6 @@ class Job:
                 return True
             else:
                 return False
-        
-        random_wait = random.random()*max_wait
-        print('random wait {:.1f}s'.format(random_wait))
-        time.sleep(random_wait)
         
         work_ids = list(self.work_ids)
         random.shuffle(work_ids)
