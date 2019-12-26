@@ -187,6 +187,12 @@ def grouping(work_ids, configs, stats, cond_dict=None, nuisance=None,
     def get_test_loss(stat):
         return stat['losses']['test'][stat['best_idx']]
     
+    def match_cond(flat_config, flat_cond):
+        for key in flat_cond:
+            if flat_cond[key]!=flat_config[key]:
+                return False
+        return True
+    
     if cond_dict is None:
         cond_dict = {}
     else:
@@ -203,48 +209,39 @@ def grouping(work_ids, configs, stats, cond_dict=None, nuisance=None,
     tic = time.time()
     for w_id in work_ids:
         assert configs.has_id(w_id), '{} does not exist in configs'.format(w_id)
-    completed_ids, flat_configs, scores = [], [], []
+    
+    matched_ids, flat_configs, scores = [], [], []
+    flat_cond, flat_keys = flatten(cond_dict), None
     for w_id in work_ids:
         if stats.has_id(w_id) and stats.fetch_record(w_id)['completed']:
-            completed_ids.append(w_id)
-            flat_configs.append(flatten(configs.fetch_record(w_id)))
-            scores.append(get_score(stats.fetch_record(w_id), **kwargs))
+            flat_config = flatten(configs.fetch_record(w_id))
+            # verify all configs are consistent
+            if flat_keys is None:
+                flat_keys = flat_config.keys()
+                assert set(flat_cond).issubset(flat_keys)
+            else:
+                assert flat_keys==flat_config.keys(), 'keys of conditioning dict are incompatible'
+            
+            if match_cond(flat_config, flat_cond):
+                matched_ids.append(w_id)
+                flat_configs.append(flat_config)
+                scores.append(get_score(stats.fetch_record(w_id), **kwargs))
     toc = time.time()
     print('{} elapsed'.format(time_str(toc-tic)))
-    
-    # verify all configs are consistent
-    full_keys = None
-    for config in flat_configs:
-        if full_keys is None:
-            full_keys = config.keys()
-        else:
-            assert full_keys==config.keys(), 'config keys inconsistent'
-    
-    # filter out works that do not match conditioned config
-    flat_cond = flatten(cond_dict)
-    assert set(flat_cond).issubset(full_keys), 'keys of conditioning dict is incompatible'
-    def match_cond(flat_config, flat_cond):
-        for key in flat_cond:
-            if flat_cond[key]!=flat_config[key]:
-                return False
-        return True
-    idxs = [i for i, flat_config in enumerate(flat_configs) if match_cond(flat_config, flat_cond)]
-    if len(idxs)==0:
-        print('no configs matching the conditions found')
-        return None, None, [], []
-    matched_ids = [completed_ids[i] for i in idxs]
-    flat_configs = [flat_configs[i] for i in idxs]
-    scores = [scores[i] for i in idxs]
+    if matched_ids:
+        print('{} matched configs found'.format(len(matched_ids)))
+    else:
+        print('no matched configs found')
     
     # identify constant config and varying config, all keys end with 'seed' are considered nuisance key
-    assert nuisance.issubset(full_keys)
-    for key in full_keys:
+    assert nuisance.issubset(flat_keys), 'nuisance flat keys are incompatible'
+    for key in flat_keys:
         if key.endswith('seed'):
             nuisance.add(key)
     val_nums = {}
-    for key in full_keys:
+    for key in flat_keys:
         if key not in nuisance:
-            vals = [] # values may be unhashable, use list instead of set here
+            vals = [] # values may be lists (unhashable), use list instead of set here
             for config in flat_configs:
                 if config[key] not in vals:
                     vals.append(config[key])
