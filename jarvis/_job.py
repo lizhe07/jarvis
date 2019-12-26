@@ -205,7 +205,7 @@ def grouping(work_ids, configs, stats, cond_dict=None, nuisance=None,
         get_score = get_test_loss
     
     # gather completed works
-    print('gathering completed works...')
+    print('gathering completed works that matches conditioning...')
     tic = time.time()
     for w_id in work_ids:
         assert configs.has_id(w_id), '{} does not exist in configs'.format(w_id)
@@ -232,6 +232,7 @@ def grouping(work_ids, configs, stats, cond_dict=None, nuisance=None,
         print('{} matched configs found'.format(len(matched_ids)))
     else:
         print('no matched configs found')
+        return None, None, [], []
     
     # identify constant config and varying config, all keys end with 'seed' are considered nuisance key
     assert nuisance.issubset(flat_keys), 'nuisance flat keys are incompatible'
