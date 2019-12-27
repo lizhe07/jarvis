@@ -242,6 +242,12 @@ class Archive:
         r_files = self._r_files()
         random.shuffle(r_files)
         
+        if mode=='all':
+            matched_ids = []
+            for r_file in r_files:
+                records = self._safe_read(r_file)
+                matched_ids += _matched_ids(records, matcher)
+            return matched_ids
         if mode=='random':
             for r_file in r_files:
                 records = self._safe_read(r_file)
@@ -249,12 +255,6 @@ class Archive:
                 if matched_ids:
                     return random.choice(matched_ids)
             return None
-        if mode=='all':
-            matched_ids = []
-            for r_file in r_files:
-                records = self._safe_read(r_file)
-                matched_ids += _matched_ids(records, matcher)
-            return matched_ids
     
     def fetch_one(self):
         r"""Fetches one random record.
@@ -294,7 +294,7 @@ class Archive:
         all_records, duplicates = [], []
         for r_file in self._r_files():
             records = self._safe_read(r_file)
-            for r in records.items():
+            for r in records.values():
                 if r in all_records:
                     duplicates.append(r)
                 else:
