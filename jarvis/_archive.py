@@ -278,6 +278,23 @@ class Archive:
         else:
             raise RuntimeError('{} does not exist'.format(r_id))
     
+    def find_duplicates(self):
+        r"""Finds duplicate records.
+        
+        Returns:
+            a list of duplicate records.
+        
+        """
+        all_records, duplicates = [], []
+        for r_file in self._r_files():
+            records = self._safe_read(r_file)
+            for r in records.items():
+                if r in all_records:
+                    duplicates.append(r)
+                else:
+                    all_records.append(r)
+        return duplicates
+    
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
         
