@@ -70,6 +70,7 @@ class Job:
         total_num = np.prod([len(l) for l in arg_lists])
         search_space = itertools.product(*arg_lists)
         
+        tic = time.time()
         for idx, arg_vals in enumerate(search_space, 1):
             arg_strs = []
             for arg_key, arg_val in zip(arg_keys, arg_vals):
@@ -91,7 +92,11 @@ class Job:
             self.work_ids.add(w_id)
             
             if idx%(-(-total_num//disp_num))==0 or idx==total_num:
-                print('{}, ({:5.1f}%)'.format(progress_str(idx, total_num), 100.*idx/total_num))
+                toc = time.time()
+                print('{}, {}'.format(
+                    progress_str(idx, total_num, True), time_str(toc-tic)
+                    ))
+                tic = toc
     
     def process(self, work_func, process_num=0, tolerance=float('inf'), **kwargs):
         r"""Processes works in random order.
