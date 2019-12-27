@@ -8,31 +8,29 @@ Created on Sat Nov 23 23:03:10 2019
 import os, pickle, random, time
 
 class Archive:
-    r"""Data structure for storing records.
-    
-    An Archive object stores records in a dictionary manner, but using multiple
-    files to save data separately according to the record ID prefix.
-    
-    Args:
-        save_dir (string): directory of where the files are stored
-        r_id_len (int): record ID length. ID for each record is a fixed length
-            string composed of '0'-'9' and 'A'-'F'.
-        f_name_len (int): file name length. Each external file is named as 'XX.axv'
-            in which 'XX' is a string of length `f_name_len`. The file contains
-            a dictionary of records whose ID startswith the file name.
-        max_try (int): maximum number of tries to read or write file via pickle.
-        pause (float): pause time between each try.
-    
-    """
     def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=10, pause=0.1):
+        r"""Data structure for storing records.
+        
+        An Archive object stores records in a dictionary manner, but using multiple files
+        to save data separately according to the record ID prefix.
+        
+        Args:
+            save_dir (str): directory of where the files are stored.
+            r_id_len (int): record ID length. ID for each record is a fixed length string
+                composed of '0'-'9' and 'A'-'F'.
+            f_name_len (int): file name length. Each external file is named as 'XX.axv' in
+                which 'XX' is a string of length `f_name_len`. The file contains a
+                dictionary of records whose ID startswith the file name.
+            max_try (int): maximum number of tries to read or write file via pickle.
+            pause (float): pause time between each try of read or write.
+        
+        """
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         self.save_dir = save_dir
-        self.r_id_len = r_id_len
-        self.f_name_len = f_name_len
+        self.r_id_len, self.f_name_len = r_id_len, f_name_len
         assert self.f_name_len<=self.r_id_len, 'file name length should be no greater than record ID length'
-        self.max_try = max_try
-        self.pause = pause
+        self.max_try, self.pause = max_try, pause
     
     def __repr__(self):
         return 'Archive object saved in {}\nfile name length is {}'.format(self.save_dir, self.f_name_len)
@@ -45,6 +43,12 @@ class Archive:
     
     def _safe_read(self, r_file):
         r"""Safely writes a file.
+        
+        Args:
+            r_file (str): archive file path.
+        
+        Returns:
+            records (dict): the dictionary saved in the archive file.
         
         """
         count = 0
@@ -63,6 +67,9 @@ class Archive:
     
     def _safe_write(self, records, r_file):
         r"""Safely writes a file.
+        
+        Args:
+            r_file (str): archive file path.
         
         """
         count = 0
@@ -102,10 +109,10 @@ class Archive:
         return r_id
     
     def _r_file(self, r_id):
-        r"""Gets the file path.
+        r"""Returns the file path.
         
         Args:
-            r_id (string): record ID.
+            r_id (str): record ID.
         
         Returns:
             a string of the file path.
@@ -114,7 +121,7 @@ class Archive:
         return os.path.join(self.save_dir, r_id[:self.f_name_len]+'.axv')
     
     def _r_file_names(self):
-        r"""Gets the names of all files.
+        r"""Returns the names of all files.
         
         Returns:
             a list of strings, containing names of all files.
@@ -124,7 +131,7 @@ class Archive:
                 if f.endswith('.axv') and len(f)==(self.f_name_len+4)]
     
     def _r_files(self):
-        r"""Gets the paths of all files.
+        r"""Returns the paths of all files.
         
         Returns:
             a list of strings, containing paths of all files.
@@ -133,7 +140,7 @@ class Archive:
         return [os.path.join(self.save_dir, f) for f in self._r_file_names()]
     
     def record_num(self):
-        r"""Gets number of records.
+        r"""Returns number of records.
         
         """
         count = 0
@@ -143,13 +150,13 @@ class Archive:
         return count
     
     def file_num(self):
-        r"""Gets number of files.
+        r"""Returns number of files.
         
         """
         return len(self._r_files())
     
     def clear(self):
-        r"""Delete all files.
+        r"""Removes all files.
         
         """
         r_files = self._r_files()
@@ -216,16 +223,15 @@ class Archive:
         r"""Fetches matched record(s).
         
         Args:
-            matcher (function): a function takes a record as inputs and returns
-                boolean. If a matcher is not specified, all records will be
-                returned.
-            mode (string): fetching mode, can be 'all' or 'random'.
+            matcher (function): a function takes a record as inputs and returns boolean.
+                If a matcher is not specified, all records will be returned.
+            mode (str): fetching mode, can be 'all' or 'random'.
         
         Returns:
-            If mode is 'all', a list of record IDs (possibly empty) that fits
-            the matcher is returned.
-            If mode is 'random', one random record ID that fits the matcher is
-            returned. If no such record exists, a `None` is returned.
+            If mode is 'all', a list of record IDs (possibly empty) that fits the matcher
+            is returned.
+            If mode is 'random', one random record ID that fits the matcher is returned.
+            If no such record exists, a `None` is returned.
         
         """
         def _matched_ids(records, matcher):
@@ -259,8 +265,8 @@ class Archive:
     def fetch_id(self, record):
         r"""Fetches the ID of a record.
         
-        ID is searched for by direct value comparison for now. Major revisions
-        are needed to speed up the process.
+        Record ID is searched for by direct value comparison for now. Major revisions are
+        needed to speed up the process.
         
         """
         return self.fetch_matched(lambda r: r==record, 'random')
@@ -298,8 +304,12 @@ class Archive:
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
         
-        If `r_id` already exists, old record will be replaced. If `r_id` does
-        not exist, a new record will be added.
+        If `r_id` already exists, old record will be replaced. If `r_id` does not exist, a
+        new record will be added.
+        
+        Args:
+            r_id (str): record ID.
+            record: the record to be assigned to `r_id`.
         
         """
         r_file = self._r_file(r_id)
@@ -310,18 +320,30 @@ class Archive:
         records[r_id] = record
         self._safe_write(records, r_file)
     
-    def add(self, record):
+    def add(self, record, check_duplicate=True):
         r"""Adds a new record.
         
-        Check to ensure there is no duplicate existing is not performed.
+        Args:
+            record: the record to add.
+            check_duplicate (bool): whether to check duplicate before adding with a new
+                record ID.
+        
+        Returns:
+            r_id (str): record ID of the record. If `check_duplicate` is `True` and at
+                least one same record does exist, the record ID of any one duplicate is
+                returned.
         
         """
+        if check_duplicate:
+            r_id = self.fetch_id(record)
+            if r_id is not None:
+                return r_id
         r_id = self._new_id()
         self.assign(r_id, record)
         return r_id
     
     def remove(self, r_id):
-        r"""Removes a record.
+        r"""Removes a record by ID.
         
         """
         if self.has_id(r_id):
@@ -336,10 +358,9 @@ class Archive:
     def sync_from(self, master_archive):
         r"""Synchronizes from another Archive object.
         
-        Records in the current archive will be updated from another master
-        archive. For each record ID in the current archive, if it also exists
-        in the master archive, the corresponding record is updated, otherwise
-        the record will be removed.
+        Records in the current archive will be updated from another master archive. For
+        each record ID in the current archive, if it also exists in the master archive,
+        the corresponding record is updated, otherwise the record will be removed.
         
         Args:
             master_archive (Archive): the archive to sync from.

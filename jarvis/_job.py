@@ -10,21 +10,21 @@ import numpy as np
 from .utils import progress_str, time_str, flatten, nest
 
 class Job:
-    r"""Data structure for managing works.
-    
-    A Job object creates a list of task IDs from the specified search space, and is
-    associated with the corresponding configuration, status and checkpoint archives.
-    
-    Args:
-        search_spec (dict): specification of search space. Each combination of specified
-            values corresponds to a list of argument strings.
-        configs (Archive): archive of work configurations.
-        stats (Archive): archive of work statuses. Each record within must have a boolean
-            'completed' and two float 'tic' and 'toc' as dictionary values.
-        ckpts (Archive): archive of work chekpoints.
-    
-    """
     def __init__(self, search_spec, configs, stats, ckpts):
+        r"""Data structure for managing works.
+        
+        A Job object creates a list of task IDs from the specified search space, and is
+        associated with the corresponding configuration, status and checkpoint archives.
+        
+        Args:
+            search_spec (dict): specification of search space. Each combination of
+                specified values corresponds to a list of argument strings.
+            configs (Archive): archive of work configurations.
+            stats (Archive): archive of work statuses. Each record within must have a
+                boolean 'completed' and two float 'tic' and 'toc' as dictionary values.
+            ckpts (Archive): archive of work chekpoints.
+        
+        """
         for key, val in search_spec.items():
             assert isinstance(val, list), '{} in search_spec should be a list'.format(key)
         self.search_spec = search_spec
@@ -87,9 +87,7 @@ class Job:
                 elif arg_val is not None:
                     arg_strs += ['--'+arg_key, str(arg_val)]
             work_config = get_config(arg_strs, **kwargs)
-            w_id = self.configs.fetch_id(work_config)
-            if w_id is None:
-                w_id = self.configs.add(work_config)
+            w_id = self.configs.add(work_config)
             self.work_ids.add(w_id)
             
             if idx%(-(-total_num//disp_num))==0 or idx==total_num:
