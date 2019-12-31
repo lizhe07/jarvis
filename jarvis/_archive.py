@@ -8,7 +8,8 @@ Created on Sat Nov 23 23:03:10 2019
 import os, pickle, random, time
 
 class Archive:
-    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=10, pause=0.1):
+    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=10, pause=0.1,
+                 record_hashable=False):
         r"""Data structure for storing records.
         
         An Archive object stores records in a dictionary manner, but using multiple files
@@ -23,6 +24,8 @@ class Archive:
                 dictionary of records whose ID startswith the file name.
             max_try (int): maximum number of tries to read or write file via pickle.
             pause (float): pause time between each try of read or write.
+            record_hashable (bool): whether record is hashable. Lists containing only
+                integers are also considered hashable here.
         
         """
         if not os.path.exists(save_dir):
@@ -31,6 +34,7 @@ class Archive:
         self.r_id_len, self.f_name_len = r_id_len, f_name_len
         assert self.f_name_len<=self.r_id_len, 'file name length should be no greater than record ID length'
         self.max_try, self.pause = max_try, pause
+        self.record_hashable = record_hashable
     
     def __repr__(self):
         return 'Archive object saved in {}\nfile name length is {}'.format(self.save_dir, self.f_name_len)
@@ -139,6 +143,12 @@ class Archive:
         """
         return [os.path.join(self.save_dir, f) for f in self._r_file_names()]
     
+    def _hash_file(self):
+        r"""Returns the path of record hash file.
+        
+        """
+        return os.path.join(self.save_dir, 'record_hash.idx')
+    
     def record_num(self):
         r"""Returns number of records.
         
@@ -162,6 +172,8 @@ class Archive:
         r_files = self._r_files()
         for r_file in r_files:
             os.remove(r_file)
+        if self.record_hashable:
+            os.remove(self._hash_file)
         os.removedirs(self.save_dir)
     
     def update_files(self, new_f_name_len):
@@ -203,6 +215,8 @@ class Archive:
             except:
                 print('{} corrupted, will be removed'.format(r_file))
                 os.remove(r_file)
+                if self.record_hashable:
+                    raise NotImplementedError
                 count += 1
         if count==0:
             print('no corrupted files detected.')
@@ -300,6 +314,57 @@ class Archive:
                 else:
                     all_records.append(r)
         return duplicates
+    
+    @staticmethod
+    def record_hash(r):
+        r"""Returns hash of a record.
+        
+        Definition of 'hashable' is different than python default. If the record is one of
+        the basic form, e.g. int, float and str, default hash is returned. If the record
+        is one container such as list, tuple, set or dict, a new container containing
+        hashes of its elements are created and converted to tuple or frozenset to get the
+        hash.
+        
+        Args:
+            r: a record in the archive.
+        
+        Returns:
+            hash of the record.
+        
+        """
+        if r is None or isinstance(r, int) or isinstance(r, float) or isinstance(r, str):
+            return hash(r)
+        if isinstance(r, list):
+            hashes = [Archive.record_hash(x) for x in r]
+            return hash(('list', tuple(hashes)))
+        if isinstance(r, tuple):
+            hashes = [Archive.record_hash(x) for x in r]
+            return hash(('tuple', tuple(hashes)))
+        if isinstance(r, set):
+            hashes = [Archive.record_hash(x) for x in r]
+            return hash(frozenset(hashes))
+        if isinstance(r, dict):
+            hashes = [Archive.record_hash(x) for x in r.items()]
+            return hash(frozenset(hashes))
+    
+    def rebuild_hash(self):
+        r"""Rebuilds the record hash file.
+        
+        A new hash file is created from the existing archive records.
+        
+        """
+        if not self.record_hashable:
+            raise RuntimeError('this archive is not for hashable record')
+        id_dict = {}
+        for r_file in self._r_files():
+            records = self._safe_read(r_file)
+            for r_id, r in records.items():
+                r_hash = Archive.record_hash(r)
+                if r_hash in id_dict:
+                    print('hash conflict found for {} and {}'.format(r_id, id_dict[r_hash]))
+                id_dict[r_hash] = r_id
+        with open(self._hash_file(), 'wb') as f:
+            pickle.dump(id_dict, f)
     
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
