@@ -144,7 +144,7 @@ class Archive:
         r"""Returns the path of record hash file.
         
         """
-        return os.path.join(self.save_dir, 'record_hash.idx')
+        return os.path.join(self.save_dir, 'record_hash')
     
     def record_num(self):
         r"""Returns number of records.
@@ -291,7 +291,10 @@ class Archive:
             r_hash = Archive.record_hash(record)
             with open(self._hash_file(), 'rb') as f:
                 id_dict = pickle.load(f)
-            return id_dict[r_hash]
+            if r_hash in id_dict:
+                return id_dict[r_hash]
+            else:
+                return None
         else:
             return self.fetch_matched(lambda r: r==record, 'random')
     
@@ -378,6 +381,7 @@ class Archive:
                 id_dict[r_hash] = r_id
         with open(self._hash_file(), 'wb') as f:
             pickle.dump(id_dict, f)
+        print('record hash file has been rebuilt')
     
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
