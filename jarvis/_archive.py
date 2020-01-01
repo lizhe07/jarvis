@@ -113,13 +113,10 @@ class Archive:
         return r_id
     
     def _r_file(self, r_id):
-        r"""Returns the file path.
+        r"""Returns the file path of corresponding record ID.
         
         Args:
             r_id (str): record ID.
-        
-        Returns:
-            a string of the file path.
         
         """
         return os.path.join(self.save_dir, r_id[:self.f_name_len]+'.axv')
@@ -270,6 +267,12 @@ class Archive:
                     return random.choice(matched_ids)
             return None
     
+    def all_ids(self):
+        r"""Returns all record IDs.
+        
+        """
+        return self.fetch_matched()
+    
     def fetch_one(self):
         r"""Fetches one random record.
         
@@ -279,11 +282,18 @@ class Archive:
     def fetch_id(self, record):
         r"""Fetches the ID of a record.
         
-        Record ID is searched for by direct value comparison for now. Major revisions are
-        needed to speed up the process.
+        If records are hashable, record ID is looked up from hash file. Otherwise, record
+        ID is searched for by direct value comparison, and a random one is returned if
+        multiple matches exist.
         
         """
-        return self.fetch_matched(lambda r: r==record, 'random')
+        if self.record_hashable:
+            r_hash = Archive.record_hash(record)
+            with open(self._hash_file(), 'rb') as f:
+                id_dict = pickle.load(f)
+            return id_dict[r_hash]
+        else:
+            return self.fetch_matched(lambda r: r==record, 'random')
     
     def fetch_record(self, r_id):
         r"""Fetches the record.
@@ -300,6 +310,9 @@ class Archive:
     
     def find_duplicates(self):
         r"""Finds duplicate records.
+        
+        This method is performed by direct comparison, whether the records are hashable or
+        not.
         
         Returns:
             a list of duplicate records.
@@ -384,6 +397,13 @@ class Archive:
             records = {}
         records[r_id] = record
         self._safe_write(records, r_file)
+        if self.record_hashable:
+            with open(self._hash_file(), 'rb') as f:
+                id_dict = pickle.load(f)
+            r_hash = Archive.record_hash(record)
+            id_dict[r_hash] = r_id
+            with open(self._hash_file(), 'wb') as f:
+                pickle.dump(id_dict, f)
     
     def add(self, record, check_duplicate=True):
         r"""Adds a new record.
@@ -414,43 +434,15 @@ class Archive:
         if self.has_id(r_id):
             r_file = self._r_file(r_id)
             records = self._safe_read(r_file)
-            records.pop(r_id)
+            record = records.pop(r_id)
             if records:
                 self._safe_write(records, r_file)
             else:
                 os.remove(r_file)
-    
-    def sync_from(self, master_archive):
-        r"""Synchronizes from another Archive object.
-        
-        Records in the current archive will be updated from another master archive. For
-        each record ID in the current archive, if it also exists in the master archive,
-        the corresponding record is updated, otherwise the record will be removed.
-        
-        Args:
-            master_archive (Archive): the archive to sync from.
-        
-        """
-        r_file_names = self._r_file_names()
-        if self.f_name_len==master_archive.f_name_len:
-            for r_file_name in r_file_names:
-                source_file = os.path.join(master_archive.save_dir, r_file_name)
-                if os.path.exists(source_file):
-                    source_records = self._safe_read(source_file)
-                else:
-                    source_records = {}
-                
-                destination_file = os.path.join(self.save_dir, r_file_name)
-                destination_records = self._safe_read(destination_file)
-                r_ids = list(destination_records.keys())
-                for r_id in r_ids:
-                    if r_id in source_records:
-                        destination_records[r_id] = source_records[r_id]
-                    else:
-                        destination_records.pop(r_id)
-                if destination_records:
-                    self._safe_write(destination_records, destination_file)
-                else:
-                    os.remove(destination_file)
-        else:
-            raise NotImplementedError
+            if self.record_hashable:
+                with open(self._hash_file(), 'rb') as f:
+                    id_dict = pickle.load(f)
+                r_hash = Archive.record_hash(record)
+                id_dict.pop(r_hash)
+                with open(self._hash_file(), 'wb') as f:
+                    pickle.dump(id_dict, f)
