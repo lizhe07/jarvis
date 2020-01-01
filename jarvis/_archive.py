@@ -170,7 +170,7 @@ class Archive:
         for r_file in r_files:
             os.remove(r_file)
         if self.record_hashable:
-            os.remove(self._hash_file)
+            os.remove(self._hash_file())
         os.removedirs(self.save_dir)
     
     def update_files(self, new_f_name_len):
@@ -289,8 +289,7 @@ class Archive:
         """
         if self.record_hashable:
             r_hash = Archive.record_hash(record)
-            with open(self._hash_file(), 'rb') as f:
-                id_dict = pickle.load(f)
+            id_dict = self._safe_read(self._hash_file())
             if r_hash in id_dict:
                 return id_dict[r_hash]
             else:
@@ -379,8 +378,7 @@ class Archive:
                 if r_hash in id_dict:
                     print('hash conflict found for {} and {}'.format(r_id, id_dict[r_hash]))
                 id_dict[r_hash] = r_id
-        with open(self._hash_file(), 'wb') as f:
-            pickle.dump(id_dict, f)
+        self._safe_write(id_dict, self._hash_file())
         print('record hash file has been rebuilt')
     
     def assign(self, r_id, record):
@@ -402,12 +400,10 @@ class Archive:
         records[r_id] = record
         self._safe_write(records, r_file)
         if self.record_hashable:
-            with open(self._hash_file(), 'rb') as f:
-                id_dict = pickle.load(f)
+            id_dict = self._safe_read(self._hash_file())
             r_hash = Archive.record_hash(record)
             id_dict[r_hash] = r_id
-            with open(self._hash_file(), 'wb') as f:
-                pickle.dump(id_dict, f)
+            self._safe_write(id_dict, self._hash_file())
     
     def add(self, record, check_duplicate=True):
         r"""Adds a new record.
