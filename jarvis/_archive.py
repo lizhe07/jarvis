@@ -35,8 +35,9 @@ class Archive:
         assert self.f_name_len<=self.r_id_len, 'file name length should be no greater than record ID length'
         self.max_try, self.pause = max_try, pause
         self.record_hashable = record_hashable
-        if self.record_hashable:
-            self.rebuild_hash()
+        if self.record_hashable and not os.path.exists(self._hash_file()):
+            with open(self._hash_file(), 'wb') as f:
+                pickle.dump({}, f)
     
     def __repr__(self):
         return 'Archive object saved in {}\nfile name length is {}'.format(self.save_dir, self.f_name_len)
