@@ -347,7 +347,7 @@ class Archive:
             hash of the record.
         
         """
-        if r is None or isinstance(r, int) or isinstance(r, float) or isinstance(r, str):
+        if r is None or isinstance(r, bool) or isinstance(r, int) or isinstance(r, float) or isinstance(r, str):
             return hash(r)
         if isinstance(r, list):
             hashes = [Archive.record_hash(x) for x in r]
