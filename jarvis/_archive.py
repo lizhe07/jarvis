@@ -24,8 +24,7 @@ class Archive:
                 dictionary of records whose ID startswith the file name.
             max_try (int): maximum number of tries to read or write file via pickle.
             pause (float): pause time between each try of read or write.
-            record_hashable (bool): whether record is hashable. Lists containing only
-                integers are also considered hashable here.
+            record_hashable (bool): whether record is hashable.
         
         """
         if not os.path.exists(save_dir):
