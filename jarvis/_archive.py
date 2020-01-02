@@ -35,9 +35,8 @@ class Archive:
         assert self.f_name_len<=self.r_id_len, 'file name length should be no greater than record ID length'
         self.max_try, self.pause = max_try, pause
         self.record_hashable = record_hashable
-        if self.record_hashable and not os.path.exists(self._hash_file()):
-            with open(self._hash_file(), 'wb') as f:
-                pickle.dump({}, f)
+        if self.record_hashable:
+            self.init_hash()
     
     def __repr__(self):
         return 'Archive object saved in {}\nfile name length is {}'.format(self.save_dir, self.f_name_len)
@@ -142,12 +141,6 @@ class Archive:
         
         """
         return [os.path.join(self.save_dir, f) for f in self._r_file_names()]
-    
-    def _hash_file(self):
-        r"""Returns the path of record hash file.
-        
-        """
-        return os.path.join(self.save_dir, 'record_hash')
     
     def record_num(self):
         r"""Returns number of records.
@@ -292,9 +285,8 @@ class Archive:
         """
         if self.record_hashable:
             r_hash = Archive.record_hash(record)
-            id_dict = self._safe_read(self._hash_file())
-            if r_hash in id_dict:
-                return id_dict[r_hash]
+            if r_hash in self.hash_dict:
+                return self.hash_dict[r_hash]
             else:
                 return None
         else:
@@ -365,24 +357,23 @@ class Archive:
             hashes = [Archive.record_hash(x) for x in r.items()]
             return hash(frozenset(hashes))
     
-    def rebuild_hash(self):
-        r"""Rebuilds the record hash file.
+    def init_hash(self):
+        r"""Initializes the record hash dictionary.
         
         A new hash file is created from the existing archive records.
         
         """
         if not self.record_hashable:
             raise RuntimeError('this archive is not for hashable record')
-        id_dict = {}
+        self.hash_dict = {}
         for r_file in self._r_files():
             records = self._safe_read(r_file)
             for r_id, r in records.items():
                 r_hash = Archive.record_hash(r)
-                if r_hash in id_dict:
-                    print('hash conflict found for {} and {}'.format(r_id, id_dict[r_hash]))
-                id_dict[r_hash] = r_id
-        self._safe_write(id_dict, self._hash_file())
-        print('record hash file has been rebuilt')
+                if r_hash in self.hash_dict:
+                    print('hash conflict found, {} will replace {}'.format(r_id, self.hash_dict[r_hash]))
+                self.hash_dict[r_hash] = r_id
+        print('record hash dictionary has been initialized')
     
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
@@ -403,10 +394,8 @@ class Archive:
         records[r_id] = record
         self._safe_write(records, r_file)
         if self.record_hashable:
-            id_dict = self._safe_read(self._hash_file())
             r_hash = Archive.record_hash(record)
-            id_dict[r_hash] = r_id
-            self._safe_write(id_dict, self._hash_file())
+            self.hash_dict[r_hash] = r_id
     
     def add(self, record, check_duplicate=True):
         r"""Adds a new record.
@@ -437,15 +426,8 @@ class Archive:
         if self.has_id(r_id):
             r_file = self._r_file(r_id)
             records = self._safe_read(r_file)
-            record = records.pop(r_id)
+            records.pop(r_id)
             if records:
                 self._safe_write(records, r_file)
             else:
                 os.remove(r_file)
-            if self.record_hashable:
-                with open(self._hash_file(), 'rb') as f:
-                    id_dict = pickle.load(f)
-                r_hash = Archive.record_hash(record)
-                id_dict.pop(r_hash)
-                with open(self._hash_file(), 'wb') as f:
-                    pickle.dump(id_dict, f)
