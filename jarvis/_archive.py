@@ -371,7 +371,7 @@ class Archive:
             for r_id, r in records.items():
                 r_hash = Archive.record_hash(r)
                 if r_hash in self.hash_dict:
-                    print('hash conflict found, {} will replace {}'.format(r_id, self.hash_dict[r_hash]))
+                    print('hash conflict found, {} will overwrite {}'.format(r_id, self.hash_dict[r_hash]))
                 self.hash_dict[r_hash] = r_id
         print('record hash dictionary has been initialized')
     
