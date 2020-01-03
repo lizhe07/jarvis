@@ -372,7 +372,6 @@ class Archive:
                 if r_hash in self.hash_dict:
                     print('hash conflict found, {} will overwrite {}'.format(r_id, self.hash_dict[r_hash]))
                 self.hash_dict[r_hash] = r_id
-        print('record hash dictionary has been initialized')
     
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.

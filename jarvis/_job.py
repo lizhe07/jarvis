@@ -96,7 +96,7 @@ class Job:
                 print('{}, {}'.format(
                     progress_str(idx, total_num, True), time_str(toc-tic)
                     ))
-                tic = toc
+                tic = time.time()
     
     def process(self, work_func, process_num=0, tolerance=float('inf'), **kwargs):
         r"""Processes works in random order.
