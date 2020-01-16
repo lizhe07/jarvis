@@ -8,8 +8,7 @@ Created on Sat Nov 23 23:03:10 2019
 import os, pickle, random, time
 
 class Archive:
-    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=10, pause=0.1,
-                 record_hashable=False):
+    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=20, pause=0.5):
         r"""Data structure for storing records.
         
         An Archive object stores records in a dictionary manner, but using multiple files
@@ -24,7 +23,6 @@ class Archive:
                 dictionary of records whose ID startswith the file name.
             max_try (int): maximum number of tries to read or write file via pickle.
             pause (float): pause time between each try of read or write.
-            record_hashable (bool): whether record is hashable.
         
         """
         if not os.path.exists(save_dir):
@@ -33,9 +31,6 @@ class Archive:
         self.r_id_len, self.f_name_len = r_id_len, f_name_len
         assert self.f_name_len<=self.r_id_len, 'file name length should be no greater than record ID length'
         self.max_try, self.pause = max_try, pause
-        self.record_hashable = record_hashable
-        if self.record_hashable:
-            self.init_hash()
     
     def __repr__(self):
         return 'Archive object saved in {}\nfile name length is {}'.format(self.save_dir, self.f_name_len)
@@ -164,8 +159,6 @@ class Archive:
         r_files = self._r_files()
         for r_file in r_files:
             os.remove(r_file)
-        if self.record_hashable:
-            os.remove(self._hash_file())
         os.removedirs(self.save_dir)
     
     def update_files(self, new_f_name_len):
@@ -207,8 +200,6 @@ class Archive:
             except:
                 print('{} corrupted, will be removed'.format(r_file))
                 os.remove(r_file)
-                if self.record_hashable:
-                    raise NotImplementedError
                 count += 1
         if count==0:
             print('no corrupted files detected.')
@@ -277,19 +268,11 @@ class Archive:
     def fetch_id(self, record):
         r"""Fetches the ID of a record.
         
-        If records are hashable, record ID is looked up from hash file. Otherwise, record
-        ID is searched for by direct value comparison, and a random one is returned if
-        multiple matches exist.
+        Record ID is searched for by direct value comparison, and a random one is returned
+        if multiple matches exist.
         
         """
-        if self.record_hashable:
-            r_hash = Archive.record_hash(record)
-            if r_hash in self.hash_dict:
-                return self.hash_dict[r_hash]
-            else:
-                return None
-        else:
-            return self.fetch_matched(lambda r: r==record, 'random')
+        return self.fetch_matched(lambda r: r==record, 'random')
     
     def fetch_record(self, r_id):
         r"""Fetches the record.
@@ -307,9 +290,6 @@ class Archive:
     def find_duplicates(self):
         r"""Finds duplicate records.
         
-        This method is performed by direct comparison, whether the records are hashable or
-        not.
-        
         Returns:
             a list of duplicate records.
         
@@ -323,55 +303,6 @@ class Archive:
                 else:
                     all_records.append(r)
         return duplicates
-    
-    @staticmethod
-    def record_hash(r):
-        r"""Returns hash of a record.
-        
-        Definition of 'hashable' is different than python default. If the record is one of
-        the basic form, e.g. int, float and str, default hash is returned. If the record
-        is one container such as list, tuple, set or dict, a new container containing
-        hashes of its elements are created and converted to tuple or frozenset to get the
-        hash.
-        
-        Args:
-            r: a record in the archive.
-        
-        Returns:
-            hash of the record.
-        
-        """
-        if r is None or isinstance(r, bool) or isinstance(r, int) or isinstance(r, float) or isinstance(r, str):
-            return hash(r)
-        if isinstance(r, list):
-            hashes = [Archive.record_hash(x) for x in r]
-            return hash(('list', tuple(hashes)))
-        if isinstance(r, tuple):
-            hashes = [Archive.record_hash(x) for x in r]
-            return hash(('tuple', tuple(hashes)))
-        if isinstance(r, set):
-            hashes = [Archive.record_hash(x) for x in r]
-            return hash(frozenset(hashes))
-        if isinstance(r, dict):
-            hashes = [Archive.record_hash(x) for x in r.items()]
-            return hash(frozenset(hashes))
-    
-    def init_hash(self):
-        r"""Initializes the record hash dictionary.
-        
-        A new hash file is created from the existing archive records.
-        
-        """
-        if not self.record_hashable:
-            raise RuntimeError('this archive is not for hashable record')
-        self.hash_dict = {}
-        for r_file in self._r_files():
-            records = self._safe_read(r_file)
-            for r_id, r in records.items():
-                r_hash = Archive.record_hash(r)
-                if r_hash in self.hash_dict:
-                    print('hash conflict found, {} will overwrite {}'.format(r_id, self.hash_dict[r_hash]))
-                self.hash_dict[r_hash] = r_id
     
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
@@ -391,9 +322,6 @@ class Archive:
             records = {}
         records[r_id] = record
         self._safe_write(records, r_file)
-        if self.record_hashable:
-            r_hash = Archive.record_hash(record)
-            self.hash_dict[r_hash] = r_id
     
     def add(self, record, check_duplicate=True):
         r"""Adds a new record.
