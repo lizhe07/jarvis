@@ -6,6 +6,7 @@ Created on Sat Nov 23 23:03:10 2019
 """
 
 import os, pickle, random, time
+from .utils import flatten
 
 class Archive:
     def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=20, pause=0.5):
@@ -253,6 +254,24 @@ class Archive:
                     return random.choice(matched_ids)
             return None
     
+    def fetch_conditioned(self, cond_dict=None, mode='all'):
+        r"""Fetches records with conditioned values.
+        
+        """
+        def match_cond(flat_config, flat_cond):
+            for key in flat_cond:
+                if key not in flat_config or flat_cond[key]!=flat_config[key]:
+                    return False
+            return True
+        
+        if cond_dict is None:
+            cond_dict = {}
+        else:
+            assert isinstance(cond_dict, dict)
+        matcher = lambda r: match_cond(flatten(r), flatten(cond_dict))
+        matched_ids = self.fetch_matched(matcher, mode)
+        return matched_ids
+    
     def all_ids(self):
         r"""Returns all record IDs.
         
@@ -333,8 +352,7 @@ class Archive:
         
         Returns:
             r_id (str): record ID of the record. If `check_duplicate` is `True` and at
-                least one same record does exist, the record ID of any one duplicate is
-                returned.
+                least one same record does exist, the ID of any matching one is returned.
         
         """
         if check_duplicate:

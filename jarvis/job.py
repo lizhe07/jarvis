@@ -5,9 +5,9 @@ Created on Mon Nov 25 22:57:30 2019
 @author: Zhe
 """
 
-import itertools, random, time
+import random, time
 import numpy as np
-from .utils import progress_str, time_str, flatten, nest
+from .utils import time_str, flatten, nest
 
 def process(search_spec, configs, stats, get_config, work_func,
             custom_converter=None, c_kwargs=None,
