@@ -35,11 +35,18 @@ def process(search_spec, configs, stats, get_config, work_func,
         w_kwargs (dict): additional keyword arguments for work_func.
     
     """
-    for arg in [custom_converter, c_kwargs, w_kwargs]:
-        if arg is None:
-            arg = {}
-        else:
-            assert isinstance(arg, dict)
+    if custom_converter is None:
+        custom_converter = {}
+    else:
+        assert isinstance(custom_converter, dict)
+    if c_kwargs is None:
+        c_kwargs = {}
+    else:
+        assert isinstance(c_kwargs, dict)
+    if w_kwargs is None:
+        w_kwargs = {}
+    else:
+        assert isinstance(w_kwargs, dict)
     
     arg_keys = list(search_spec.keys())
     arg_lists = [search_spec[key] for key in arg_keys]
