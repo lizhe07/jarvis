@@ -14,5 +14,5 @@ setup(
     author='Zhe Li',
     python_requires='>=3',
     packages=find_packages(),
-    install_requires=['numpy'],
+    install_requires=['numpy', 'torch'],
 )
