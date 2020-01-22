@@ -8,22 +8,24 @@ Created on Mon Jan 20 23:31:04 2020
 from .archive import Archive
 from .utils import set_seed
 
-class Job:
-    def __init__(self, save_dir):
+class ModelTrainer:
+    def __init__(self, save_dir, get_config):
         self.save_dir = save_dir
         
         self.configs = Archive(save_dir)
         self.stats = Archive(save_dir, max_try=20)
         self.ckpts = Archive(save_dir, f_name_len=4, max_try=20, pause=1.)
-    
-    def hypersearch(self, search_spec):
-        print('sample argument strings')
-        # arg_strs = self.sample(search_spec)
         
-        print('get assignment configuration')
+        self.get_config = get_config
+    
+    # def hypersearch(self, search_spec):
+    #     print('sample argument strings')
+    #     # arg_strs = self.sample(search_spec)
+        
+    #     print('get assignment configuration')
         
     
-    def process(self, assign_config, run_config):
+    def main(self, assign_config, run_config):
         print('display assignment info')
         # self.print_info(assign_config)
         
@@ -81,4 +83,6 @@ class Job:
         #     print('elapsed time for one epoch: {}'.format(time_str(toc_epoch-tic_epoch)))
         
         print('display brief summary')
-        return a_id
+        
+        print('return ID')
+        return
