@@ -5,38 +5,35 @@ Created on Mon Jan 20 23:31:04 2020
 @author: Zhe
 """
 
+import os
+
 from .archive import Archive
 from .utils import set_seed
 
 class ModelTrainer:
-    def __init__(self, save_dir, get_config):
+    def __init__(self, save_dir, get_config, print_info):
         self.save_dir = save_dir
         
-        self.configs = Archive(save_dir)
-        self.stats = Archive(save_dir, max_try=20)
-        self.ckpts = Archive(save_dir, f_name_len=4, max_try=20, pause=1.)
+        self.configs = Archive(os.path.join(save_dir, 'configs'))
+        self.stats = Archive(os.path.join(save_dir, 'stats'), max_try=20)
+        self.ckpts = Archive(os.path.join(save_dir, 'ckpts'), f_name_len=4, max_try=20, pause=1.)
         
         self.get_config = get_config
+        self.print_info = print_info
     
-    # def hypersearch(self, search_spec):
-    #     print('sample argument strings')
-    #     # arg_strs = self.sample(search_spec)
-        
-    #     print('get assignment configuration')
-        
+    def is_completed(self, a_id):
+        return self.stats.has_id(a_id) and self.stats.fetch_record(a_id)['completed'] and self.ckpts.has_id(a_id)
     
-    def main(self, assign_config, run_config):
-        print('display assignment info')
-        # self.print_info(assign_config)
+    def process(self, asgmt_config, run_config):
+        self.print_info(asgmt_config)
         
-        print('get assignment id and check existing')
-        # a_id = self.configs.add(assign_config)
-        # if self.stats.has_id(a_id) and self.stats.fetch_record(a_id)['completed'] and self.ckpts.has_id(a_id):
-        #     if 'ignore_existing' in run_config and run_config['ignore_existing']:
-        #         print('a completed assignment ({}) exists, will be replaced')
-        #     else:
-        #         print('a completed assignment ({}) exists, will skip')
-        #         return
+        a_id = self.configs.add(asgmt_config)
+        if self.is_completed(a_id):
+            if 'ignore_existing' in run_config and run_config['ignore_existing']:
+                print('a completed assignment ({}) exists, will be replaced')
+            else:
+                print('a completed assignment ({}) exists, will skip')
+                return
         
         print('prepare certain data')
         # self.preprocess(assign_config, run_config)
