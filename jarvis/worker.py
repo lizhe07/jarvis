@@ -11,7 +11,7 @@ from .archive import Archive
 from .utils import set_seed
 
 class ModelTrainer:
-    def __init__(self, save_dir, get_config, print_info, preprocess):
+    def __init__(self, save_dir, get_config, print_info, preprocess, prepare_datasets):
         self.save_dir = save_dir
         
         self.configs = Archive(os.path.join(save_dir, 'configs'))
@@ -21,6 +21,7 @@ class ModelTrainer:
         self.get_config = get_config
         self.print_info = print_info
         self.preprocess = preprocess
+        self.prepare_datasets = prepare_datasets
     
     @staticmethod
     def is_valid(asgmt_config):
@@ -53,7 +54,7 @@ class ModelTrainer:
         set_seed(asgmt_config['train_config']['seed'])
         tic = time.time()
         
-        print('prepare datasets')
+        self.prepare_datasets(asgmt_config, run_config)
         
         print('prepare models')
         
