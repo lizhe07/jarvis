@@ -20,6 +20,17 @@ class ModelTrainer:
         
         self.get_config = get_config
         self.print_info = print_info
+        self.preprocess = preprocess
+    
+    @staticmethod
+    def is_valid(asgmt_config):
+        if not isinstance(asgmt_config, dict):
+            return False
+        if 'train_config' not in asgmt_config:
+            return False
+        if 'seed' not in asgmt_config['train_config']:
+            return False
+        return True
     
     def is_completed(self, a_id):
         return self.stats.has_id(a_id) and self.stats.fetch_record(a_id)['completed'] and self.ckpts.has_id(a_id)
