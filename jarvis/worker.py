@@ -5,13 +5,13 @@ Created on Mon Jan 20 23:31:04 2020
 @author: Zhe
 """
 
-import os
+import os, time
 
 from .archive import Archive
 from .utils import set_seed
 
 class ModelTrainer:
-    def __init__(self, save_dir, get_config, print_info):
+    def __init__(self, save_dir, get_config, print_info, preprocess):
         self.save_dir = save_dir
         
         self.configs = Archive(os.path.join(save_dir, 'configs'))
@@ -46,12 +46,12 @@ class ModelTrainer:
                 print('a completed assignment ({}) exists, will skip')
                 return
         
-        print('prepare certain data')
-        # self.preprocess(assign_config, run_config)
+        if self.preprocess is not None:
+            self.preprocess(asgmt_config, run_config)
         
         print('set seed and start processing')
-        # set_seed(assign_config['train_config']['seed'])
-        # tic = time.time()
+        set_seed(asgmt_config['train_config']['seed'])
+        tic = time.time()
         
         print('prepare datasets')
         
