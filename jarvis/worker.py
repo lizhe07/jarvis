@@ -11,7 +11,8 @@ from .archive import Archive
 from .utils import set_seed
 
 class ModelTrainer:
-    def __init__(self, save_dir, get_config, print_info, preprocess, prepare_datasets):
+    def __init__(self, save_dir, get_config, print_info, preprocess,
+                 prepare_datasets, prepare_model):
         self.save_dir = save_dir
         
         self.configs = Archive(os.path.join(save_dir, 'configs'))
@@ -22,12 +23,15 @@ class ModelTrainer:
         self.print_info = print_info
         self.preprocess = preprocess
         self.prepare_datasets = prepare_datasets
+        self.prepare_model = prepare_model
     
     @staticmethod
     def is_valid(asgmt_config):
         if not isinstance(asgmt_config, dict):
             return False
         if 'train_config' not in asgmt_config:
+            return False
+        if 'model_config' not in asgmt_config:
             return False
         if 'seed' not in asgmt_config['train_config']:
             return False
@@ -37,6 +41,9 @@ class ModelTrainer:
         return self.stats.has_id(a_id) and self.stats.fetch_record(a_id)['completed'] and self.ckpts.has_id(a_id)
     
     def process(self, asgmt_config, run_config):
+        if not self.is_valid(asgmt_config):
+            raise RuntimeError('assignment configuration is invalid')
+        
         self.print_info(asgmt_config)
         
         a_id = self.configs.add(asgmt_config)
@@ -56,7 +63,7 @@ class ModelTrainer:
         
         self.prepare_datasets(asgmt_config, run_config)
         
-        print('prepare models')
+        model = self.prepare_model(asgmt_config['model_config'])
         
         print('define criterion')
         
