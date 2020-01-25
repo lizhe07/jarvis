@@ -34,6 +34,15 @@ def progress_str(i, total, show_percent=False):
         disp_str += ', ({:5.1f}%)'.format(100.*i/total)
     return disp_str
 
+def get_seed(seed=None, max_seed=1000):
+    r"""Returns a random seed.
+    
+    """
+    if seed is None:
+        return random.randrange(max_seed)
+    else:
+        return seed%max_seed
+
 def set_seed(seed):
     r"""Sets random seed for random, numpy and torch.
     

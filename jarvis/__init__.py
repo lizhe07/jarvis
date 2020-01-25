@@ -8,4 +8,3 @@ Created on Wed Aug 28 09:16:03 2019
 __version__ = '0.0.11'
 
 from .archive import Archive
-from .worker import ModelTrainer
