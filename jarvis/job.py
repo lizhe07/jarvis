@@ -11,22 +11,24 @@ from .utils import time_str, flatten, nest
 from .archive import Archive
 
 class BaseJob:
-    def __init__(self, save_dir):
+    def __init__(self, save_dir, search_spec=None):
         self.save_dir = save_dir
         self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60)
         self.stats = Archive(os.path.join(self.save_dir, 'stats'))
         self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), f_name_len=4, pause=4)
         self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1)
+        
+        self.search_spec = search_spec
     
-    def is_completed(self, r_id):
-        return self.stats.has_id(r_id) and self.stats.fetch_record(r_id)['completed'] and self.outputs.has_id(r_id)
+    def is_completed(self, w_id):
+        return self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed'] and self.outputs.has_id(w_id)
     
-    def process(self, work_config, policy='overwrite'):
+    def process_single(self, work_config, policy='overwrite'):
         assert policy in ['overwrite', 'preserve', 'verify']
         
-        r_id = self.configs.add(work_config)
-        if self.is_completed(r_id):
-            info_str = '{} already exists, outputs and previews will be '.format(r_id)
+        w_id = self.configs.add(work_config)
+        if self.is_completed(w_id):
+            info_str = '{} already exists, outputs and previews will be '.format(w_id)
             if policy=='overwrite':
                 print(info_str+'overwritten')
             if policy=='preserve':
@@ -35,9 +37,9 @@ class BaseJob:
             if policy=='verify':
                 print(info_str+'verified')
         
-        print('\n{} starts'.format(r_id))
+        print('\n{} starts'.format(w_id))
         tic = time.time()
-        self.stats.assign(r_id, {
+        self.stats.assign(w_id, {
             'tic': tic, 'toc': None,
             'completed': False,
             })
@@ -45,17 +47,64 @@ class BaseJob:
         output, preview = self.main(work_config)
         toc = time.time()
         
-        if policy=='overwrite':
-            self.stats.assign(r_id, {
+        if policy=='verify':
+            raise NotImplementedError('method to verify output and preview is not implemented')
+        else:
+            self.stats.assign(w_id, {
                 'tic': tic, 'toc': toc,
                 'completed': True,
                 })
-            self.outputs.assign(r_id, output)
-            self.previews.assign(r_id, preview)
-        else:
-            raise NotImplementedError('method to verify output and preview is not implemented')
+            self.outputs.assign(w_id, output)
+            self.previews.assign(w_id, preview)
     
-    def main(self):
+    def converter(self, key, val):
+        if isinstance(val, bool):
+            if val:
+                return ['--'+key]
+        elif isinstance(val, list):
+            if val:
+                return ['--'+key]+[str(v) for v in val]
+        elif val is not None:
+            return ['--'+key, str(val)]
+    
+    def process_multi(self, process_num=0, tolerance=float('inf')):
+        arg_keys = list(self.search_spec.keys())
+        val_lists = [self.search_spec[key] for key in arg_keys]
+        space_dim = [len(v) for v in val_lists]
+        total_num = np.prod(space_dim)
+        
+        def idx2args(idx):
+            sub_idxs = np.unravel_index(idx, space_dim)
+            arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
+            return arg_vals
+        def to_run(work_config):
+            w_id = self.configs.add(work_config)
+            if not self.stats.has_id(w_id):
+                return True
+            stat = self.stats.fetch_record(w_id)
+            if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
+                return True
+            else:
+                return False
+        
+        count = 0
+        for idx in random.sample(range(total_num), total_num):
+            arg_vals = idx2args(idx)
+            arg_strs = []
+            for arg_key, arg_val in zip(arg_keys, arg_vals):
+                arg_strs += self.converter(arg_key, arg_val)
+            work_config = self.get_work_config(arg_strs)
+            if to_run(work_config):
+                self.process_single(work_config, 'preserve')
+                count += 1
+            
+            if process_num>0 and count==process_num:
+                break
+    
+    def get_work_config(self, arg_strs):
+        raise NotImplementedError
+    
+    def main(self, work_config):
         raise NotImplementedError
 
 def process(search_spec, configs, stats, get_config, work_func,
