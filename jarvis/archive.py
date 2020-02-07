@@ -9,7 +9,7 @@ import os, pickle, random, time
 from .utils import flatten
 
 class Archive:
-    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=20, pause=0.5):
+    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=30, pause=0.5):
         r"""Data structure for storing records.
         
         An Archive object stores records in a dictionary manner, but using multiple files

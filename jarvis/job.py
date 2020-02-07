@@ -5,9 +5,58 @@ Created on Mon Nov 25 22:57:30 2019
 @author: Zhe
 """
 
-import random, time
+import os, random, time
 import numpy as np
 from .utils import time_str, flatten, nest
+from .archive import Archive
+
+class BaseJob:
+    def __init__(self, save_dir):
+        self.save_dir = save_dir
+        self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60)
+        self.stats = Archive(os.path.join(self.save_dir, 'stats'))
+        self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), f_name_len=4, pause=4)
+        self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1)
+    
+    def is_completed(self, r_id):
+        return self.stats.has_id(r_id) and self.stats.fetch_record(r_id)['completed'] and self.outputs.has_id(r_id)
+    
+    def process(self, work_config, policy='overwrite'):
+        assert policy in ['overwrite', 'preserve', 'verify']
+        
+        r_id = self.configs.add(work_config)
+        if self.is_completed(r_id):
+            info_str = '{} already exists, outputs and previews will be '.format(r_id)
+            if policy=='overwrite':
+                print(info_str+'overwritten')
+            if policy=='preserve':
+                print(info_str+'preserved')
+                return
+            if policy=='verify':
+                print(info_str+'verified')
+        
+        print('\n{} starts'.format(r_id))
+        tic = time.time()
+        self.stats.assign(r_id, {
+            'tic': tic, 'toc': None,
+            'completed': False,
+            })
+        
+        output, preview = self.main(work_config)
+        toc = time.time()
+        
+        if policy=='overwrite':
+            self.stats.assign(r_id, {
+                'tic': tic, 'toc': toc,
+                'completed': True,
+                })
+            self.outputs.assign(r_id, output)
+            self.previews.assign(r_id, preview)
+        else:
+            raise NotImplementedError('method to verify output and preview is not implemented')
+    
+    def main(self):
+        raise NotImplementedError
 
 def process(search_spec, configs, stats, get_config, work_func,
             custom_converter=None, c_kwargs=None,
