@@ -33,7 +33,7 @@ class BaseJob:
                 print(info_str+'overwritten')
             if policy=='preserve':
                 print(info_str+'preserved')
-                return
+                return w_id
             if policy=='verify':
                 print(info_str+'verified')
         
