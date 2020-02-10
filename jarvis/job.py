@@ -23,7 +23,7 @@ class BaseJob:
     def is_completed(self, w_id):
         return self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed'] and self.outputs.has_id(w_id)
     
-    def process_single(self, work_config, policy='overwrite'):
+    def process(self, work_config, policy='overwrite'):
         assert policy in ['overwrite', 'preserve', 'verify']
         
         w_id = self.configs.add(work_config)
@@ -56,6 +56,7 @@ class BaseJob:
                 })
             self.outputs.assign(w_id, output)
             self.previews.assign(w_id, preview)
+        return w_id
     
     def converter(self, key, val):
         if isinstance(val, bool):
@@ -67,7 +68,7 @@ class BaseJob:
         elif val is not None:
             return ['--'+key, str(val)]
     
-    def process_multi(self, process_num=0, tolerance=float('inf')):
+    def random_search(self, process_num=0, tolerance=float('inf')):
         arg_keys = list(self.search_spec.keys())
         val_lists = [self.search_spec[key] for key in arg_keys]
         space_dim = [len(v) for v in val_lists]
@@ -95,7 +96,7 @@ class BaseJob:
                 arg_strs += self.converter(arg_key, arg_val)
             work_config = self.get_work_config(arg_strs)
             if to_run(work_config):
-                self.process_single(work_config, 'preserve')
+                self.process(work_config, 'preserve')
                 count += 1
             
             if process_num>0 and count==process_num:
