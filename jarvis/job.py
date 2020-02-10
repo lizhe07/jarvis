@@ -67,6 +67,7 @@ class BaseJob:
                 return ['--'+key]+[str(v) for v in val]
         elif val is not None:
             return ['--'+key, str(val)]
+        return []
     
     def random_search(self, process_num=0, tolerance=float('inf')):
         arg_keys = list(self.search_spec.keys())
