@@ -7,7 +7,7 @@ Created on Mon Nov 25 22:57:30 2019
 
 import os, random, time
 import numpy as np
-from .utils import time_str, flatten, nest
+from .utils import time_str, progress_str, flatten, nest
 from .archive import Archive
 
 class BaseJob:
@@ -87,6 +87,34 @@ class BaseJob:
                 arg_strs += self.converter(arg_key, arg_val)
             work_config = self.get_work_config(arg_strs)
             yield work_config
+    
+    def gather_configs(self):
+        search_configs = [c for c in self.config_generator()]
+        
+        unique_configs = []
+        for config in search_configs:
+            if config not in unique_configs:
+                unique_configs.append(config)
+        
+        completed_configs = []
+        for w_id in self.stats.all_ids():
+            if self.is_completed(w_id):
+                config = self.configs.fetch_record(w_id)
+                if config in unique_configs:
+                    completed_configs.append(config)
+        return unique_configs, completed_configs
+    
+    def overview(self):
+        unique_configs, completed_configs = self.gather_configs()
+        time_costs = []
+        for config in completed_configs:
+            w_id = self.configs.fetch_id(config)
+            stat = self.stats.fetch_record(w_id)
+            time_costs.append(stat['toc']-stat['tic'])
+        print('{} work completed, average processing time {}'.format(
+            progress_str(len(completed_configs), len(unique_configs)),
+            time_str(np.mean(time_costs))
+            ))
     
     def random_search(self, process_num=0, tolerance=float('inf')):
         def to_run(work_config):
