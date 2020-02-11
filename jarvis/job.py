@@ -69,7 +69,7 @@ class BaseJob:
             return ['--'+key, str(val)]
         return []
     
-    def random_search(self, process_num=0, tolerance=float('inf')):
+    def config_generator(self):
         arg_keys = list(self.search_spec.keys())
         val_lists = [self.search_spec[key] for key in arg_keys]
         space_dim = [len(v) for v in val_lists]
@@ -79,6 +79,16 @@ class BaseJob:
             sub_idxs = np.unravel_index(idx, space_dim)
             arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
             return arg_vals
+        
+        for idx in random.sample(range(total_num), total_num):
+            arg_vals = idx2args(idx)
+            arg_strs = []
+            for arg_key, arg_val in zip(arg_keys, arg_vals):
+                arg_strs += self.converter(arg_key, arg_val)
+            work_config = self.get_work_config(arg_strs)
+            yield work_config
+    
+    def random_search(self, process_num=0, tolerance=float('inf')):
         def to_run(work_config):
             w_id = self.configs.add(work_config)
             if not self.stats.has_id(w_id):
@@ -90,12 +100,7 @@ class BaseJob:
                 return False
         
         count = 0
-        for idx in random.sample(range(total_num), total_num):
-            arg_vals = idx2args(idx)
-            arg_strs = []
-            for arg_key, arg_val in zip(arg_keys, arg_vals):
-                arg_strs += self.converter(arg_key, arg_val)
-            work_config = self.get_work_config(arg_strs)
+        for work_config in self.config_generator():
             if to_run(work_config):
                 self.process(work_config, 'preserve')
                 count += 1
