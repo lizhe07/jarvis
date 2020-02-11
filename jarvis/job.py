@@ -106,7 +106,7 @@ class BaseJob:
             w_id = self.configs.fetch_id(config)
             stat = self.stats.fetch_record(w_id)
             time_costs.append(stat['toc']-stat['tic'])
-        print('{} work completed'.format(
+        print('{} works completed'.format(
             progress_str(len(completed_configs), len(unique_configs))
             ))
         if time_costs:

@@ -293,7 +293,10 @@ class Archive:
         if multiple matches exist.
         
         """
-        return self.fetch_matched(lambda r: r==record, 'random')
+        if self.record_hashable:
+            return self.fetch_matched(lambda r: r==self._make_hashable(record), 'random')
+        else:
+            return self.fetch_matched(lambda r: r==record, 'random')
     
     def fetch_record(self, r_id):
         r"""Fetches the record.
@@ -325,6 +328,23 @@ class Archive:
                     all_records.append(r)
         return duplicates
     
+    @staticmethod
+    def _make_hashable(record):
+        r"""Converts record to hashable type.
+        
+        """
+        if isinstance(record, list):
+            return HashableList(record)
+        elif isinstance(record, dict):
+            return HashableDict(**record)
+        else:
+            try:
+                hash(record)
+            except:
+                raise TypeError('record is not hashable')
+            else:
+                return record
+    
     def assign(self, r_id, record):
         r"""Assigns a record to an ID.
         
@@ -342,17 +362,7 @@ class Archive:
         else:
             records = {}
         if self.record_hashable:
-            if isinstance(record, list):
-                records[r_id] = HashableList(record)
-            elif isinstance(record, dict):
-                records[r_id] = HashableDict(**record)
-            else:
-                records[r_id] = record
-            
-            try:
-                hash(records[r_id])
-            except:
-                raise TypeError('record is not hashable')
+            records[r_id] = self._make_hashable(record)
         else:
             records[r_id] = record
         self._safe_write(records, r_file)
