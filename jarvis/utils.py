@@ -98,3 +98,39 @@ def nest(flat_dict):
                            if key_full.startswith(key))
             nested_dict[key] = nest(subdict)
     return nested_dict
+
+class HashableList(list):
+    def __init__(self, vals):
+        converted = []
+        for val in vals:
+            if isinstance(val, list):
+                converted.append(HashableList(val))
+            elif isinstance(val, dict):
+                converted.append(HashableDict(**val))
+            else:
+                converted.append(val)
+        super(HashableList, self).__init__(converted)
+    
+    def __hash__(self):
+        return hash(tuple(self))
+    
+    def __eq__(self, other):
+        return self.__hash__()==other.__hash__()
+
+class HashableDict(dict):
+    def __init__(self, **kwargs):
+        converted = {}
+        for key, val in kwargs.items():
+            if isinstance(val, list):
+                converted[key] = HashableList(val)
+            elif isinstance(val, dict):
+                converted[key] = HashableDict(**val)
+            else:
+                converted[key] = val
+        super(HashableDict, self).__init__(**converted)
+    
+    def __hash__(self):
+        return hash(frozenset(self.items()))
+    
+    def __eq__(self, other):
+        return self.__hash__()==other.__hash__()
