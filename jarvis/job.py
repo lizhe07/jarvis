@@ -106,10 +106,11 @@ class BaseJob:
             w_id = self.configs.fetch_id(config)
             stat = self.stats.fetch_record(w_id)
             time_costs.append(stat['toc']-stat['tic'])
-        print('{} work completed, average processing time {}'.format(
-            progress_str(len(completed_configs), len(unique_configs)),
-            time_str(np.mean(time_costs))
+        print('{} work completed'.format(
+            progress_str(len(completed_configs), len(unique_configs))
             ))
+        if time_costs:
+            print('average processing time {}'.format(time_str(np.mean(time_costs))))
     
     def random_search(self, process_num=0, tolerance=float('inf')):
         def to_run(work_config):
