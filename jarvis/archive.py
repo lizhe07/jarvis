@@ -6,10 +6,11 @@ Created on Sat Nov 23 23:03:10 2019
 """
 
 import os, pickle, random, time
-from .utils import flatten
+from .utils import flatten, HashableList, HashableDict
 
 class Archive:
-    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=30, pause=0.5):
+    def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=30, pause=0.5,
+                 record_hashable=False):
         r"""Data structure for storing records.
         
         An Archive object stores records in a dictionary manner, but using multiple files
@@ -32,6 +33,7 @@ class Archive:
         self.r_id_len, self.f_name_len = r_id_len, f_name_len
         assert self.f_name_len<=self.r_id_len, 'file name length should be no greater than record ID length'
         self.max_try, self.pause = max_try, pause
+        self.record_hashable = record_hashable
     
     def __repr__(self):
         return 'Archive object saved in {}\nfile name length is {}'.format(self.save_dir, self.f_name_len)
@@ -339,7 +341,20 @@ class Archive:
             records = self._safe_read(r_file)
         else:
             records = {}
-        records[r_id] = record
+        if self.record_hashable:
+            if isinstance(record, list):
+                records[r_id] = HashableList(record)
+            elif isinstance(record, dict):
+                records[r_id] = HashableDict(**record)
+            else:
+                records[r_id] = record
+            
+            try:
+                hash(records[r_id])
+            except:
+                raise TypeError('record is not hashable')
+        else:
+            records[r_id] = record
         self._safe_write(records, r_file)
     
     def add(self, record, check_duplicate=True):

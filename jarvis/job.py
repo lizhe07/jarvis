@@ -7,13 +7,13 @@ Created on Mon Nov 25 22:57:30 2019
 
 import os, random, time
 import numpy as np
-from .utils import time_str, progress_str, flatten, nest
+from .utils import time_str, progress_str, flatten, nest, HashableDict
 from .archive import Archive
 
 class BaseJob:
     def __init__(self, save_dir, search_spec=None):
         self.save_dir = save_dir
-        self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60)
+        self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60, record_hashable=True)
         self.stats = Archive(os.path.join(self.save_dir, 'stats'))
         self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), f_name_len=4, pause=4)
         self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1)
@@ -86,22 +86,17 @@ class BaseJob:
             for arg_key, arg_val in zip(arg_keys, arg_vals):
                 arg_strs += self.converter(arg_key, arg_val)
             work_config = self.get_work_config(arg_strs)
-            yield work_config
+            yield HashableDict(**work_config)
     
-    def gather_configs(self):
-        search_configs = [c for c in self.config_generator()]
+    def gather_configs(self):        
+        unique_configs = set([c for c in self.config_generator()])
         
-        unique_configs = []
-        for config in search_configs:
-            if config not in unique_configs:
-                unique_configs.append(config)
-        
-        completed_configs = []
+        completed_configs = set()
         for w_id in self.stats.all_ids():
             if self.is_completed(w_id):
                 config = self.configs.fetch_record(w_id)
                 if config in unique_configs:
-                    completed_configs.append(config)
+                    completed_configs.add(config)
         return unique_configs, completed_configs
     
     def overview(self):
