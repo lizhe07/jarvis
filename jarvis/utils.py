@@ -116,6 +116,15 @@ class HashableList(list):
     
     def __eq__(self, other):
         return self.__hash__()==other.__hash__()
+    
+    def native(self):
+        converted = []
+        for val in self:
+            if isinstance(val, HashableList) or isinstance(val, HashableDict):
+                converted.append(val.native())
+            else:
+                converted.append(val)
+        return converted
 
 class HashableDict(dict):
     def __init__(self, **kwargs):
@@ -134,3 +143,12 @@ class HashableDict(dict):
     
     def __eq__(self, other):
         return self.__hash__()==other.__hash__()
+    
+    def native(self):
+        converted = {}
+        for key, val in self.items():
+            if isinstance(val, HashableList) or isinstance(val, HashableDict):
+                converted[key] = val.native()
+            else:
+                converted[key] = val
+        return converted
