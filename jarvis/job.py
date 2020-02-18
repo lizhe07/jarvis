@@ -91,12 +91,12 @@ class BaseJob:
     def gather_configs(self):        
         unique_configs = set([c for c in self.config_generator()])
         
-        completed_configs = set()
+        completed_configs = []
         for w_id in self.stats.all_ids():
             if self.is_completed(w_id):
                 config = self.configs.fetch_record(w_id)
                 if config in unique_configs:
-                    completed_configs.add(config)
+                    completed_configs.append(config)
         return unique_configs, completed_configs
     
     def overview(self):

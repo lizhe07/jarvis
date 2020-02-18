@@ -99,6 +99,45 @@ def nest(flat_dict):
             nested_dict[key] = nest(subdict)
     return nested_dict
 
+def match_cond(config, cond):
+    r"""Checks if a configuration matched condition.
+    
+    """
+    flat_config, flat_cond = flatten(config), flatten(cond)
+    for key in flat_cond:
+        if key not in flat_config or flat_cond[key]!=flat_config[key]:
+            return False
+    return True
+
+def grouping(configs, nuisance=None):
+    if nuisance is None:
+        nuisance = set()
+    
+    flat_configs = [flatten(c) for c in configs]
+    flat_keys = None
+    for c in flat_configs:
+        if flat_keys is None:
+            flat_keys = c.keys()
+        else:
+            assert flat_keys==c.keys()
+    assert nuisance.issubset(flat_keys)
+    
+    for key in flat_keys:
+        if key.endswith('seed'):
+            nuisance.add(key)
+    val_nums = {}
+    for key in flat_keys:
+        if key not in nuisance:
+            vals = set() # values may be lists (unhashable), use list instead of set here
+            for c in flat_configs:
+                vals.add(c[key])
+            val_nums[key] = len(vals)
+    varying_keys = [key for key in val_nums if val_nums[key]>1]
+    varying_configs = list(set([HashableDict(**nest(dict((key, flat_config[key]) for key in varying_keys)))\
+                                for flat_config in flat_configs]))
+    groups = [[c for c in configs if match_cond(c, v)] for v in varying_configs]
+    return groups
+
 class HashableList(list):
     def __init__(self, vals):
         converted = []

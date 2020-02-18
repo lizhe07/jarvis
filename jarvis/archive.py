@@ -6,7 +6,7 @@ Created on Sat Nov 23 23:03:10 2019
 """
 
 import os, pickle, random, time
-from .utils import flatten, HashableList, HashableDict
+from .utils import match_cond, HashableList, HashableDict
 
 class Archive:
     def __init__(self, save_dir, r_id_len=8, f_name_len=2, max_try=30, pause=0.5,
@@ -256,21 +256,15 @@ class Archive:
                     return random.choice(matched_ids)
             return None
     
-    def fetch_conditioned(self, cond_dict=None, mode='all'):
+    def fetch_conditioned(self, cond=None, mode='all'):
         r"""Fetches records with conditioned values.
         
         """
-        def match_cond(flat_config, flat_cond):
-            for key in flat_cond:
-                if key not in flat_config or flat_cond[key]!=flat_config[key]:
-                    return False
-            return True
-        
-        if cond_dict is None:
-            cond_dict = {}
+        if cond is None:
+            cond = {}
         else:
-            assert isinstance(cond_dict, dict)
-        matcher = lambda r: match_cond(flatten(r), flatten(cond_dict))
+            assert isinstance(cond, dict)
+        matcher = lambda r: match_cond(r, cond)
         matched_ids = self.fetch_matched(matcher, mode)
         return matched_ids
     
