@@ -107,6 +107,7 @@ class BaseJob:
             ))
         if time_costs:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
+        return completed_configs
     
     def random_search(self, process_num=0, tolerance=float('inf')):
         def to_run(work_config):
