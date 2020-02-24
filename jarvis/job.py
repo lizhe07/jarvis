@@ -21,7 +21,7 @@ class BaseJob:
         self.search_spec = search_spec
     
     def is_completed(self, w_id):
-        return self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed'] and self.outputs.has_id(w_id)
+        return self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed'] and self.previews.has_id(w_id)
     
     def process(self, work_config, policy='overwrite'):
         assert policy in ['overwrite', 'preserve', 'verify']
@@ -88,26 +88,22 @@ class BaseJob:
             work_config = self.get_work_config(arg_strs)
             yield HashableDict(**work_config)
     
-    def gather_configs(self):        
-        unique_configs = set([c for c in self.config_generator()])
-        
-        completed_configs = []
-        for w_id in self.stats.all_ids():
-            if self.is_completed(w_id):
-                config = self.configs.fetch_record(w_id)
-                if config in unique_configs:
-                    completed_configs.append(config)
-        return unique_configs, completed_configs
+    def completed_ids(self):
+        c_ids = [w_id for w_id in self.stats.fetch_matched(lambda r: r['completed']) \
+                 if self.previews.has_id(w_id)]
+        return c_ids
     
     def overview(self):
-        unique_configs, completed_configs = self.gather_configs()
-        time_costs = []
-        for config in completed_configs:
-            w_id = self.configs.fetch_id(config)
-            stat = self.stats.fetch_record(w_id)
-            time_costs.append(stat['toc']-stat['tic'])
+        all_configs = set([c for c in self.config_generator()])
+        completed_configs, time_costs = [], []
+        for w_id in self.completed_ids():
+            config = self.configs.fetch_record(w_id)
+            if config in all_configs:
+                completed_configs.append(config)
+                stat = self.stats.fetch_record(w_id)
+                time_costs.append(stat['toc']-stat['tic'])
         print('{} works completed'.format(
-            progress_str(len(completed_configs), len(unique_configs))
+            progress_str(len(completed_configs), len(all_configs))
             ))
         if time_costs:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
