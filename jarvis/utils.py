@@ -135,7 +135,7 @@ def grouping(configs, nuisance=None):
     varying_keys = [key for key in val_nums if val_nums[key]>1]
     varying_configs = list(set([HashableDict(**nest(dict((key, flat_config[key]) for key in varying_keys)))\
                                 for flat_config in flat_configs]))
-    groups = [[c for c in configs if match_cond(c, v)] for v in varying_configs]
+    groups = dict((v, [c for c in configs if match_cond(c, v)]) for v in varying_configs)
     return groups
 
 class HashableList(list):
