@@ -11,17 +11,20 @@ from .utils import time_str, progress_str, flatten, nest, HashableDict
 from .archive import Archive
 
 class BaseJob:
-    def __init__(self, save_dir, search_spec=None):
+    def __init__(self, save_dir):
         self.save_dir = save_dir
         self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60, record_hashable=True)
         self.stats = Archive(os.path.join(self.save_dir, 'stats'))
         self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), f_name_len=4, pause=4)
         self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1)
-        
-        self.search_spec = search_spec
     
     def is_completed(self, w_id):
         return self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed'] and self.previews.has_id(w_id)
+    
+    def completed_ids(self):
+        c_ids = [w_id for w_id in self.stats.fetch_matched(lambda r: r['completed']) \
+                 if self.previews.has_id(w_id)]
+        return c_ids
     
     def process(self, work_config, policy='overwrite'):
         assert policy in ['overwrite', 'preserve', 'verify']
@@ -69,9 +72,9 @@ class BaseJob:
             return ['--'+key, str(val)]
         return []
     
-    def config_generator(self):
-        arg_keys = list(self.search_spec.keys())
-        val_lists = [self.search_spec[key] for key in arg_keys]
+    def conjunction_configs(self, search_spec):
+        arg_keys = list(search_spec.keys())
+        val_lists = [search_spec[key] for key in arg_keys]
         space_dim = [len(v) for v in val_lists]
         total_num = np.prod(space_dim)
         
@@ -88,17 +91,13 @@ class BaseJob:
             work_config = self.get_work_config(arg_strs)
             yield HashableDict(**work_config)
     
-    def completed_ids(self):
-        c_ids = [w_id for w_id in self.stats.fetch_matched(lambda r: r['completed']) \
-                 if self.previews.has_id(w_id)]
-        return c_ids
-    
-    def overview(self):
-        all_configs = set([c for c in self.config_generator()])
+    def overview(self, search_spec=None):
+        if search_spec is not None:
+            all_configs = set([c for c in self.conjunction_configs(search_spec)])
         completed_configs, time_costs = [], []
         for w_id in self.completed_ids():
             config = self.configs.fetch_record(w_id)
-            if config in all_configs:
+            if search_spec is None or (search_spec is not None and config in all_configs):
                 completed_configs.append(config)
                 stat = self.stats.fetch_record(w_id)
                 time_costs.append(stat['toc']-stat['tic'])
@@ -109,7 +108,7 @@ class BaseJob:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
         return completed_configs
     
-    def random_search(self, process_num=0, tolerance=float('inf')):
+    def random_search(self, search_spec, process_num=0, tolerance=float('inf')):
         def to_run(work_config):
             w_id = self.configs.add(work_config)
             if not self.stats.has_id(w_id):
@@ -121,7 +120,7 @@ class BaseJob:
                 return False
         
         count = 0
-        for work_config in self.config_generator():
+        for work_config in self.conjunction_configs(search_spec):
             if to_run(work_config):
                 self.process(work_config, 'preserve')
                 count += 1
