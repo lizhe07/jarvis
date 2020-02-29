@@ -110,6 +110,21 @@ def match_cond(config, cond):
     return True
 
 def grouping(configs, nuisance=None):
+    r"""Organizes configs into groups.
+    
+    Configuration dictionaries are flatten and grouped based on the values that is not
+    constant. Nuisance keys such as random seeds will be ignored.
+    
+    Args:
+        configs (list): list of dictionaries with same structure.
+        nuisance (set): set of keys of flat configs.
+    
+    Returns:
+        groups (dict): a dictionary with hashable dictionaries as keys, each corresponding
+            to the varying part of `configs`. Each value is a list of the corresponding
+            subset of `configs`.
+    
+    """
     if nuisance is None:
         nuisance = set()
     
@@ -157,6 +172,9 @@ class HashableList(list):
         return self.__hash__()==other.__hash__()
     
     def native(self):
+        r"""Returns the native version of the list.
+        
+        """
         converted = []
         for val in self:
             if isinstance(val, HashableList) or isinstance(val, HashableDict):
@@ -184,6 +202,9 @@ class HashableDict(dict):
         return self.__hash__()==other.__hash__()
     
     def native(self):
+        r"""Returns the native version of the dictionary.
+        
+        """
         converted = {}
         for key, val in self.items():
             if isinstance(val, HashableList) or isinstance(val, HashableDict):
