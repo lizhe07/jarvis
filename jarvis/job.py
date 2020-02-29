@@ -160,6 +160,7 @@ class BaseJob:
                 stat = self.stats.fetch_record(w_id)
                 time_costs.append(stat['toc']-stat['tic'])
         print('{} works completed'.format(
+            len(completed_configs) if search_spec is None else \
             progress_str(len(completed_configs), len(all_configs))
             ))
         if time_costs:
