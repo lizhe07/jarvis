@@ -68,10 +68,7 @@ def flatten(nested_dict):
     flat_dict = {}
     for key, val in nested_dict.items():
         if isinstance(val, dict) and val and isinstance(next(iter(val)), str):
-            flat_dict.update(dict((
-                    key+'::'+subkey,
-                    flatten(subval) if isinstance(subval, dict) else subval
-                    ) for subkey, subval in val.items()))
+            flat_dict.update(dict((key+'::'+subkey, subval) for subkey, subval in flatten(val).items()))
         else:
             flat_dict[key] = val
     return flat_dict
@@ -128,7 +125,7 @@ def grouping(configs, nuisance=None):
     if nuisance is None:
         nuisance = set()
     
-    flat_configs = [flatten(c) for c in configs]
+    flat_configs = [HashableDict(**flatten(c)) for c in configs]
     flat_keys = None
     for c in flat_configs:
         if flat_keys is None:
