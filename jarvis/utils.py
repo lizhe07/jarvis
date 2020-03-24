@@ -193,7 +193,7 @@ class HashableDict(dict):
             elif isinstance(val, dict):
                 converted[key] = HashableDict(**val)
             elif isinstance(val, set):
-                converted.append(frozenset(val))
+                converted[key] = frozenset(val)
             else:
                 converted[key] = val
         super(HashableDict, self).__init__(**converted)
@@ -213,7 +213,7 @@ class HashableDict(dict):
             if isinstance(val, HashableList) or isinstance(val, HashableDict):
                 converted[key] = val.native()
             elif isinstance(val, frozenset):
-                converted.append(set(val))
+                converted[key] = set(val)
             else:
                 converted[key] = val
         return converted
