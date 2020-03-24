@@ -158,6 +158,8 @@ class HashableList(list):
                 converted.append(HashableList(val))
             elif isinstance(val, dict):
                 converted.append(HashableDict(**val))
+            elif isinstance(val, set):
+                converted.append(frozenset(val))
             else:
                 converted.append(val)
         super(HashableList, self).__init__(converted)
@@ -176,6 +178,8 @@ class HashableList(list):
         for val in self:
             if isinstance(val, HashableList) or isinstance(val, HashableDict):
                 converted.append(val.native())
+            elif isinstance(val, frozenset):
+                converted.append(set(val))
             else:
                 converted.append(val)
         return converted
@@ -188,6 +192,8 @@ class HashableDict(dict):
                 converted[key] = HashableList(val)
             elif isinstance(val, dict):
                 converted[key] = HashableDict(**val)
+            elif isinstance(val, set):
+                converted.append(frozenset(val))
             else:
                 converted[key] = val
         super(HashableDict, self).__init__(**converted)
@@ -206,6 +212,8 @@ class HashableDict(dict):
         for key, val in self.items():
             if isinstance(val, HashableList) or isinstance(val, HashableDict):
                 converted[key] = val.native()
+            elif isinstance(val, frozenset):
+                converted.append(set(val))
             else:
                 converted[key] = val
         return converted
