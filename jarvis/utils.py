@@ -31,7 +31,7 @@ def progress_str(i, total, show_percent=False):
     field_width = int(np.log10(total))+1
     disp_str = '{{:{}d}}/{{:{}d}}'.format(field_width, field_width).format(i, total)
     if show_percent:
-        disp_str += ', ({:5.1f}%)'.format(100.*i/total)
+        disp_str += ', ({:6.1%})'.format(i/total)
     return disp_str
 
 def get_seed(seed=None, max_seed=1000):
