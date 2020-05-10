@@ -16,7 +16,7 @@ def time_str(t_elapse, progress=1.):
         progress (float): estimated progress, used for estimating field width.
     
     """
-    field_width = int(np.log10(t_elapse/60/progress))+1
+    field_width = int(np.log10(max(t_elapse, 1e-6)/60/progress))+1
     return '{{:{}d}}m{{:05.2f}}s'.format(field_width).format(int(t_elapse//60), t_elapse%60)
 
 def progress_str(i, total, show_percent=False):
@@ -217,3 +217,17 @@ class HashableDict(dict):
             else:
                 converted[key] = val
         return converted
+
+def numpy_dict(model_state):
+    r"""Converts state dict to numpy arrays.
+    
+    """
+    return dict((name, param.data.cpu().clone().numpy()) \
+                for name, param in model_state.items())
+
+def tensor_dict(model_state):
+    r"""Converts state dict to pytorch tensors.
+    
+    """
+    return dict((name, torch.tensor(param, dtype=torch.float)) \
+                for name, param in model_state.items())
