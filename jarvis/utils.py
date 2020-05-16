@@ -231,3 +231,19 @@ def tensor_dict(model_state):
     """
     return dict((name, torch.tensor(param, dtype=torch.float)) \
                 for name, param in model_state.items())
+
+def update_default(d_config, n_config):
+    r"""Updates default config from new config.
+    
+    Unlike `update` method of dictionary, only keys in the default config will be updated.
+    
+    Args:
+        d_config (dict): default configuration dictionary.
+        n_config (dict): new configuration dictionary.
+    
+    Returns:
+        u_config (dict): updated configuration dictionary.
+    
+    """
+    u_config = dict((key, n_config[key] if n_config and key in n_config else d_config[key]) for key in d_config)
+    return u_config
