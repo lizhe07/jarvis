@@ -60,15 +60,17 @@ class BaseJob:
         assert policy in ['overwrite', 'preserve', 'verify']
         
         w_id = self.configs.add(work_config)
+        
         if not silent_mode and self.is_completed(w_id):
             info_str = '{} already exists, outputs and previews will be '.format(w_id)
             if policy=='overwrite':
                 print(info_str+'overwritten')
             if policy=='preserve':
                 print(info_str+'preserved')
-                return w_id
             if policy=='verify':
                 print(info_str+'verified')
+        if self.is_completed(w_id) and policy=='preserve':
+            return w_id
         
         if not silent_mode:
             print('\n{} starts'.format(w_id))
