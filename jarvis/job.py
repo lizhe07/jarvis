@@ -31,6 +31,21 @@ class BaseJob:
         self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), f_name_len=4, pause=4)
         self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1)
 
+    def remove_corrupted(self):
+        r"""Removes corrupted files.
+
+        """
+        self.configs.remove_corrupted()
+        self.stats.remove_corrupted()
+        self.outputs.remove_corrupted()
+        self.previews.remove_corrupted()
+
+        w_ids = self.configs.all_ids()
+        for archive in [self.stats, self.outputs, self.previews]:
+            to_remove = [w_id for w_id in archive.all_ids() if w_id not in w_ids]
+            for w_id in to_remove:
+                archive.remove(w_id)
+
     def is_completed(self, w_id):
         r"""Returns if a work is completed.
 
