@@ -10,6 +10,7 @@ import numpy as np
 from .utils import time_str, progress_str, HashableDict
 from .archive import Archive
 
+
 class BaseJob:
     r"""Class of batch job.
 
@@ -240,7 +241,7 @@ class BaseJob:
 
             if process_num>0 and count==process_num:
                 break
-        print('\nall works processed')
+        print('\nall works processed or being processed')
 
     def get_work_config(self, arg_strs):
         r"""Returns work configuratiion dictionary from argument strings.
