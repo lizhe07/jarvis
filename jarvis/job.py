@@ -151,6 +151,7 @@ class BaseJob:
         r"""Returns a generator iterates over a search specification randomly.
 
         Args
+        ----
         search_spec: dict
             The work configuration search specification. Dictionary items are
             `(key, vals)`, in which `vals` is a list containing possible
