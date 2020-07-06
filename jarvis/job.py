@@ -241,7 +241,8 @@ class BaseJob:
                 count += 1
 
             if process_num>0 and count==process_num:
-                break
+                print('\n{} works processed'.format(process_num))
+                return
         print('\nall works processed or being processed')
 
     def get_work_config(self, arg_strs):
