@@ -36,9 +36,13 @@ class BaseJob:
         r"""Removes corrupted files.
 
         """
+        print('cleaning configs...')
         self.configs.remove_corrupted()
+        print('cleaning stats...')
         self.stats.remove_corrupted()
+        print('cleaning outputs...')
         self.outputs.remove_corrupted()
+        print('cleaning previews...')
         self.previews.remove_corrupted()
 
         w_ids = self.configs.all_ids()
