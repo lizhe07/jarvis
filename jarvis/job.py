@@ -45,6 +45,7 @@ class BaseJob:
         print('cleaning previews...')
         self.previews.remove_corrupted()
 
+        print('removing all dangling records...')
         w_ids = self.configs.all_ids()
         for archive in [self.stats, self.outputs, self.previews]:
             to_remove = [w_id for w_id in archive.all_ids() if w_id not in w_ids]
