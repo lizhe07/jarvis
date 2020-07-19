@@ -10,23 +10,30 @@ import numpy as np
 
 def time_str(t_elapse, progress=1.):
     r"""Returns a formatted string for a duration.
-    
-    Args:
-        t_elapse (float): elapsed time in seconds.
-        progress (float): estimated progress, used for estimating field width.
-    
+
+    Args
+    ----
+    t_elapse: float
+        The elapsed time in seconds.
+    progress: float
+        The estimated progress, used for estimating field width.
+
     """
     field_width = int(np.log10(max(t_elapse, 1e-6)/60/progress))+1
     return '{{:{}d}}m{{:05.2f}}s'.format(field_width).format(int(t_elapse//60), t_elapse%60)
 
 def progress_str(i, total, show_percent=False):
     r"""Returns a formatted string for progress.
-    
-    Args:
-        i (int): current iteration index.
-        total (int): total iteration number.
-        show_percent (bool): whether to show percentage or not.
-    
+
+    Args
+    ----
+    i： int
+        The current iteration index.
+    total: int
+        The total iteration number.
+    show_percent: bool
+        Whether to show percentage or not.
+
     """
     field_width = int(np.log10(total))+1
     disp_str = '{{:{}d}}/{{:{}d}}'.format(field_width, field_width).format(i, total)
@@ -36,7 +43,7 @@ def progress_str(i, total, show_percent=False):
 
 def get_seed(seed=None, max_seed=1000):
     r"""Returns a random seed.
-    
+
     """
     if seed is None:
         return random.randrange(max_seed)
@@ -45,7 +52,7 @@ def get_seed(seed=None, max_seed=1000):
 
 def set_seed(seed):
     r"""Sets random seed for random, numpy and torch.
-    
+
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -55,15 +62,20 @@ def set_seed(seed):
 
 def flatten(nested_dict):
     r"""Flattens a nested dictionary.
-    
-    A nested dictionary like `{'A': {'B', val}}` will be converted to `{'A::B', val}`.
-    
-    Args:
-        nested_dict (dict): a nested dictionary possibly contains dictionaries as values.
-    
-    Returns:
-        flat_dict (dict): a flat dictionary with keys containing '::' for hierarchy.
-    
+
+    A nested dictionary like `{'A': {'B', val}}` will be converted to
+    `{'A::B', val}`.
+
+    Args
+    ----
+    nested_dict: dict
+        A nested dictionary possibly contains dictionaries as values.
+
+    Returns
+    -------
+    flat_dict: dict
+        A flat dictionary with keys containing ``'::'`` for hierarchy.
+
     """
     flat_dict = {}
     for key, val in nested_dict.items():
@@ -75,15 +87,20 @@ def flatten(nested_dict):
 
 def nest(flat_dict):
     r"""Nests a flat dictionary.
-    
-    A flat dictionary like `{'A::B', val}` will be converted to `{'A': {'B', val}}`.
-    
-    Args:
-        flat_dict (dict): a flat dictionary with keys containing '::' for hierarchy.
-    
-    Returns:
-        nested_dict (dict): a nested dictionary possibly contains dictionaries as values.
-    
+
+    A flat dictionary like `{'A::B', val}` will be converted to
+    `{'A': {'B', val}}`.
+
+    Args
+    ----
+    flat_dict: dict
+        A flat dictionary with keys containing ``'::'`` for hierarchy.
+
+    Returns
+    -------
+    nested_dict: dict
+        A nested dictionary possibly contains dictionaries as values.
+
     """
     keys = set([k.split('::')[0] if isinstance(k, str) and '::' in k else k for k in flat_dict])
     nested_dict = {}
@@ -98,7 +115,7 @@ def nest(flat_dict):
 
 def match_cond(config, cond):
     r"""Checks if a configuration matched condition.
-    
+
     """
     flat_config, flat_cond = flatten(config), flatten(cond)
     for key in flat_cond:
@@ -108,23 +125,27 @@ def match_cond(config, cond):
 
 def grouping(configs, nuisance=None):
     r"""Organizes configs into groups.
-    
-    Configuration dictionaries are flatten and grouped based on the values that is not
-    constant. Nuisance keys such as random seeds will be ignored.
-    
-    Args:
-        configs (list): list of dictionaries with same structure.
-        nuisance (set): set of keys of flat configs.
-    
+
+    Configuration dictionaries are flatten and grouped based on the values that
+    is not constant. Nuisance keys such as random seeds will be ignored.
+
+    Args
+    ----
+    configs: list
+        A list of dictionaries with same structure.
+    nuisance: set
+        The set of nuisance keys of flat configs.
+
     Returns:
-        groups (dict): a dictionary with hashable dictionaries as keys, each corresponding
-            to the varying part of `configs`. Each value is a list of the corresponding
-            subset of `configs`.
-    
+    groups: dict
+        A dictionary with hashable dictionaries as keys, each corresponding to
+        the varying part of `configs`. Each value is a list of the
+        corresponding subset of `configs`.
+
     """
     if nuisance is None:
         nuisance = set()
-    
+
     flat_configs = [HashableDict(**flatten(c)) for c in configs]
     flat_keys = None
     for c in flat_configs:
@@ -133,7 +154,7 @@ def grouping(configs, nuisance=None):
         else:
             assert flat_keys==c.keys()
     assert nuisance.issubset(flat_keys)
-    
+
     for key in flat_keys:
         if key.endswith('seed'):
             nuisance.add(key)
@@ -163,16 +184,16 @@ class HashableList(list):
             else:
                 converted.append(val)
         super(HashableList, self).__init__(converted)
-    
+
     def __hash__(self):
         return hash(tuple(self))
-    
+
     def __eq__(self, other):
         return self.__hash__()==other.__hash__()
-    
+
     def native(self):
         r"""Returns the native version of the list.
-        
+
         """
         converted = []
         for val in self:
@@ -197,16 +218,16 @@ class HashableDict(dict):
             else:
                 converted[key] = val
         super(HashableDict, self).__init__(**converted)
-    
+
     def __hash__(self):
         return hash(frozenset(self.items()))
-    
+
     def __eq__(self, other):
         return self.__hash__()==other.__hash__()
-    
+
     def native(self):
         r"""Returns the native version of the dictionary.
-        
+
         """
         converted = {}
         for key, val in self.items():
@@ -220,30 +241,36 @@ class HashableDict(dict):
 
 def numpy_dict(model_state):
     r"""Converts state dict to numpy arrays.
-    
+
     """
     return dict((name, param.data.cpu().clone().numpy()) \
                 for name, param in model_state.items())
 
 def tensor_dict(model_state):
     r"""Converts state dict to pytorch tensors.
-    
+
     """
     return dict((name, torch.tensor(param, dtype=torch.float)) \
                 for name, param in model_state.items())
 
 def update_default(d_config, n_config):
     r"""Updates default config from new config.
-    
-    Unlike `update` method of dictionary, only keys in the default config will be updated.
-    
-    Args:
-        d_config (dict): default configuration dictionary.
-        n_config (dict): new configuration dictionary.
-    
-    Returns:
-        u_config (dict): updated configuration dictionary.
-    
+
+    Unlike `update` method of dictionary, only keys in the default config will
+    be updated.
+
+    Args
+    ----
+    d_config: dict
+        The default configuration dictionary.
+    n_config: dict
+        The new configuration dictionary.
+
+    Returns
+    -------
+    u_config: dict
+        The updated configuration dictionary.
+
     """
     u_config = dict((key, n_config[key] if n_config and key in n_config else d_config[key]) for key in d_config)
     return u_config
