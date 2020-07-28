@@ -214,6 +214,31 @@ class BaseJob:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
         return completed_configs
 
+    def to_run(self, work_config, tolerance):
+        r"""Determines whether to run a work.
+
+        Args
+        ----
+        work_config: dict
+            The work configuration dictionary.
+        tolerance: float
+            The maximum allowed hours.
+
+        Returns
+        -------
+        ``False`` if a work is completed or the running time since its start
+        has not exceed `tolerance`, ``True`` otherwise.
+
+        """
+        w_id = self.configs.add(work_config)
+        if not self.stats.has_id(w_id):
+            return True
+        stat = self.stats.fetch_record(w_id)
+        if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
+            return True
+        else:
+            return False
+
     def random_search(self, search_spec, process_num=0, tolerance=float('inf')):
         r"""Randomly processes work in the search space.
 
@@ -225,23 +250,12 @@ class BaseJob:
             The number of works to process. `process_num=0` means to process
             all pending works.
         tolerance: float
-            The maximum allowed hours. Any unfinished work started earlier than
-            the threshold will be restarted.
+            The maximum allowed hours.
 
         """
-        def to_run(work_config):
-            w_id = self.configs.add(work_config)
-            if not self.stats.has_id(w_id):
-                return True
-            stat = self.stats.fetch_record(w_id)
-            if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
-                return True
-            else:
-                return False
-
         count = 0
         for work_config in self.conjunction_configs(search_spec):
-            if to_run(work_config):
+            if self.to_run(work_config, tolerance):
                 self.process(work_config, 'preserve')
                 count += 1
 
