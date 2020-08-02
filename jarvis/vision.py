@@ -11,6 +11,16 @@ import numpy as np
 from torch.utils.data import Subset
 from torchvision import transforms
 
+from models import resnet
+
+MODELS = {
+    'ResNet18': resnet.resnet18,
+    'ResNet34': resnet.resnet34,
+    'ResNet50': resnet.resnet50,
+    'ResNet101': resnet.resnet101,
+    'ResNet152': resnet.resnet152,
+    }
+
 
 def prepare_datasets(task, benchmarks_dir, valid_num=None):
     r"""Prepares vision datasets.
@@ -123,3 +133,25 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
                 np.array(sample_nums)-valid_num, dtype=torch.float
                 )
             return dataset_train, dataset_valid, dataset_test, weight
+
+
+def prepare_model(task, arch):
+    r"""Prepares model.
+
+    Args
+    ----
+    task: str
+        The name of the dataset, e.g. ``'CIFAR10'``.
+    arch: str
+        The name of model architecture, e.g. ``ResNet18``.
+
+    """
+    if task=='CIFAR10':
+        class_num = 10
+    if task=='CIFAR100':
+        class_num = 100
+    if task=='16ImageNet':
+        class_num = 16
+
+    model = MODELS[arch](class_num=class_num)
+    return model
