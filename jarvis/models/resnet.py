@@ -57,7 +57,7 @@ class ResBlock(nn.Module):
                 nn.Conv2d(base_channels, base_channels,
                           kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(base_channels),
-                nn.ReLu(),
+                nn.ReLU(),
                 )
             self.layer2 = nn.Sequential(
                 nn.Conv2d(base_channels, out_channels,
