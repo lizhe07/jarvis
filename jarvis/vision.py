@@ -8,7 +8,7 @@ Created on Fri Jul 31 21:59:48 2020
 import os, random
 import torch, torchvision
 import numpy as np
-from torch.utils.data import Subset
+from torch.utils.data import Subset, DataLoader
 from torchvision import transforms
 
 from .models import resnet
@@ -155,3 +155,45 @@ def prepare_model(task, arch):
 
     model = MODELS[arch](class_num=class_num)
     return model
+
+
+def evaluate(model, dataset, device, batch_size, worker_num):
+    r"""Evaluates the task performance of the model.
+
+    Args
+    ----
+    model: nn.Module
+        The model to be evaluated.
+    dataset: Dataset
+        The dataset to evaluate the model on.
+    device: str
+        The device used for evaluation.
+    batch_size: int
+        The batch size of the data loader.
+    worker_num: int
+        The number of workers of the data loader.
+
+    Returns
+    -------
+    loss: float
+        The cross-entropy loss averaged over the dataset.
+    acc: float
+        The classification accuracy averaged over the dataset.
+
+    """
+    if device=='cuda' and not torch.cuda.is_available():
+        device = 'cpu'
+    model.eval().to(device)
+    criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
+
+    loader = DataLoader(dataset, batch_size=batch_size, num_workers=worker_num)
+    loss, count = 0., 0.
+    for images, labels in loader:
+        with torch.no_grad():
+            logits = model(images.to(device))
+            loss += criterion(logits, labels.to(device)).item()
+            _, predicts = logits.max(dim=1)
+            count += (predicts.cpu()==labels).to(torch.float).sum().item()
+    loss = loss/len(dataset)
+    acc = count/len(dataset)
+    return loss, acc
