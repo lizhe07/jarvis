@@ -11,7 +11,7 @@ import numpy as np
 from torch.utils.data import Subset
 from torchvision import transforms
 
-from models import resnet
+from .models import resnet
 
 MODELS = {
     'ResNet18': resnet.resnet18,
