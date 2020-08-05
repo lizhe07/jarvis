@@ -153,10 +153,10 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
             sample_num = 1300*1000
             idxs_valid = random.sample(range(sample_num), valid_num)
             idxs_train = [i for i in range(sample_num) if i not in idxs_valid]
-            dataset_train = Subset(torchvision.datasets.ImageNet(
+            dataset_train = Subset(torchvision.datasets.ImageFolder(
                 f'{benchmarks_dir}/ILSVRC2012/train', transform=t_train,
                 ), idxs_train)
-            dataset_valid = Subset(torchvision.datasets.ImageNet(
+            dataset_valid = Subset(torchvision.datasets.ImageFolder(
                 f'{benchmarks_dir}/ILSVRC2012/train', transform=t_test,
                 ), idxs_valid)
 
