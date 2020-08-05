@@ -181,6 +181,8 @@ def prepare_model(task, arch):
         class_num = 100
     if task=='16ImageNet':
         class_num = 16
+    if task=='ImageNet':
+        class_num = 1000
 
     model = MODELS[arch](class_num=class_num)
     return model
