@@ -139,7 +139,7 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
             transforms.ToTensor(),
             ])
         dataset_test = torchvision.datasets.ImageNet(
-            f'{benchmarks_dir}/ILSVRC2012', split='valid',
+            f'{benchmarks_dir}/ILSVRC2012', split='val',
             transform=t_test,
             )
 
