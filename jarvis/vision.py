@@ -160,6 +160,9 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
                 f'{benchmarks_dir}/ILSVRC2012/train', transform=t_test,
                 ), idxs_valid)
 
+            weight = None
+            return dataset_train, dataset_valid, dataset_test, None
+
 
 def prepare_model(task, arch):
     r"""Prepares model.
