@@ -74,8 +74,8 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
                 transforms.ToTensor()
                 ])
             sample_num = 50000
-            idxs_valid = random.sample(range(sample_num), valid_num)
-            idxs_train = [i for i in range(sample_num) if i not in idxs_valid]
+            idxs_valid = np.array(random.sample(range(sample_num), valid_num))
+            idxs_train = np.setdiff1d(np.arange(sample_num), idxs_valid, assume_unique=True)
             if task=='CIFAR10':
                 dataset_train = Subset(torchvision.datasets.CIFAR10(
                     benchmarks_dir, train=True, transform=t_train,
@@ -116,8 +116,8 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
                           for sample_num in sample_nums]
             idxs_valid = np.concatenate([
                 np.array(idxs_valid[i])+sum(sample_nums[:i]) for i in range(len(class_names))
-                ]).tolist()
-            idxs_train = [i for i in range(sum(sample_nums)) if i not in idxs_valid]
+                ])
+            idxs_train = np.setdiff1d(np.arange(sum(sample_nums)), idxs_valid, assume_unique=True)
             dataset_train = Subset(torchvision.datasets.ImageFolder(
                 f'{benchmarks_dir}/16imagenet_split/train',
                 transform=t_train,
@@ -150,9 +150,15 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 ])
-            sample_num = 1300*1000
-            idxs_valid = random.sample(range(sample_num), valid_num)
-            idxs_train = [i for i in range(sample_num) if i not in idxs_valid]
+            class_names = [c for c in os.listdir(f'{benchmarks_dir}/ILSVRC2012/train') if c.startswith('n')]
+            sample_nums = [len(os.listdir(f'{benchmarks_dir}/ILSVRC2012/train/{c_name}')) \
+                           for c_name in class_names]
+            idxs_valid = [random.sample(range(sample_num), valid_num) \
+                          for sample_num in sample_nums]
+            idxs_valid = np.concatenate([
+                np.array(idxs_valid[i])+sum(sample_nums[:i]) for i in range(len(class_names))
+                ])
+            idxs_train = np.setdiff1d(np.arange(sum(sample_nums)), idxs_valid, assume_unique=True)
             dataset_train = Subset(torchvision.datasets.ImageFolder(
                 f'{benchmarks_dir}/ILSVRC2012/train', transform=t_train,
                 ), idxs_train)
