@@ -55,62 +55,60 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
 
     """
     if task.startswith('CIFAR'):
-        t_common = [
-            transforms.ToTensor(),
-        ]
+        t_test = transforms.ToTensor()
         if task=='CIFAR10':
             dataset_test = torchvision.datasets.CIFAR10(
-                benchmarks_dir, train=False, transform=transforms.Compose(t_common),
+                benchmarks_dir, train=False, transform=t_test,
                 )
         if task=='CIFAR100':
             dataset_test = torchvision.datasets.CIFAR100(
-                benchmarks_dir, train=False, transform=transforms.Compose(t_common),
+                benchmarks_dir, train=False, transform=t_test,
                 )
 
         if valid_num is None:
             return dataset_test
         else:
-            t_aug = [
+            t_train = transforms.Compose([
                 transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
                 transforms.RandomHorizontalFlip(),
-                ]
+                transforms.ToTensor()
+                ])
             sample_num = 50000
             idxs_valid = random.sample(range(sample_num), valid_num)
             idxs_train = [i for i in range(sample_num) if i not in idxs_valid]
             if task=='CIFAR10':
                 dataset_train = Subset(torchvision.datasets.CIFAR10(
-                    benchmarks_dir, train=True, transform=transforms.Compose(t_aug+t_common),
+                    benchmarks_dir, train=True, transform=t_train,
                     ), idxs_train)
                 dataset_valid = Subset(torchvision.datasets.CIFAR10(
-                    benchmarks_dir, train=True, transform=transforms.Compose(t_common),
+                    benchmarks_dir, train=True, transform=t_test,
                     ), idxs_valid)
             if task=='CIFAR100':
                 dataset_train = Subset(torchvision.datasets.CIFAR100(
-                    benchmarks_dir, train=True, transform=transforms.Compose(t_aug+t_common),
+                    benchmarks_dir, train=True, transform=t_train,
                     ), idxs_train)
                 dataset_valid = Subset(torchvision.datasets.CIFAR100(
-                    benchmarks_dir, train=True, transform=transforms.Compose(t_common),
+                    benchmarks_dir, train=True, transform=t_test,
                     ), idxs_valid)
 
             weight = None
             return dataset_train, dataset_valid, dataset_test, None
 
     if task=='16ImageNet':
-        t_common = [
-            transforms.ToTensor(),
-        ]
+        t_test = transforms.ToTensor()
         dataset_test = torchvision.datasets.ImageFolder(
             f'{benchmarks_dir}/16imagenet_split/test',
-            transform=transforms.Compose(t_common),
+            transform=t_test,
             )
 
         if valid_num is None:
             return dataset_test
         else:
-            t_aug = [
+            t_train = transforms.Compose([
                 transforms.RandomCrop(256, padding=32, padding_mode='reflect'),
                 transforms.RandomHorizontalFlip(),
-            ]
+                transforms.ToTensor()
+                ])
             class_names = os.listdir(f'{benchmarks_dir}/16imagenet_split/train')
             sample_nums = [len(os.listdir(f'{benchmarks_dir}/16imagenet_split/train/{c_name}')) \
                            for c_name in class_names]
@@ -122,17 +120,46 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None):
             idxs_train = [i for i in range(sum(sample_nums)) if i not in idxs_valid]
             dataset_train = Subset(torchvision.datasets.ImageFolder(
                 f'{benchmarks_dir}/16imagenet_split/train',
-                transform=transforms.Compose(t_aug+t_common),
+                transform=t_train,
                 ), idxs_train)
             dataset_valid = Subset(torchvision.datasets.ImageFolder(
                 f'{benchmarks_dir}/16imagenet_split/train',
-                transform=transforms.Compose(t_common),
+                transform=t_test,
                 ), idxs_valid)
 
             weight = 1/torch.tensor(
                 np.array(sample_nums)-valid_num, dtype=torch.float
                 )
             return dataset_train, dataset_valid, dataset_test, weight
+
+    if task=='ImageNet':
+        t_test = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            ])
+        dataset_test = torchvision.datasets.ImageNet(
+            f'{benchmarks_dir}/ILSVRC2012', split='valid',
+            transform=t_test,
+            )
+
+        if valid_num is None:
+            return dataset_test
+        else:
+            t_train = transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                ])
+            sample_num = 1300*1000
+            idxs_valid = random.sample(range(sample_num), valid_num)
+            idxs_train = [i for i in range(sample_num) if i not in idxs_valid]
+            dataset_train = Subset(torchvision.datasets.ImageNet(
+                f'{benchmarks_dir}/ILSVRC2012', split='train', transform=t_train,
+                ), idxs_train)
+            dataset_valid = Subset(torchvision.datasets.ImageNet(
+                f'{benchmarks_dir}/ILSVRC2012', split='train', transform=t_test,
+                ), idxs_valid)
 
 
 def prepare_model(task, arch):
