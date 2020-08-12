@@ -73,7 +73,7 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
             t_train = transforms.Compose([
                 transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
                 transforms.RandomHorizontalFlip(),
-                ]+[transforms.ToTensor()] if train_tensor else [])
+                ]+([transforms.ToTensor()] if train_tensor else []))
             sample_num = 50000
             idxs_valid = np.array(random.sample(range(sample_num), valid_num))
             idxs_train = np.setdiff1d(np.arange(sample_num), idxs_valid, assume_unique=True)
@@ -108,7 +108,7 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
             t_train = transforms.Compose([
                 transforms.RandomCrop(256, padding=32, padding_mode='reflect'),
                 transforms.RandomHorizontalFlip(),
-                ]+[transforms.ToTensor()] if train_tensor else [])
+                ]+([transforms.ToTensor()] if train_tensor else []))
             class_names = os.listdir(f'{benchmarks_dir}/16imagenet_split/train')
             sample_nums = [len(os.listdir(f'{benchmarks_dir}/16imagenet_split/train/{c_name}')) \
                            for c_name in class_names]
@@ -148,7 +148,7 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
             t_train = transforms.Compose([
                 transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
-                ]+[transforms.ToTensor()] if train_tensor else [])
+                ]+([transforms.ToTensor()] if train_tensor else []))
             class_names = [c for c in os.listdir(f'{benchmarks_dir}/ILSVRC2012/train') if c.startswith('n')]
             sample_nums = [len(os.listdir(f'{benchmarks_dir}/ILSVRC2012/train/{c_name}')) \
                            for c_name in class_names]
