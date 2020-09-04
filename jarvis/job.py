@@ -52,6 +52,16 @@ class BaseJob:
             for w_id in to_remove:
                 archive.remove(w_id)
 
+    def remove_uncompleted(self):
+        r"""Removes uncompleted works.
+
+        """
+        to_remove = [w_id for w_id in self.configs.all_ids() if not self.is_completed(w_id)]
+        for w_id in to_remove:
+            for axv in [self.configs, self.stats, self.outputs, self.previews]:
+                if axv.has_id(w_id):
+                    axv.remove(w_id)
+
     def is_completed(self, w_id):
         r"""Returns if a work is completed.
 
