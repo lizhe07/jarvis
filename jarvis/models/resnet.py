@@ -147,6 +147,25 @@ class ResNet(nn.Module):
                  i_shift=None, i_scale=None, **kwargs):
         super(ResNet, self).__init__()
 
+        if i_shift is None:
+            if in_channels==3:
+                i_shift = [0.485, 0.456, 0.406]
+            else:
+                i_shift = [0.5]
+        if i_scale is None:
+            if in_channels==3:
+                i_scale = [1/0.229, 1/0.224, 1/0.225]
+            else:
+                i_scale = [5.]
+        self.i_shift = torch.nn.Parameter(
+            torch.tensor(i_shift, dtype=torch.float)[:, None, None],
+            requires_grad=False
+            )
+        self.i_scale = torch.nn.Parameter(
+            torch.tensor(i_scale, dtype=torch.float)[:, None, None],
+            requires_grad=False
+            )
+
         assert block_type in ['Basic', 'Bottleneck']
         self.section_num = len(block_nums)
 
@@ -168,25 +187,6 @@ class ResNet(nn.Module):
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(in_channels, class_num)
-
-        if i_shift is None:
-            if in_channels==3:
-                i_shift = [0.485, 0.456, 0.406]
-            else:
-                i_shift = [0.5]
-        if i_scale is None:
-            if in_channels==3:
-                i_scale = [1/0.229, 1/0.224, 1/0.225]
-            else:
-                i_scale = [5.]
-        self.i_shift = torch.nn.Parameter(
-            torch.tensor(i_shift, dtype=torch.float)[:, None, None],
-            requires_grad=False
-            )
-        self.i_scale = torch.nn.Parameter(
-            torch.tensor(i_scale, dtype=torch.float)[:, None, None],
-            requires_grad=False
-            )
 
     def _make_section(self, block_num, block_type, in_channels, base_channels, stride):
         r"""Constructs one ResNet section.
