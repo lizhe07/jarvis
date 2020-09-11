@@ -123,7 +123,7 @@ def match_cond(config, cond):
             return False
     return True
 
-def grouping(configs, nuisance=None):
+def grouping(configs, nuisances=None):
     r"""Organizes configs into groups.
 
     Configuration dictionaries are flatten and grouped based on the values that
@@ -133,42 +133,54 @@ def grouping(configs, nuisance=None):
     ----
     configs: list
         A list of dictionaries with same structure.
-    nuisance: set
-        The set of nuisance keys of flat configs.
+    nuisances: set
+        The set of nuisance specifications of flat configs. Each element could
+        be a flat config key, or the beginning part of one.
 
-    Returns:
+    Returns
+    -------
     groups: dict
         A dictionary with hashable dictionaries as keys, each corresponding to
         the varying part of `configs`. Each value is a list of the
         corresponding subset of `configs`.
 
     """
-    if nuisance is None:
-        nuisance = set()
+    if nuisances is None:
+        nuisances = set()
 
+    # get union of all flat keys
     flat_configs = [HashableDict(**flatten(c)) for c in configs]
-    flat_keys = None
-    for c in flat_configs:
-        if flat_keys is None:
-            flat_keys = c.keys()
-        else:
-            assert flat_keys==c.keys()
-    assert nuisance.issubset(flat_keys)
+    flat_keys = set().union(*[c.keys() for c in flat_configs])
 
+    # remove nuisance keys
+    n_keys = set()
     for key in flat_keys:
         if key.endswith('seed'):
-            nuisance.add(key)
-    val_nums = {}
+            n_keys.add(key)
+        else:
+            for nuisance in nuisances:
+                if key.startswith(nuisance):
+                    n_keys.add(key)
+    flat_keys -= n_keys
+
+    # remove keys with unique values
+    u_keys = set()
     for key in flat_keys:
-        if key not in nuisance:
-            vals = set() # values may be lists (unhashable), use list instead of set here
-            for c in flat_configs:
+        in_all, vals = True, set()
+        for c in flat_configs:
+            if key in c:
                 vals.add(c[key])
-            val_nums[key] = len(vals)
-    varying_keys = [key for key in val_nums if val_nums[key]>1]
-    varying_configs = list(set([HashableDict(**nest(dict((key, flat_config[key]) for key in varying_keys)))\
-                                for flat_config in flat_configs]))
-    groups = dict((v, [c for c in configs if match_cond(c, v)]) for v in varying_configs)
+            else:
+                in_all = False
+        if in_all and len(vals)==1:
+            u_keys.add(key)
+    flat_keys -= u_keys
+
+    # group configs based on changing values
+    group_keys = set([HashableDict(**nest(dict((key, c[key]) for key in flat_keys in key in c))) \
+                      for c in flat_configs])
+    groups = dict((key, [c for c in configs if match_cond(c, key)]) \
+                  for key in group_keys)
     return groups
 
 class HashableList(list):
