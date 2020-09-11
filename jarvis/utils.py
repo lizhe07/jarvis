@@ -177,7 +177,7 @@ def grouping(configs, nuisances=None):
     flat_keys -= u_keys
 
     # group configs based on changing values
-    group_keys = set([HashableDict(**nest(dict((key, c[key]) for key in flat_keys in key in c))) \
+    group_keys = set([HashableDict(**nest(dict((key, c[key]) for key in flat_keys if key in c))) \
                       for c in flat_configs])
     groups = dict((key, [c for c in configs if match_cond(c, key)]) \
                   for key in group_keys)
