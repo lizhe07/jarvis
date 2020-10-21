@@ -22,14 +22,14 @@ MODELS = {
     }
 
 
-def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
+def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
     r"""Prepares vision datasets.
 
     Args
     ----
     task: str
         The name of the dataset, e.g. ``'CIFAR10'``.
-    benchmarks_dir: str
+    datasets_dir: str
         The directory of vision benchmarks.
     valid_num: int
         The validation dataset size. For ``'16ImageNet'`` task, it is the
@@ -50,21 +50,21 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
 
     Examples
     --------
-    >>> dataset_test = prepare_datasets(task, benchmarks_dir)
+    >>> dataset_test = prepare_datasets(task, datasets_dir)
 
     >>> dataset_train, dataset_valid, dataset_test, weight = \
-            prepare_datasets(task, benchmarks_dir, valid_num)
+            prepare_datasets(task, datasets_dir, valid_num)
 
     """
     if task.startswith('CIFAR'):
         t_test = transforms.ToTensor()
         if task=='CIFAR10':
             dataset_test = torchvision.datasets.CIFAR10(
-                benchmarks_dir, train=False, transform=t_test,
+                datasets_dir, train=False, transform=t_test,
                 )
         if task=='CIFAR100':
             dataset_test = torchvision.datasets.CIFAR100(
-                benchmarks_dir, train=False, transform=t_test,
+                datasets_dir, train=False, transform=t_test,
                 )
 
         if valid_num is None:
@@ -79,17 +79,17 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
             idxs_train = np.setdiff1d(np.arange(sample_num), idxs_valid, assume_unique=True)
             if task=='CIFAR10':
                 dataset_train = Subset(torchvision.datasets.CIFAR10(
-                    benchmarks_dir, train=True, transform=t_train,
+                    datasets_dir, train=True, transform=t_train,
                     ), idxs_train)
                 dataset_valid = Subset(torchvision.datasets.CIFAR10(
-                    benchmarks_dir, train=True, transform=t_test,
+                    datasets_dir, train=True, transform=t_test,
                     ), idxs_valid)
             if task=='CIFAR100':
                 dataset_train = Subset(torchvision.datasets.CIFAR100(
-                    benchmarks_dir, train=True, transform=t_train,
+                    datasets_dir, train=True, transform=t_train,
                     ), idxs_train)
                 dataset_valid = Subset(torchvision.datasets.CIFAR100(
-                    benchmarks_dir, train=True, transform=t_test,
+                    datasets_dir, train=True, transform=t_test,
                     ), idxs_valid)
 
             weight = None
@@ -98,7 +98,7 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
     if task=='16ImageNet':
         t_test = transforms.ToTensor()
         dataset_test = torchvision.datasets.ImageFolder(
-            f'{benchmarks_dir}/16imagenet_split/test',
+            f'{datasets_dir}/16imagenet_split/test',
             transform=t_test,
             )
 
@@ -109,8 +109,8 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
                 transforms.RandomCrop(256, padding=32, padding_mode='reflect'),
                 transforms.RandomHorizontalFlip(),
                 ]+([transforms.ToTensor()] if train_tensor else []))
-            class_names = os.listdir(f'{benchmarks_dir}/16imagenet_split/train')
-            sample_nums = [len(os.listdir(f'{benchmarks_dir}/16imagenet_split/train/{c_name}')) \
+            class_names = os.listdir(f'{datasets_dir}/16imagenet_split/train')
+            sample_nums = [len(os.listdir(f'{datasets_dir}/16imagenet_split/train/{c_name}')) \
                            for c_name in class_names]
             idxs_valid = [random.sample(range(sample_num), valid_num) \
                           for sample_num in sample_nums]
@@ -119,11 +119,11 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
                 ])
             idxs_train = np.setdiff1d(np.arange(sum(sample_nums)), idxs_valid, assume_unique=True)
             dataset_train = Subset(torchvision.datasets.ImageFolder(
-                f'{benchmarks_dir}/16imagenet_split/train',
+                f'{datasets_dir}/16imagenet_split/train',
                 transform=t_train,
                 ), idxs_train)
             dataset_valid = Subset(torchvision.datasets.ImageFolder(
-                f'{benchmarks_dir}/16imagenet_split/train',
+                f'{datasets_dir}/16imagenet_split/train',
                 transform=t_test,
                 ), idxs_valid)
 
@@ -139,7 +139,7 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
             transforms.ToTensor(),
             ])
         dataset_test = torchvision.datasets.ImageFolder(
-            f'{benchmarks_dir}/ILSVRC2012/val', transform=t_test,
+            f'{datasets_dir}/ILSVRC2012/val', transform=t_test,
             )
 
         if valid_num is None:
@@ -149,8 +149,8 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
                 transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
                 ]+([transforms.ToTensor()] if train_tensor else []))
-            class_names = [c for c in os.listdir(f'{benchmarks_dir}/ILSVRC2012/train') if c.startswith('n')]
-            sample_nums = [len(os.listdir(f'{benchmarks_dir}/ILSVRC2012/train/{c_name}')) \
+            class_names = [c for c in os.listdir(f'{datasets_dir}/ILSVRC2012/train') if c.startswith('n')]
+            sample_nums = [len(os.listdir(f'{datasets_dir}/ILSVRC2012/train/{c_name}')) \
                            for c_name in class_names]
             idxs_valid = [random.sample(range(sample_num), valid_num) \
                           for sample_num in sample_nums]
@@ -159,10 +159,10 @@ def prepare_datasets(task, benchmarks_dir, valid_num=None, train_tensor=True):
                 ])
             idxs_train = np.setdiff1d(np.arange(sum(sample_nums)), idxs_valid, assume_unique=True)
             dataset_train = Subset(torchvision.datasets.ImageFolder(
-                f'{benchmarks_dir}/ILSVRC2012/train', transform=t_train,
+                f'{datasets_dir}/ILSVRC2012/train', transform=t_train,
                 ), idxs_train)
             dataset_valid = Subset(torchvision.datasets.ImageFolder(
-                f'{benchmarks_dir}/ILSVRC2012/train', transform=t_test,
+                f'{datasets_dir}/ILSVRC2012/train', transform=t_test,
                 ), idxs_valid)
 
             weight = None
