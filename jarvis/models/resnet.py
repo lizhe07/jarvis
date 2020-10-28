@@ -8,6 +8,7 @@ Created on Sun Jul 26 12:15:55 2020
 import torch
 import torch.nn as nn
 
+
 class ResBlock(nn.Module):
     r"""ResNet block.
 
