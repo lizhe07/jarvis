@@ -56,6 +56,31 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
             prepare_datasets(task, datasets_dir, valid_num)
 
     """
+    if task=='MNIST':
+        t_test = transforms.ToTensor()
+        dataset_test = torchvision.datasets.MNIST(
+            datasets_dir, train=False, transform=t_test,
+            )
+
+        if valid_num is None:
+            return dataset_test
+        else:
+            t_train = transforms.Compose([
+                transforms.RandomCrop(28, padding=4, padding_mode='reflect'),
+                ]+([transforms.ToTensor()] if train_tensor else []))
+            sample_num = 60000
+            idxs_valid = np.array(random.sample(range(sample_num), valid_num))
+            idxs_train = np.setdiff1d(np.arange(sample_num), idxs_valid, assume_unique=True)
+            dataset_train = Subset(torchvision.datasets.MNIST(
+                datasets_dir, train=True, transform=t_train,
+                ), idxs_train)
+            dataset_valid = Subset(torchvision.datasets.MNIST(
+                datasets_dir, train=True, transform=t_test,
+                ), idxs_valid)
+
+            weight = None
+            return dataset_train, dataset_valid, dataset_test, weight
+
     if task.startswith('CIFAR'):
         t_test = transforms.ToTensor()
         if task=='CIFAR10':
@@ -93,7 +118,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
                     ), idxs_valid)
 
             weight = None
-            return dataset_train, dataset_valid, dataset_test, None
+            return dataset_train, dataset_valid, dataset_test, weight
 
     if task=='16ImageNet':
         t_test = transforms.ToTensor()
@@ -166,7 +191,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
                 ), idxs_valid)
 
             weight = None
-            return dataset_train, dataset_valid, dataset_test, None
+            return dataset_train, dataset_valid, dataset_test, weight
 
 
 def prepare_model(task, arch):
