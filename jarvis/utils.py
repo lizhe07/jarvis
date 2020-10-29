@@ -119,7 +119,7 @@ def match_cond(config, cond):
     """
     flat_config, flat_cond = flatten(config), flatten(cond)
     for key in flat_cond:
-        if flat_cond[key] and (key not in flat_config or flat_cond[key]!=flat_config[key]):
+        if flat_cond[key]!={} and (key not in flat_config or flat_cond[key]!=flat_config[key]):
             return False
     return True
 
