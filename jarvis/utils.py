@@ -8,6 +8,7 @@ Created on Wed Oct 16 14:04:58 2019
 import random, torch
 import numpy as np
 
+
 def time_str(t_elapse, progress=1.):
     r"""Returns a formatted string for a duration.
 
@@ -21,6 +22,7 @@ def time_str(t_elapse, progress=1.):
     """
     field_width = int(np.log10(max(t_elapse, 1e-6)/60/progress))+1
     return '{{:{}d}}m{{:05.2f}}s'.format(field_width).format(int(t_elapse//60), t_elapse%60)
+
 
 def progress_str(i, total, show_percent=False):
     r"""Returns a formatted string for progress.
@@ -41,6 +43,7 @@ def progress_str(i, total, show_percent=False):
         disp_str += ', ({:6.1%})'.format(i/total)
     return disp_str
 
+
 def get_seed(seed=None, max_seed=1000):
     r"""Returns a random seed.
 
@@ -49,6 +52,7 @@ def get_seed(seed=None, max_seed=1000):
         return random.randrange(max_seed)
     else:
         return seed%max_seed
+
 
 def set_seed(seed):
     r"""Sets random seed for random, numpy and torch.
@@ -59,6 +63,7 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
 
 def flatten(nested_dict):
     r"""Flattens a nested dictionary.
@@ -84,6 +89,7 @@ def flatten(nested_dict):
         else:
             flat_dict[key] = val
     return flat_dict
+
 
 def nest(flat_dict):
     r"""Nests a flat dictionary.
@@ -113,6 +119,7 @@ def nest(flat_dict):
             nested_dict[key] = nest(subdict)
     return nested_dict
 
+
 def match_cond(config, cond):
     r"""Checks if a configuration matched condition.
 
@@ -122,6 +129,7 @@ def match_cond(config, cond):
         if flat_cond[key]!={} and (key not in flat_config or flat_cond[key]!=flat_config[key]):
             return False
     return True
+
 
 def grouping(configs, nuisances=None):
     r"""Organizes configs into groups.
@@ -183,6 +191,7 @@ def grouping(configs, nuisances=None):
                   for key in group_keys)
     return groups
 
+
 class HashableList(list):
     def __init__(self, vals):
         converted = []
@@ -216,6 +225,7 @@ class HashableList(list):
             else:
                 converted.append(val)
         return converted
+
 
 class HashableDict(dict):
     def __init__(self, **kwargs):
@@ -251,6 +261,7 @@ class HashableDict(dict):
                 converted[key] = val
         return converted
 
+
 def numpy_dict(model_state):
     r"""Converts state dict to numpy arrays.
 
@@ -258,12 +269,14 @@ def numpy_dict(model_state):
     return dict((name, param.data.cpu().clone().numpy()) \
                 for name, param in model_state.items())
 
+
 def tensor_dict(model_state):
     r"""Converts state dict to pytorch tensors.
 
     """
     return dict((name, torch.tensor(param, dtype=torch.float)) \
                 for name, param in model_state.items())
+
 
 def update_default(d_config, n_config):
     r"""Updates default config from new config.
