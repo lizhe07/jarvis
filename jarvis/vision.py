@@ -66,7 +66,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
             return dataset_test
         else:
             t_train = transforms.Compose([
-                transforms.RandomCrop(28, padding=4, padding_mode='reflect'),
+                transforms.RandomCrop(28, padding=4),
                 ]+([transforms.ToTensor()] if train_tensor else []))
             sample_num = 60000
             idxs_valid = np.array(random.sample(range(sample_num), valid_num))
