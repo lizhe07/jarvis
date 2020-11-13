@@ -44,6 +44,18 @@ class BaseJob:
         self.outputs.remove_corrupted()
         print('cleaning previews...')
         self.previews.remove_corrupted()
+        
+        print('removing imcomplete records...')
+        w_ids = self.configs.all_ids()
+        to_remove = []
+        for w_id in w_ids:
+            if not(self.stats.has_id(w_id) and self.outputs.has_id(w_id) and self.previews.has_id(w_id)):
+                to_remove.append(w_id)
+        for w_id in to_remove:
+            for archive in [self.stats, self.outputs, self.previews]:
+                if archive.has_id(w_id):
+                    archive.remove(w_id)
+            self.configs.remove(w_id)
 
         print('removing all dangling records...')
         w_ids = self.configs.all_ids()
