@@ -46,6 +46,9 @@ class BaseJob:
         self.previews.remove_corrupted()
 
     def remove_dangling(self):
+        r"""Removes dangling records.
+        
+        """
         print('removing all dangling records...')
         w_ids = self.configs.all_ids()
         to_remove = set()
