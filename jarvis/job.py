@@ -44,23 +44,16 @@ class BaseJob:
         self.outputs.remove_corrupted()
         print('cleaning previews...')
         self.previews.remove_corrupted()
-        
-        print('removing imcomplete records...')
-        w_ids = self.configs.all_ids()
-        to_remove = []
-        for w_id in w_ids:
-            if not(self.stats.has_id(w_id) and self.outputs.has_id(w_id) and self.previews.has_id(w_id)):
-                to_remove.append(w_id)
-        for w_id in to_remove:
-            for archive in [self.stats, self.outputs, self.previews]:
-                if archive.has_id(w_id):
-                    archive.remove(w_id)
-            self.configs.remove(w_id)
 
+    def remove_dangling(self):
         print('removing all dangling records...')
         w_ids = self.configs.all_ids()
+        to_remove = set()
         for archive in [self.stats, self.outputs, self.previews]:
-            to_remove = [w_id for w_id in archive.all_ids() if w_id not in w_ids]
+            for w_id in archive.all_ids():
+                if w_id not in w_ids:
+                    to_remove.add(w_id)
+        for archive in [self.stats, self.outputs, self.previews]:
             for w_id in to_remove:
                 archive.remove(w_id)
 
@@ -83,7 +76,10 @@ class BaseJob:
             The work ID.
 
         """
-        return self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed'] and self.previews.has_id(w_id)
+        return (
+            self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed']
+            and self.previews.has_id(w_id) and self.outputs.has_id(w_id)
+            )
 
     def completed_ids(self):
         r"""Returns the completed work IDs.
