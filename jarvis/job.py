@@ -92,7 +92,7 @@ class BaseJob:
                  if self.previews.has_id(w_id)]
         return c_ids
 
-    def process(self, work_config, policy='overwrite', silent_mode=False):
+    def process(self, work_config, policy='overwrite', print_info=True):
         r"""Processes one work.
 
         Args
@@ -101,9 +101,6 @@ class BaseJob:
             The work configuration dictionary.
         policy: str
             The process policy regarding the existing work record.
-        silent_mode: bool
-            No information about job will be printed if `silent_mode` is set to
-            ``True``.
 
         Returns
         -------
@@ -115,7 +112,7 @@ class BaseJob:
 
         w_id = self.configs.add(work_config)
 
-        if not silent_mode and self.is_completed(w_id):
+        if print_info and self.is_completed(w_id):
             info_str = '{} already exists, outputs and previews will be '.format(w_id)
             if policy=='overwrite':
                 print(info_str+'overwritten')
@@ -126,7 +123,7 @@ class BaseJob:
         if self.is_completed(w_id) and policy=='preserve':
             return w_id
 
-        if not silent_mode:
+        if print_info:
             print('\n{} starts'.format(w_id))
         tic = time.time()
         self.stats.assign(w_id, {
@@ -134,7 +131,7 @@ class BaseJob:
             'completed': False,
             })
 
-        output, preview = self.main(work_config)
+        output, preview = self.main(work_config, print_info=print_info)
         toc = time.time()
 
         if policy=='verify':
