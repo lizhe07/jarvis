@@ -22,7 +22,8 @@ MODELS = {
     }
 
 
-def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
+def prepare_datasets(task, datasets_dir, valid_num=None, *,
+                     to_grayscale=False, t_aug=None):
     r"""Prepares vision datasets.
 
     Args
@@ -35,8 +36,8 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
         The validation dataset size. For ``'16ImageNet'`` task, it is the
         number of validation images per class. When `valid_num` is ``None``,
         only testing dataset will be returned.
-    train_tensor: bool
-        Training set returns PIL images instead of tensors if ``True``.
+    t_aug: transform
+        Data augmentation transformation.
 
     Returns
     -------
@@ -56,8 +57,26 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
             prepare_datasets(task, datasets_dir, valid_num)
 
     """
+    t_test = [transforms.ToTensor()]
+    if to_grayscale:
+        t_test = [transforms.Grayscale()]+t_test
+
+    if t_aug is None:
+        if task=='MNIST':
+            t_aug = [transforms.RandomCrop(28, padding=4)]
+        if task.startswith('CIFAR'):
+            t_aug = [
+                transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
+                transforms.RandomHorizontalFlip()
+                ]
+        if task=='ImageNet':[
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                ]
+    t_train = t_aug+t_test
+
     if task=='MNIST':
-        t_test = transforms.ToTensor()
+        t_test = transforms.Compose(t_test)
         dataset_test = torchvision.datasets.MNIST(
             datasets_dir, train=False, transform=t_test,
             )
@@ -65,9 +84,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
         if valid_num is None:
             return dataset_test
         else:
-            t_train = transforms.Compose([
-                transforms.RandomCrop(28, padding=4),
-                ]+([transforms.ToTensor()] if train_tensor else []))
+            t_train = transforms.Compose(t_train)
             sample_num = 60000
             idxs_valid = np.array(random.sample(range(sample_num), valid_num))
             idxs_train = np.setdiff1d(np.arange(sample_num), idxs_valid, assume_unique=True)
@@ -82,7 +99,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
             return dataset_train, dataset_valid, dataset_test, weight
 
     if task.startswith('CIFAR'):
-        t_test = transforms.ToTensor()
+        t_test = transforms.Compose(t_test)
         if task=='CIFAR10':
             dataset_test = torchvision.datasets.CIFAR10(
                 datasets_dir, train=False, transform=t_test,
@@ -95,10 +112,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
         if valid_num is None:
             return dataset_test
         else:
-            t_train = transforms.Compose([
-                transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-                transforms.RandomHorizontalFlip(),
-                ]+([transforms.ToTensor()] if train_tensor else []))
+            t_train = transforms.Compose(t_train)
             sample_num = 50000
             idxs_valid = np.array(random.sample(range(sample_num), valid_num))
             idxs_train = np.setdiff1d(np.arange(sample_num), idxs_valid, assume_unique=True)
@@ -120,49 +134,10 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
             weight = None
             return dataset_train, dataset_valid, dataset_test, weight
 
-    if task=='16ImageNet':
-        t_test = transforms.ToTensor()
-        dataset_test = torchvision.datasets.ImageFolder(
-            f'{datasets_dir}/16imagenet_split/test',
-            transform=t_test,
-            )
-
-        if valid_num is None:
-            return dataset_test
-        else:
-            t_train = transforms.Compose([
-                transforms.RandomCrop(256, padding=32, padding_mode='reflect'),
-                transforms.RandomHorizontalFlip(),
-                ]+([transforms.ToTensor()] if train_tensor else []))
-            class_names = os.listdir(f'{datasets_dir}/16imagenet_split/train')
-            sample_nums = [len(os.listdir(f'{datasets_dir}/16imagenet_split/train/{c_name}')) \
-                           for c_name in class_names]
-            idxs_valid = [random.sample(range(sample_num), valid_num) \
-                          for sample_num in sample_nums]
-            idxs_valid = np.concatenate([
-                np.array(idxs_valid[i])+sum(sample_nums[:i]) for i in range(len(class_names))
-                ])
-            idxs_train = np.setdiff1d(np.arange(sum(sample_nums)), idxs_valid, assume_unique=True)
-            dataset_train = Subset(torchvision.datasets.ImageFolder(
-                f'{datasets_dir}/16imagenet_split/train',
-                transform=t_train,
-                ), idxs_train)
-            dataset_valid = Subset(torchvision.datasets.ImageFolder(
-                f'{datasets_dir}/16imagenet_split/train',
-                transform=t_test,
-                ), idxs_valid)
-
-            weight = 1/torch.tensor(
-                np.array(sample_nums)-valid_num, dtype=torch.float
-                )
-            return dataset_train, dataset_valid, dataset_test, weight
-
     if task=='ImageNet':
-        t_test = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            ])
+        t_test = transforms.Compose(
+            [transforms.Resize(256), transforms.CenterCrop(224)]+t_test
+            )
         dataset_test = torchvision.datasets.ImageFolder(
             f'{datasets_dir}/ILSVRC2012/val', transform=t_test,
             )
@@ -170,10 +145,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
         if valid_num is None:
             return dataset_test
         else:
-            t_train = transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                ]+([transforms.ToTensor()] if train_tensor else []))
+            t_train = transforms.Compose(t_train)
             class_names = [c for c in os.listdir(f'{datasets_dir}/ILSVRC2012/train') if c.startswith('n')]
             sample_nums = [len(os.listdir(f'{datasets_dir}/ILSVRC2012/train/{c_name}')) \
                            for c_name in class_names]
@@ -194,7 +166,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, train_tensor=True):
             return dataset_train, dataset_valid, dataset_test, weight
 
 
-def prepare_model(task, arch):
+def prepare_model(task, arch, **kwargs):
     r"""Prepares model.
 
     Args
@@ -214,7 +186,7 @@ def prepare_model(task, arch):
     if task=='ImageNet':
         class_num = 1000
 
-    model = MODELS[arch](class_num=class_num)
+    model = MODELS[arch](class_num=class_num, **kwargs)
     return model
 
 

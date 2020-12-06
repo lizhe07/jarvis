@@ -278,7 +278,7 @@ def tensor_dict(model_state):
                 for name, param in model_state.items())
 
 
-def update_default(d_config, n_config):
+def update_default(d_config, n_config=None):
     r"""Updates default config from new config.
 
     Unlike `update` method of dictionary, only keys in the default config will
@@ -297,5 +297,7 @@ def update_default(d_config, n_config):
         The updated configuration dictionary.
 
     """
+    if n_config is None:
+        n_config = {}
     u_config = dict((key, n_config[key] if n_config and key in n_config else d_config[key]) for key in d_config)
     return u_config

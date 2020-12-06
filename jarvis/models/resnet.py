@@ -5,8 +5,12 @@ Created on Sun Jul 26 12:15:55 2020
 @author: Zhe
 """
 
+from typing import Tuple, List, Any
+
 import torch
 import torch.nn as nn
+
+from . import ImageClassifier
 
 
 class ResBlock(nn.Module):
@@ -25,7 +29,13 @@ class ResBlock(nn.Module):
 
     """
 
-    def __init__(self, block_type, in_channels, base_channels, stride=1):
+    def __init__(
+            self,
+            block_type: str,
+            in_channels: int,
+            base_channels: int,
+            stride: int = 1,
+            ) -> None:
         super(ResBlock, self).__init__()
         self.block_type = block_type
         if self.block_type=='Basic':
@@ -36,35 +46,37 @@ class ResBlock(nn.Module):
         self.in_channels, self.out_channels = in_channels, out_channels
 
         if self.block_type=='Basic':
-            self.layer0 = nn.Sequential(
+            self.conv0 = nn.Sequential(
                 nn.Conv2d(in_channels, base_channels,
                           kernel_size=3, padding=1, stride=stride, bias=False),
                 nn.BatchNorm2d(base_channels),
-                nn.ReLU(),
                 )
-            self.layer1 = nn.Sequential(
+            self.nonlinear0 = nn.ReLU()
+            self.conv1 = nn.Sequential(
                 nn.Conv2d(base_channels, out_channels,
                           kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(base_channels),
                 )
+            self.nonlinear1 = nn.ReLU()
         if self.block_type=='Bottleneck':
-            self.layer0 = nn.Sequential(
+            self.conv0 = nn.Sequential(
                 nn.Conv2d(in_channels, base_channels,
-                          kernel_size=1, padding=0, stride=stride, bias=False),
+                          kernel_size=1, padding=0, bias=False),
                 nn.BatchNorm2d(base_channels),
-                nn.ReLU(),
                 )
-            self.layer1 = nn.Sequential(
+            self.nonlinear0 = nn.ReLU()
+            self.conv1 = nn.Sequential(
                 nn.Conv2d(base_channels, base_channels,
-                          kernel_size=3, padding=1, bias=False),
+                          kernel_size=3, padding=1, stride=stride, bias=False),
                 nn.BatchNorm2d(base_channels),
-                nn.ReLU(),
                 )
-            self.layer2 = nn.Sequential(
+            self.nonlinear1 = nn.ReLU()
+            self.conv2 = nn.Sequential(
                 nn.Conv2d(base_channels, out_channels,
                           kernel_size=1, padding=0, bias=False),
                 nn.BatchNorm2d(out_channels),
                 )
+            self.nonlinear2 = nn.ReLU()
 
         if stride==1 and in_channels==out_channels:
             self.shortcut = nn.Sequential()
@@ -75,7 +87,10 @@ class ResBlock(nn.Module):
                 nn.BatchNorm2d(out_channels),
                 )
 
-    def layer_activations(self, x):
+    def layer_activations(
+            self,
+            x: torch.Tensor,
+            ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         r"""Returns activations of all layers.
 
         Args
@@ -90,17 +105,26 @@ class ResBlock(nn.Module):
 
         """
         if self.block_type=='Basic':
-            out0 = self.layer0(x)
-            out1 = torch.relu(self.layer1(out0)+self.shortcut(x))
-            activations = [out0, out1]
-        if self.block_type=='Bottleneck':
-            out0 = self.layer0(x)
-            out1 = self.layer1(out0)
-            out2 = torch.relu(self.layer2(out1)+self.shortcut(x))
-            activations = [out0, out1, out2]
-        return activations
+            pre0 = self.conv0(x)
+            post0 = self.nonlinear0(pre0)
+            pre1 = self.conv1(post0)+self.shortcut(x)
+            post1 = self.nonlinear1(pre1)
 
-    def forward(self, x):
+            pre_acts = [pre0, pre1]
+            post_acts = [post0, post1]
+        if self.block_type=='Bottleneck':
+            pre0 = self.conv0(x)
+            post0 = self.nonlinear0(pre0)
+            pre1 = self.conv1(post0)
+            post1 = self.nonlinear1(pre1)
+            pre2 = self.conv2(post1)+self.shortcut(x)
+            post2 = self.nonlinear2(pre2)
+
+            pre_acts = [pre0, pre1, pre2]
+            post_acts = [post0, post1, post2]
+        return pre_acts, post_acts
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         r"""Implements the forward pass of the ResNet block.
 
         Args
@@ -113,10 +137,11 @@ class ResBlock(nn.Module):
         The output of the block.
 
         """
-        return self.layer_activations(x)[-1]
+        _, post_acts = self.layer_activations(x)
+        return post_acts[-1]
 
 
-class ResNet(nn.Module):
+class ResNet(ImageClassifier):
     r"""ResNet model.
 
     In addition to an input section, four more sections are stacked to form a
@@ -143,46 +168,39 @@ class ResNet(nn.Module):
 
     """
 
-    def __init__(self, block_nums, block_type, class_num=10,
-                 in_channels=3, base_channels=64,
-                 i_shift=None, i_scale=None, **kwargs):
-        super(ResNet, self).__init__()
-
-        if i_shift is None:
-            if in_channels==3:
-                i_shift = [0.485, 0.456, 0.406]
-            else:
-                i_shift = [0.5]
-        if i_scale is None:
-            if in_channels==3:
-                i_scale = [1/0.229, 1/0.224, 1/0.225]
-            else:
-                i_scale = [5.]
-        self.i_shift = torch.nn.Parameter(
-            torch.tensor(i_shift, dtype=torch.float)[:, None, None],
-            requires_grad=False
-            )
-        self.i_scale = torch.nn.Parameter(
-            torch.tensor(i_scale, dtype=torch.float)[:, None, None],
-            requires_grad=False
-            )
+    def __init__(
+            self,
+            block_nums: List[int],
+            block_type: str,
+            conv0_channels: int = 64,
+            conv0_kernel_size: int = 7,
+            base_channels: int = 64,
+            **kwargs: Any,
+            ) -> None:
+        super(ResNet, self).__init__(**kwargs)
+        in_channels, class_num = self.in_channels, self.class_num
 
         assert block_type in ['Basic', 'Bottleneck']
+        self.block_nums = block_nums
         self.section_num = len(block_nums)
 
-        self.sections = nn.ModuleList([nn.Sequential(
-            nn.Conv2d(in_channels, base_channels, kernel_size=7, padding=3, bias=False),
-            nn.BatchNorm2d(base_channels),
-            nn.ReLU(),
-            )])
+        assert conv0_kernel_size%2==1
+        self.conv0 = nn.Sequential(
+            nn.Conv2d(in_channels, conv0_channels,
+                      kernel_size=conv0_kernel_size,
+                      padding=conv0_kernel_size//2, bias=False),
+            nn.BatchNorm2d(conv0_channels),
+            )
+        self.nonlinear0 = nn.ReLU()
 
-        in_channels = base_channels
+        in_channels = conv0_channels
         base_channels = [base_channels*(2**i) for i in range(self.section_num)]
         strides = [1]+[2]*(self.section_num-1)
 
+        self.sections = nn.ModuleList()
         for i in range(self.section_num):
             section, in_channels = self._make_section(
-                block_nums[i], block_type, in_channels, base_channels[i], strides[i]
+                block_nums[i], block_type, in_channels, base_channels[i], strides[i],
                 )
             self.sections.append(section)
 
@@ -199,9 +217,9 @@ class ResNet(nn.Module):
         block_type: str
             The block type.
         in_channels: int
-            The input channel number.
+            The number of input channels.
         base_channels: int
-            The base channel number for blocks in the section.
+            The number of base channels for this section.
         stride: int
             The stride of the first ResNet block.
 
@@ -217,10 +235,13 @@ class ResNet(nn.Module):
         out_channels = blocks[0].out_channels
         for _ in range(block_num-1):
             blocks.append(ResBlock(block_type, out_channels, base_channels))
-        section = nn.Sequential(*blocks)
+        section = nn.ModuleList(blocks)
         return section, out_channels
 
-    def layer_activations(self, images):
+    def layer_activations(
+            self,
+            images: torch.Tensor
+            ) -> Tuple[List[torch.Tensor], List[torch.Tensor], torch.Tensor]:
         r"""Returns activations of all layers.
 
         Args
@@ -234,29 +255,18 @@ class ResNet(nn.Module):
             The activations for each layer.
 
         """
-        activations = [self.sections[0]((images-self.i_shift)*self.i_scale)]
-        for i in range(self.section_num):
-            for block in self.sections[i+1]:
-                activations += block.layer_activations(activations[-1])
-        activations.append(self.fc(self.avgpool(activations[-1]).flatten(1)))
-        return activations
+        pre0 = self.conv0(self.preprocess(images))
+        post0 = self.nonlinear0(pre0)
+        pre_acts, post_acts = [pre0], [post0]
 
-    def forward(self, images):
-        r"""Implements the forward pass of the ResNet model.
+        for section in self.sections:
+            for block in section:
+                _pre_acts, _post_acts = block.layer_activations(post_acts[-1])
+                pre_acts += _pre_acts
+                post_acts += _post_acts
 
-        Args
-        ----
-        images: (N, C, H, W), tensor
-            The input images, with values in ``[0, 1]``.
-
-        Returns
-        -------
-        logits: (N, class_num), tensor
-            The output logits.
-
-        """
-        logits = self.layer_activations(images)[-1]
-        return logits
+        logits = self.fc(self.avgpool(post_acts[-1]).flatten(1))
+        return pre_acts, post_acts, logits
 
 
 def resnet18(**kwargs):
