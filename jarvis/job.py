@@ -47,7 +47,7 @@ class BaseJob:
 
     def remove_dangling(self):
         r"""Removes dangling records.
-        
+
         """
         print('removing all dangling records...')
         w_ids = self.configs.all_ids()
@@ -131,7 +131,7 @@ class BaseJob:
             'completed': False,
             })
 
-        output, preview = self.main(work_config)
+        output, preview = self.main(work_config, print_info=print_info)
         toc = time.time()
 
         if policy=='verify':
