@@ -131,7 +131,7 @@ class BaseJob:
             'completed': False,
             })
 
-        output, preview = self.main(work_config, print_info=print_info)
+        output, preview = self.main(work_config)
         toc = time.time()
 
         if policy=='verify':
