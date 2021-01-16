@@ -78,7 +78,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, *,
     if task=='MNIST':
         t_test = transforms.Compose(t_test)
         dataset_test = torchvision.datasets.MNIST(
-            datasets_dir, train=False, download=True, transform=t_test,
+            datasets_dir, train=False, transform=t_test,
             )
 
         if valid_num is None:
@@ -102,11 +102,11 @@ def prepare_datasets(task, datasets_dir, valid_num=None, *,
         t_test = transforms.Compose(t_test)
         if task=='CIFAR10':
             dataset_test = torchvision.datasets.CIFAR10(
-                datasets_dir, train=False, download=True, transform=t_test,
+                datasets_dir, train=False, transform=t_test,
                 )
         if task=='CIFAR100':
             dataset_test = torchvision.datasets.CIFAR100(
-                datasets_dir, train=False, download=True, transform=t_test,
+                datasets_dir, train=False, transform=t_test,
                 )
 
         if valid_num is None:
