@@ -11,6 +11,30 @@ import torch
 import torch.nn as nn
 
 
+class Normalizer(nn.Module):
+
+    def __init__(
+            self,
+            mean: List[float],
+            std: List[float],
+            ) -> None:
+        super(Normalizer, self).__init__()
+
+        assert len(mean)==1 or len(std)==1 or len(mean)==len(std), 'mean and std are inconsistent'
+        assert min(std)>0, 'std has to be positive'
+        self.mean = nn.Parameter(
+            torch.tensor(mean, dtype=torch.float)[..., None, None],
+            requires_grad=False
+            )
+        self.std = nn.Parameter(
+            torch.tensor(std, dtype=torch.float)[..., None, None],
+            requires_grad=False
+            )
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        return (images-self.mean)/self.std
+
+
 class ImageClassifier(nn.Module):
     r"""A base class for image classifier.
 
@@ -20,8 +44,8 @@ class ImageClassifier(nn.Module):
         The number of input channels.
     class_num: int
         The number of classes.
-    i_shift, i_scale: list of floats
-        The shift and scale parameters for input preprocessing.
+    mean, std: list of floats
+        The mean and std parameters for input normalization.
 
     """
 
@@ -29,38 +53,28 @@ class ImageClassifier(nn.Module):
             self,
             in_channels: int = 3,
             class_num: int = 10,
-            i_shift: Optional[List[float]] = None,
-            i_scale: Optional[List[float]] = None,
+            mean: Optional[List[float]] = None,
+            std: Optional[List[float]] = None,
             **kwargs: Any,
             ) -> None:
         super(ImageClassifier, self).__init__()
         self.in_channels, self.class_num = in_channels, class_num
 
-        if i_shift is None:
+        if mean is None:
             if in_channels==3:
-                i_shift = [0.485, 0.456, 0.406]
+                mean = [0.485, 0.456, 0.406]
             else:
-                i_shift = [0.5]
-        if i_scale is None:
+                mean = [0.5]
+        if std is None:
             if in_channels==3:
-                i_scale = [1/0.229, 1/0.224, 1/0.225]
+                std = [0.229, 0.224, 0.225]
             else:
-                i_scale = [5.]
-        self.i_shift = nn.Parameter(
-            torch.tensor(i_shift, dtype=torch.float)[:, None, None],
-            requires_grad=False
-            )
-        self.i_scale = nn.Parameter(
-            torch.tensor(i_scale, dtype=torch.float)[:, None, None],
-            requires_grad=False
-            )
-
-    def preprocess(self, images: torch.Tensor) -> torch.Tensor:
-        return (images-self.i_shift)*self.i_scale
+                std = [0.2]
+        self.normalizer = Normalizer(mean, std)
 
     def layer_activations(self, images: torch.Tensor) -> List[torch.Tensor]:
         raise NotImplementedError
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
-        *_, logits = self.layer_activations(images)
+        *_, logits = self.layer_activations(self.normalizer(images))
         return logits

@@ -46,32 +46,32 @@ class ResBlock(nn.Module):
         self.in_channels, self.out_channels = in_channels, out_channels
 
         if self.block_type=='Basic':
-            self.conv0 = nn.Sequential(
+            self.layer0 = nn.Sequential(
                 nn.Conv2d(in_channels, base_channels,
                           kernel_size=3, padding=1, stride=stride, bias=False),
                 nn.BatchNorm2d(base_channels),
                 )
             self.nonlinear0 = nn.ReLU()
-            self.conv1 = nn.Sequential(
+            self.layer1 = nn.Sequential(
                 nn.Conv2d(base_channels, out_channels,
                           kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(base_channels),
                 )
             self.nonlinear1 = nn.ReLU()
         if self.block_type=='Bottleneck':
-            self.conv0 = nn.Sequential(
+            self.layer0 = nn.Sequential(
                 nn.Conv2d(in_channels, base_channels,
                           kernel_size=1, padding=0, bias=False),
                 nn.BatchNorm2d(base_channels),
                 )
             self.nonlinear0 = nn.ReLU()
-            self.conv1 = nn.Sequential(
+            self.layer1 = nn.Sequential(
                 nn.Conv2d(base_channels, base_channels,
                           kernel_size=3, padding=1, stride=stride, bias=False),
                 nn.BatchNorm2d(base_channels),
                 )
             self.nonlinear1 = nn.ReLU()
-            self.conv2 = nn.Sequential(
+            self.layer2 = nn.Sequential(
                 nn.Conv2d(base_channels, out_channels,
                           kernel_size=1, padding=0, bias=False),
                 nn.BatchNorm2d(out_channels),
@@ -105,19 +105,19 @@ class ResBlock(nn.Module):
 
         """
         if self.block_type=='Basic':
-            pre0 = self.conv0(x)
+            pre0 = self.layer0(x)
             post0 = self.nonlinear0(pre0)
-            pre1 = self.conv1(post0)+self.shortcut(x)
+            pre1 = self.layer1(post0)+self.shortcut(x)
             post1 = self.nonlinear1(pre1)
 
             pre_acts = [pre0, pre1]
             post_acts = [post0, post1]
         if self.block_type=='Bottleneck':
-            pre0 = self.conv0(x)
+            pre0 = self.layer0(x)
             post0 = self.nonlinear0(pre0)
-            pre1 = self.conv1(post0)
+            pre1 = self.layer1(post0)
             post1 = self.nonlinear1(pre1)
-            pre2 = self.conv2(post1)+self.shortcut(x)
+            pre2 = self.layer2(post1)+self.shortcut(x)
             post2 = self.nonlinear2(pre2)
 
             pre_acts = [pre0, pre1, pre2]
@@ -155,16 +155,12 @@ class ResNet(ImageClassifier):
         The number of ResNet blocks in each section, usually of length 4.
     block_type: str
         The block type, can be ``Basic`` or ``Bottleneck``.
-    class_num: int
-        The number of classes.
-    in_channels: int
-        The input channel number.
+    conv0_channels: int
+        The channel number for the first convolution layer.
+    conv0_kernel_size: int
+        The kernel size for the first convolution layer.
     base_channels: int
-        The base channel number.
-    i_shift: (in_channels,), tensor
-        The shift parameter for image preprocessing.
-    i_scale: (in_channels,), tensor
-        The scale parameter for image preprocessing.
+        The base channel number, used for ResBlock sections.
 
     """
 
@@ -217,9 +213,9 @@ class ResNet(ImageClassifier):
         block_type: str
             The block type.
         in_channels: int
-            The number of input channels.
+            The input channel number.
         base_channels: int
-            The number of base channels for this section.
+            The base channel number for this section.
         stride: int
             The stride of the first ResNet block.
 
@@ -240,14 +236,14 @@ class ResNet(ImageClassifier):
 
     def layer_activations(
             self,
-            images: torch.Tensor
+            x: torch.Tensor
             ) -> Tuple[List[torch.Tensor], List[torch.Tensor], torch.Tensor]:
         r"""Returns activations of all layers.
 
         Args
         ----
-        images: (N, C, H, W), tensor
-            The input images, with values in ``[0, 1]``.
+        x: (N, C, H, W), tensor
+            The normalized input images.
 
         Returns
         -------
@@ -255,7 +251,7 @@ class ResNet(ImageClassifier):
             The activations for each layer.
 
         """
-        pre0 = self.conv0(self.preprocess(images))
+        pre0 = self.conv0(x)
         post0 = self.nonlinear0(pre0)
         pre_acts, post_acts = [pre0], [post0]
 
