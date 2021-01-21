@@ -26,6 +26,7 @@ class AlexNet(nn.Module):
 
     def __init__(
             self,
+            in_channels: int = 3,
             class_num: int = 10,
             act_type: str = 'ReLU',
             ) -> None:
@@ -39,7 +40,7 @@ class AlexNet(nn.Module):
 
         self.layers = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
+                nn.Conv2d(in_channels, 64, kernel_size=11, stride=4, padding=2),
                 _act_layer(act_type),
                 nn.MaxPool2d(kernel_size=3, stride=2),
                 ),
