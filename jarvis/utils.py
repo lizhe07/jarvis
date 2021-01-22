@@ -192,73 +192,102 @@ def grouping(configs, nuisances=None):
     return groups
 
 
+def to_hashable(val):
+    r"""Converts to hashable data type.
+
+    """
+    if isinstance(val, list):
+        return HashableList(val)
+    if isinstance(val, tuple):
+        return HashableTuple(val)
+    if isinstance(val, set):
+        return HashableSet(val)
+    if isinstance(val, dict):
+        return HashableDict(val)
+
+    try:
+        hash(val)
+    except:
+        raise TypeError('hashable type is not implemented')
+    else:
+        return val
+
+
+def _is_custom_hashable(val):
+    r"""Returns whether the input is a custom hashable type.
+
+    All custom hashable class implements `native` method.
+
+    """
+    return isinstance(val, HashableList) or isinstance(val, HashableTuple) or isinstance(val, HashableSet) or isinstance(val, HashableDict)
+
+
 class HashableList(list):
+    r"""Hashable list class.
+
+    """
+
     def __init__(self, vals):
-        converted = []
-        for val in vals:
-            if isinstance(val, list):
-                converted.append(HashableList(val))
-            elif isinstance(val, dict):
-                converted.append(HashableDict(**val))
-            elif isinstance(val, set):
-                converted.append(frozenset(val))
-            else:
-                converted.append(val)
-        super(HashableList, self).__init__(converted)
+        super(HashableList, self).__init__([to_hashable(val) for val in vals])
 
     def __hash__(self):
         return hash(tuple(self))
 
-    def __eq__(self, other):
-        return self.__hash__()==other.__hash__()
-
     def native(self):
-        r"""Returns the native version of the list.
-
-        """
         converted = []
         for val in self:
-            if isinstance(val, HashableList) or isinstance(val, HashableDict):
-                converted.append(val.native())
-            elif isinstance(val, frozenset):
-                converted.append(set(val))
-            else:
-                converted.append(val)
+            converted.append(val.native() if _is_custom_hashable(val) else val)
         return converted
 
 
+class HashableTuple(tuple):
+    r"""Hashable tuple class.
+
+    """
+
+    def __new__(cls, vals):
+        return super(HashableTuple, cls).__new__(cls, tuple(to_hashable(val) for val in vals))
+
+    def native(self):
+        converted = []
+        for val in self:
+            converted.append(val.native() if _is_custom_hashable(val) else val)
+        return tuple(converted)
+
+
+class HashableSet(set):
+    r"""Hashable set class.
+
+    """
+
+    def __init__(self, vals):
+        super(HashableSet, self).__init__([to_hashable(val) for val in vals])
+
+    def __hash__(self):
+        return hash(frozenset(self))
+
+    def native(self):
+        converted = []
+        for val in self:
+            converted.append(val.native() if _is_custom_hashable(val) else val)
+        return set(converted)
+
+
 class HashableDict(dict):
-    def __init__(self, **kwargs):
-        converted = {}
-        for key, val in kwargs.items():
-            if isinstance(val, list):
-                converted[key] = HashableList(val)
-            elif isinstance(val, dict):
-                converted[key] = HashableDict(**val)
-            elif isinstance(val, set):
-                converted[key] = frozenset(val)
-            else:
-                converted[key] = val
-        super(HashableDict, self).__init__(**converted)
+    r"""Hashable dictionary class.
+
+    """
+
+    def __init__(self, vals):
+        super(HashableDict, self).__init__((key, to_hashable(val)) for key, val in vals.items())
 
     def __hash__(self):
         return hash(frozenset(self.items()))
 
-    def __eq__(self, other):
-        return self.__hash__()==other.__hash__()
-
     def native(self):
-        r"""Returns the native version of the dictionary.
-
-        """
         converted = {}
         for key, val in self.items():
-            if isinstance(val, HashableList) or isinstance(val, HashableDict):
-                converted[key] = val.native()
-            elif isinstance(val, frozenset):
-                converted[key] = set(val)
-            else:
-                converted[key] = val
+            converted[key] = val.native() if _is_custom_hashable(val) else val
         return converted
 
 
