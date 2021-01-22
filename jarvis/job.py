@@ -7,15 +7,15 @@ Created on Mon Nov 25 22:57:30 2019
 
 import os, random, time
 import numpy as np
-from .utils import time_str, progress_str, HashableDict
+from .utils import time_str, progress_str
 from .archive import Archive
 
 
 class BaseJob:
-    r"""Class of batch job.
+    r"""Base class for batch processing.
 
-    The job is associated with different folders storing configurations,
-    status, outputs and previews of all works. Methods `get_work_config` and
+    The job is associated with different directories storing configurations,
+    status, outputs and previews of all works. Methods `get_config` and
     `main` need to be implemented by child class.
 
     Args
@@ -27,123 +27,134 @@ class BaseJob:
 
     def __init__(self, save_dir):
         self.save_dir = save_dir
-        self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60, record_hashable=True)
+        self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60, hashable=True)
         self.stats = Archive(os.path.join(self.save_dir, 'stats'))
-        self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), f_name_len=4, pause=4)
-        self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1)
+        self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), pth_len=4, pause=5.)
+        self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1.)
 
-    def remove_corrupted(self):
+    def prune(self):
         r"""Removes corrupted files.
 
         """
-        print('cleaning configs...')
-        self.configs.remove_corrupted()
-        print('cleaning stats...')
-        self.stats.remove_corrupted()
-        print('cleaning outputs...')
-        self.outputs.remove_corrupted()
-        print('cleaning previews...')
-        self.previews.remove_corrupted()
+        print('pruning configs...')
+        self.configs.prune()
+        print('pruning stats...')
+        self.stats.prune()
+        print('pruning outputs...')
+        self.outputs.prune()
+        print('pruning previews...')
+        self.previews.prune()
 
-    def remove_dangling(self):
-        r"""Removes dangling records.
+    def get_config(self, arg_strs):
+        r"""Returns a configuratiion dictionary from argument strings.
 
-        """
-        print('removing all dangling records...')
-        w_ids = self.configs.all_ids()
-        to_remove = set()
-        for archive in [self.stats, self.outputs, self.previews]:
-            for w_id in archive.all_ids():
-                if w_id not in w_ids:
-                    to_remove.add(w_id)
-        for archive in [self.stats, self.outputs, self.previews]:
-            for w_id in to_remove:
-                archive.remove(w_id)
-
-    def remove_uncompleted(self):
-        r"""Removes uncompleted works.
-
-        """
-        to_remove = [w_id for w_id in self.configs.all_ids() if not self.is_completed(w_id)]
-        for w_id in to_remove:
-            for axv in [self.configs, self.stats, self.outputs, self.previews]:
-                if axv.has_id(w_id):
-                    axv.remove(w_id)
-
-    def is_completed(self, w_id):
-        r"""Returns if a work is completed.
+        The method needs to be implemented in the child class.
 
         Args
         ----
-        w_id: str
-            The work ID.
+        arg_strs: list
+            The argument strings as the input of an argument parser.
+
+        Returns
+        -------
+        work_config: dict
+            The work configuration dictionary.
 
         """
-        return (
-            self.stats.has_id(w_id) and self.stats.fetch_record(w_id)['completed']
-            and self.previews.has_id(w_id) and self.outputs.has_id(w_id)
-            )
+        raise NotImplementedError
 
-    def completed_ids(self):
-        r"""Returns the completed work IDs.
+    def main(self, config, verbose):
+        r"""Main function of work processing.
+
+        The method needs to be implemented in the child class.
+
+        Args
+        ----
+        config: dict
+            The configuration dictionary to process.
+        verbose: bool
+            Whether to display information.
 
         """
-        c_ids = [w_id for w_id in self.stats.fetch_matched(lambda r: r['completed']) \
-                 if self.previews.has_id(w_id)]
-        return c_ids
+        raise NotImplementedError
 
-    def process(self, work_config, policy='overwrite', print_info=True):
+    def is_completed(self, key, strict=False):
+        r"""Returns whether a work is completed.
+
+        Args
+        ----
+        key: str
+            The work key.
+        strict: bool
+            Whether to check `outputs` and `previews`.
+
+        """
+        try:
+            stat = self.stats[key]
+        except:
+            return False
+        else:
+            if not stat[key]['completed']:
+                return False
+        if strict and not(key in self.outputs and key in self.previews):
+            return False
+        return True
+
+    def completed_keys(self, strict=False):
+        r"""Returns keys of completed works.
+
+        Args
+        ----
+        strict: bool
+            Whether to check `outputs` and `previews`.
+
+        """
+        if strict:
+            return [key for key, stat in self.stats.items() if (
+                stat['completed'] and key in self.outputs and key in self.previews
+                )]
+        else:
+            return [key for key, stat in self.stats.items() if stat['completed']]
+
+    def process(self, config, policy='preserve', verbose=True):
         r"""Processes one work.
 
         Args
         ----
-        work_config: dict
-            The work configuration dictionary.
+        config: dict
+            The configuration dictionary to process.
         policy: str
-            The process policy regarding the existing work record.
+            The process policy regarding the existing record, can be
+            ``preserve`` or ``overwrite``.
+        verbose: bool
+            Whether to display information.
 
         Returns
         -------
-        w_id: str
-            The work ID.
+        key: str
+            The work key.
 
         """
-        assert policy in ['overwrite', 'preserve', 'verify']
+        assert policy in ['overwrite', 'preserve']
 
-        w_id = self.configs.add(work_config)
-
-        if print_info and self.is_completed(w_id):
-            info_str = '{} already exists, outputs and previews will be '.format(w_id)
-            if policy=='overwrite':
-                print(info_str+'overwritten')
+        key = self.configs.add(config, check_duplicate=True)
+        if self.is_completed(key):
             if policy=='preserve':
-                print(info_str+'preserved')
-            if policy=='verify':
-                print(info_str+'verified')
-        if self.is_completed(w_id) and policy=='preserve':
-            return w_id
+                if verbose:
+                    print(f'{key} already exists, outputs and previews will be preserved')
+                return key
+            if policy=='overwrite':
+                if verbose:
+                    print(f'{key} already exists, outputs and previews will be overwritten')
 
-        if print_info:
-            print('\n{} starts'.format(w_id))
         tic = time.time()
-        self.stats.assign(w_id, {
-            'tic': tic, 'toc': None,
-            'completed': False,
-            })
-
-        output, preview = self.main(work_config)
+        self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
+        output, preview = self.main(config, verbose)
+        self.outputs[key] = output
+        self.previews[key] = preview
         toc = time.time()
-
-        if policy=='verify':
-            raise NotImplementedError('method to verify output and preview is not implemented')
-        else:
-            self.stats.assign(w_id, {
-                'tic': tic, 'toc': toc,
-                'completed': True,
-                })
-            self.outputs.assign(w_id, output)
-            self.previews.assign(w_id, preview)
-        return w_id
+        self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
+        return key
 
     def converter(self, key, val):
         r"""Converts the key-val pair to argument strings.
@@ -200,8 +211,8 @@ class BaseJob:
             arg_strs = []
             for arg_key, arg_val in zip(arg_keys, arg_vals):
                 arg_strs += self.converter(arg_key, arg_val)
-            work_config = self.get_work_config(arg_strs)
-            yield HashableDict(**work_config)
+            config = self.get_config(arg_strs)
+            yield config
 
     def overview(self, search_spec=None):
         r"""Displays an overview of the job.
@@ -212,35 +223,36 @@ class BaseJob:
         Args
         ----
         search_spec: dict
-            The work configuration search specification.
+            The work configuration search specification. If ``None``, all
+            completed works will be shown.
 
         """
         if search_spec is not None:
             all_configs = set([c for c in self.conjunction_configs(search_spec)])
         completed_configs, time_costs = [], []
-        for w_id in self.completed_ids():
-            config = self.configs.fetch_record(w_id)
-            if search_spec is None or (search_spec is not None and config in all_configs):
+        for key in self.completed_keys():
+            config = self.configs[key]
+            if search_spec is None or (config in all_configs):
                 completed_configs.append(config)
-                stat = self.stats.fetch_record(w_id)
+                stat = self.stats[key]
                 time_costs.append(stat['toc']-stat['tic'])
         print('{} works completed'.format(
             len(completed_configs) if search_spec is None else \
             progress_str(len(completed_configs), len(all_configs))
             ))
-        if time_costs:
+        if completed_configs:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
         return completed_configs
 
-    def to_run(self, work_config, tolerance):
+    def to_run(self, config, tolerance):
         r"""Determines whether to run a work.
 
         Args
         ----
-        work_config: dict
-            The work configuration dictionary.
+        config: dict
+            The configuration dictionary to process.
         tolerance: float
-            The maximum allowed hours.
+            The maximum allowed running time (hours).
 
         Returns
         -------
@@ -248,16 +260,18 @@ class BaseJob:
         has not exceed `tolerance`, ``True`` otherwise.
 
         """
-        w_id = self.configs.add(work_config)
-        if not self.stats.has_id(w_id):
-            return True
-        stat = self.stats.fetch_record(w_id)
+        key = self.configs.add(config, check_duplicate=True)
+        try:
+            stat = self.stats[key]
+        except:
+            return True # stats[key] does not exist
+
         if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
-            return True
+            return True # running time exceeds tolerance
         else:
             return False
 
-    def random_search(self, search_spec, process_num=0, tolerance=float('inf')):
+    def random_search(self, search_spec, process_num=0, tolerance=float('inf'), verbose=True):
         r"""Randomly processes work in the search space.
 
         Args
@@ -269,46 +283,18 @@ class BaseJob:
             all pending works.
         tolerance: float
             The maximum allowed hours.
+        verbose: bool
+            Whether to display information.
 
         """
         count = 0
-        for work_config in self.conjunction_configs(search_spec):
-            if self.to_run(work_config, tolerance):
-                self.process(work_config, 'preserve')
+        for config in self.conjunction_configs(search_spec):
+            if self.to_run(config, tolerance):
+                self.process(config, verbose=verbose)
                 count += 1
-
             if process_num>0 and count==process_num:
-                print('\n{} works processed'.format(process_num))
+                if verbose:
+                    print('\n{} works processed'.format(process_num))
                 return
-        print('\nall works processed or being processed')
-
-    def get_work_config(self, arg_strs):
-        r"""Returns work configuratiion dictionary from argument strings.
-
-        The method needs to be implemented in the child class.
-
-        Args
-        ----
-        arg_strs: list
-            The argument strings as the input of an argument parser.
-
-        Returns
-        -------
-        work_config: dict
-            The work configuration dictionary.
-
-        """
-        raise NotImplementedError
-
-    def main(self, work_config):
-        r"""Main function of work processing.
-
-        The method needs to be implemented in the child class.
-
-        Args
-        ----
-        work_config: dict
-            The work configuration dictionary.
-
-        """
-        raise NotImplementedError
+        if verbose:
+            print('\nall works processed or being processed')
