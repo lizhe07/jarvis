@@ -15,22 +15,29 @@ class BaseJob:
     r"""Base class for batch processing.
 
     The job is associated with different directories storing configurations,
-    status, outputs and previews of all works. Methods `get_config` and
-    `main` need to be implemented by child class.
+    status, results and previews of all works. Method `main` need to be
+    implemented by child class. Method `get_config` need to be implemented by
+    child class in order to process works in batch.
 
     Args
     ----
-    save_dir: str
-        The directory for saving data.
+    store_dir: str
+        The directory for storing data.
 
     """
 
-    def __init__(self, save_dir):
-        self.save_dir = save_dir
-        self.configs = Archive(os.path.join(self.save_dir, 'configs'), max_try=60, hashable=True)
-        self.stats = Archive(os.path.join(self.save_dir, 'stats'))
-        self.outputs = Archive(os.path.join(self.save_dir, 'outputs'), pth_len=4, pause=5.)
-        self.previews = Archive(os.path.join(self.save_dir, 'previews'), pause=1.)
+    def __init__(self, store_dir=None):
+        self.store_dir = store_dir
+        if self.store_dir is None:
+            self.configs = Archive(hashable=True)
+            self.stats = Archive()
+            self.results = Archive()
+            self.previews = Archive()
+        else:
+            self.configs = Archive(os.path.join(self.store_dir, 'configs'), max_try=60, hashable=True)
+            self.stats = Archive(os.path.join(self.store_dir, 'stats'))
+            self.results = Archive(os.path.join(self.store_dir, 'results'), pth_len=4, pause=5.)
+            self.previews = Archive(os.path.join(self.store_dir, 'previews'), pause=1.)
 
     def prune(self):
         r"""Removes corrupted files.
@@ -40,28 +47,10 @@ class BaseJob:
         self.configs.prune()
         print('pruning stats...')
         self.stats.prune()
-        print('pruning outputs...')
-        self.outputs.prune()
+        print('pruning results...')
+        self.results.prune()
         print('pruning previews...')
         self.previews.prune()
-
-    def get_config(self, arg_strs):
-        r"""Returns a configuratiion dictionary from argument strings.
-
-        The method needs to be implemented in the child class.
-
-        Args
-        ----
-        arg_strs: list
-            The argument strings as the input of an argument parser.
-
-        Returns
-        -------
-        work_config: dict
-            The work configuration dictionary.
-
-        """
-        raise NotImplementedError
 
     def main(self, config, verbose):
         r"""Main function of work processing.
@@ -78,6 +67,25 @@ class BaseJob:
         """
         raise NotImplementedError
 
+    def get_config(self, arg_strs):
+        r"""Returns a configuratiion dictionary from argument strings.
+
+        The method needs to be implemented in the child class for batch
+        processing.
+
+        Args
+        ----
+        arg_strs: list
+            The argument strings as the input of an argument parser.
+
+        Returns
+        -------
+        config: dict
+            The configuration dictionary specified by `arg_strs`.
+
+        """
+        raise NotImplementedError
+
     def is_completed(self, key, strict=False):
         r"""Returns whether a work is completed.
 
@@ -86,7 +94,7 @@ class BaseJob:
         key: str
             The work key.
         strict: bool
-            Whether to check `outputs` and `previews`.
+            Whether to check `results` and `previews`.
 
         """
         try:
@@ -94,9 +102,9 @@ class BaseJob:
         except:
             return False
         else:
-            if not stat[key]['completed']:
+            if not stat['completed']:
                 return False
-        if strict and not(key in self.outputs and key in self.previews):
+        if strict and not(key in self.results and key in self.previews):
             return False
         return True
 
@@ -106,12 +114,12 @@ class BaseJob:
         Args
         ----
         strict: bool
-            Whether to check `outputs` and `previews`.
+            Whether to check `results` and `previews`.
 
         """
         if strict:
             return [key for key, stat in self.stats.items() if (
-                stat['completed'] and key in self.outputs and key in self.previews
+                stat['completed'] and key in self.results and key in self.previews
                 )]
         else:
             return [key for key, stat in self.stats.items() if stat['completed']]
@@ -125,61 +133,36 @@ class BaseJob:
             The configuration dictionary to process.
         policy: str
             The process policy regarding the existing record, can be
-            ``preserve`` or ``overwrite``.
+            ``'preserve'`` or ``'overwrite'``.
         verbose: bool
             Whether to display information.
 
         Returns
         -------
-        key: str
-            The work key.
+        result, preview:
+            The result and preview of the processed work.
 
         """
         assert policy in ['overwrite', 'preserve']
 
-        key = self.configs.add(config, check_duplicate=True)
+        key = self.configs.add(config)
         if self.is_completed(key):
             if policy=='preserve':
                 if verbose:
-                    print(f'{key} already exists, outputs and previews will be preserved')
-                return key
+                    print(f"{key} already exists, results and previews will be preserved")
+                return self.results[key], self.previews[key]
             if policy=='overwrite':
                 if verbose:
-                    print(f'{key} already exists, outputs and previews will be overwritten')
+                    print(f"{key} already exists, results and previews will be overwritten")
 
         tic = time.time()
         self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
-        output, preview = self.main(config, verbose)
-        self.outputs[key] = output
+        result, preview = self.main(config, verbose)
+        self.results[key] = result
         self.previews[key] = preview
         toc = time.time()
         self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
-        return key
-
-    def converter(self, key, val):
-        r"""Converts the key-val pair to argument strings.
-
-        Args
-        ----
-        key: str
-            The argument key.
-        val: bool, float, int, list
-            The argument value.
-
-        Returns
-        -------
-        A list of argument strings.
-
-        """
-        if isinstance(val, bool):
-            if val:
-                return ['--'+key]
-        elif isinstance(val, list):
-            if val:
-                return ['--'+key]+[str(v) for v in val]
-        elif val is not None:
-            return ['--'+key, str(val)]
-        return []
+        return result, preview
 
     def conjunction_configs(self, search_spec):
         r"""Returns a generator iterates over a search specification randomly.
@@ -196,21 +179,32 @@ class BaseJob:
             A work configuration dictionary in random order.
 
         """
-        arg_keys = list(search_spec.keys())
-        val_lists = [search_spec[key] for key in arg_keys]
-        space_dim = [len(v) for v in val_lists]
-        total_num = np.prod(space_dim)
-
         def idx2args(idx):
             sub_idxs = np.unravel_index(idx, space_dim)
             arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
             return arg_vals
 
+        def converter(key, val):
+            if isinstance(val, bool):
+                if val:
+                    return ['--'+key]
+            elif isinstance(val, list):
+                if val:
+                    return ['--'+key]+[str(v) for v in val]
+            elif val is not None:
+                return ['--'+key, str(val)]
+            return []
+
+        arg_keys = list(search_spec.keys())
+        val_lists = [search_spec[key] for key in arg_keys]
+        space_dim = [len(v) for v in val_lists]
+        total_num = np.prod(space_dim)
+
         for idx in random.sample(range(total_num), total_num):
             arg_vals = idx2args(idx)
             arg_strs = []
             for arg_key, arg_val in zip(arg_keys, arg_vals):
-                arg_strs += self.converter(arg_key, arg_val)
+                arg_strs += converter(arg_key, arg_val)
             config = self.get_config(arg_strs)
             yield config
 
@@ -244,33 +238,6 @@ class BaseJob:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
         return completed_configs
 
-    def to_run(self, config, tolerance):
-        r"""Determines whether to run a work.
-
-        Args
-        ----
-        config: dict
-            The configuration dictionary to process.
-        tolerance: float
-            The maximum allowed running time (hours).
-
-        Returns
-        -------
-        ``False`` if a work is completed or the running time since its start
-        has not exceed `tolerance`, ``True`` otherwise.
-
-        """
-        key = self.configs.add(config, check_duplicate=True)
-        try:
-            stat = self.stats[key]
-        except:
-            return True # stats[key] does not exist
-
-        if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
-            return True # running time exceeds tolerance
-        else:
-            return False
-
     def random_search(self, search_spec, process_num=0, tolerance=float('inf'), verbose=True):
         r"""Randomly processes work in the search space.
 
@@ -287,9 +254,23 @@ class BaseJob:
             Whether to display information.
 
         """
+        def to_run(config):
+            r"""Determines whether to run a work.
+
+            """
+            key = self.configs.add(config)
+            try:
+                stat = self.stats[key]
+            except:
+                return True # stats[key] does not exist
+            if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
+                return True # running time exceeds tolerance
+            else:
+                return False
+
         count = 0
         for config in self.conjunction_configs(search_spec):
-            if self.to_run(config, tolerance):
+            if to_run(config):
                 self.process(config, verbose=verbose)
                 count += 1
             if process_num>0 and count==process_num:
