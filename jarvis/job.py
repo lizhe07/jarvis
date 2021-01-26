@@ -155,6 +155,8 @@ class BaseJob:
                 if verbose:
                     print(f"{key} already exists, results and previews will be overwritten")
 
+        if verbose:
+            print(f'processing {key}...')
         tic = time.time()
         self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
         result, preview = self.main(config, verbose)
