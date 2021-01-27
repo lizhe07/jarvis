@@ -23,7 +23,7 @@ MODELS = {
 
 
 def prepare_datasets(task, datasets_dir, valid_num=None, *,
-                     to_grayscale=False, t_aug=None):
+                     grayscale=False, t_aug=None):
     r"""Prepares vision datasets.
 
     Args
@@ -36,6 +36,8 @@ def prepare_datasets(task, datasets_dir, valid_num=None, *,
         The validation dataset size. For ``'16ImageNet'`` task, it is the
         number of validation images per class. When `valid_num` is ``None``,
         only testing dataset will be returned.
+    grayscale: bool
+        Whether to use grayscale images.
     t_aug: transform
         Data augmentation transformation.
 
@@ -58,7 +60,7 @@ def prepare_datasets(task, datasets_dir, valid_num=None, *,
 
     """
     t_test = [transforms.ToTensor()]
-    if to_grayscale:
+    if grayscale:
         t_test = [transforms.Grayscale()]+t_test
 
     if t_aug is None:

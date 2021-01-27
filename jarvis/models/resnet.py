@@ -100,8 +100,8 @@ class ResBlock(nn.Module):
 
         Returns
         -------
-        activations: list of tensors
-            The activations for each layer.
+        pre_acts, post_acts: list of tensors
+            The pre and post activations for each layer.
 
         """
         if self.block_type=='Basic':
@@ -247,8 +247,10 @@ class ResNet(ImageClassifier):
 
         Returns
         -------
-        activations: list of tensors
-            The activations for each layer.
+        pre_acts, post_acts: list of tensors
+            The pre and post activations for each layer.
+        logits: tensor
+            The logits.
 
         """
         pre0 = self.conv0(x)
