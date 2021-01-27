@@ -157,7 +157,7 @@ def grouping(configs, nuisances=None):
         nuisances = set()
 
     # get union of all flat keys
-    flat_configs = [HashableDict(**flatten(c)) for c in configs]
+    flat_configs = [HashableDict(flatten(c)) for c in configs]
     flat_keys = set().union(*[c.keys() for c in flat_configs])
 
     # remove nuisance keys
@@ -185,7 +185,7 @@ def grouping(configs, nuisances=None):
     flat_keys -= u_keys
 
     # group configs based on changing values
-    group_keys = set([HashableDict(**nest(dict((key, c[key]) for key in flat_keys if key in c))) \
+    group_keys = set([HashableDict(nest(dict((key, c[key]) for key in flat_keys if key in c))) \
                       for c in flat_configs])
     groups = dict((key, [c for c in configs if match_cond(c, key)]) \
                   for key in group_keys)

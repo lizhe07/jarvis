@@ -6,7 +6,7 @@ Created on Sat Nov 23 23:03:10 2019
 """
 
 import os, pickle, random, time
-from .utils import to_hashable
+from .utils import to_hashable, match_cond
 
 
 class Archive():
@@ -265,3 +265,10 @@ class Archive():
                 print('no corrupted files detected')
             else:
                 print('{} corrupted files removed'.format(count))
+
+    def find_matched(self, matcher):
+        return [key for key, val in self.items() if matcher(val)]
+
+    def find_conditioned(self, cond):
+        matcher = lambda config: match_cond(config, cond)
+        return self.find_matched(matcher)
