@@ -86,6 +86,28 @@ class BaseJob:
         """
         raise NotImplementedError
 
+    def is_completed(self, key, strict=False):
+        r"""Returns whether a work is completed.
+
+        Args
+        ----
+        key: str
+            The work key.
+        strict: bool
+            Whether to check `results` and `previews`.
+
+        """
+        try:
+            stat = self.stats[key]
+        except:
+            return False
+        else:
+            if not stat['completed']:
+                return False
+        if strict and not(key in self.results and key in self.previews):
+            return False
+        return True
+
     def process(self, config, policy='preserve', verbose=True):
         r"""Processes one work.
 
