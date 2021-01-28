@@ -7,7 +7,7 @@ Created on Mon Nov 25 22:57:30 2019
 
 import os, random, time
 import numpy as np
-from .utils import time_str, progress_str
+from .utils import time_str, progress_str, match_cond
 from .archive import Archive
 
 
@@ -85,44 +85,6 @@ class BaseJob:
 
         """
         raise NotImplementedError
-
-    def is_completed(self, key, strict=False):
-        r"""Returns whether a work is completed.
-
-        Args
-        ----
-        key: str
-            The work key.
-        strict: bool
-            Whether to check `results` and `previews`.
-
-        """
-        try:
-            stat = self.stats[key]
-        except:
-            return False
-        else:
-            if not stat['completed']:
-                return False
-        if strict and not(key in self.results and key in self.previews):
-            return False
-        return True
-
-    def completed_keys(self, strict=False):
-        r"""Returns keys of completed works.
-
-        Args
-        ----
-        strict: bool
-            Whether to check `results` and `previews`.
-
-        """
-        if strict:
-            return [key for key, stat in self.stats.items() if (
-                stat['completed'] and key in self.results and key in self.previews
-                )]
-        else:
-            return [key for key, stat in self.stats.items() if stat['completed']]
 
     def process(self, config, policy='preserve', verbose=True):
         r"""Processes one work.
@@ -210,6 +172,71 @@ class BaseJob:
             config = self.get_config(arg_strs)
             yield config
 
+    def completed(self, strict=False):
+        r"""Returns a generator for completed works.
+
+        Args
+        ----
+        strict: bool
+            Whether to check `results` and `previews`.
+
+        Yields
+        ------
+        key: str
+            The key of a completed work.
+        config: dict
+            The configuration dictionary.
+        stat: dict
+            The status dictionary.
+
+        """
+        for key, stat in self.stats.items():
+            if stat['completed']:
+                config = self.configs[key]
+                if not strict or (key in self.results and key in self.previews):
+                    yield key, config, stat
+
+    def matched(self, matcher):
+        r"""Returns a generator for completed works matching certain pattern.
+
+        Args
+        ----
+        matcher: callable
+            `matcher(config)` returns ``True`` if `config` matches the pattern,
+            ``False`` otherwise.
+
+        Yields
+        ------
+        key: str
+            The key of a completed work that matches `matcher`.
+        config: dict
+            The configuration dictionary.
+
+        """
+        for key, config, _ in self.completed():
+            if matcher(config):
+                yield key, config
+
+    def conditioned(self, cond):
+        r"""Returns a generator for completed works matching a condition.
+
+        Args
+        ----
+        cond: dict
+            A dictionary specifying the condioned values of configurations.
+
+        Yields
+        ------
+        key: str
+            The key of a completed work that is correctly conditioned.
+        config: dict
+            The configuration dictionary.
+
+        """
+        matcher = lambda config: match_cond(config, cond)
+        for key, config in self.matched(matcher):
+            yield key, config
+
     def overview(self, search_spec=None):
         r"""Displays an overview of the job.
 
@@ -226,14 +253,12 @@ class BaseJob:
         if search_spec is not None:
             all_configs = set([c for c in self.conjunction_configs(search_spec)])
         completed_configs, time_costs = [], []
-        for key in self.completed_keys():
-            config = self.configs[key]
+        for key, config, stat in self.completed():
             if search_spec is None or (config in all_configs):
                 completed_configs.append(config)
-                stat = self.stats[key]
                 time_costs.append(stat['toc']-stat['tic'])
         print('{} works completed'.format(
-            len(completed_configs) if search_spec is None else \
+            len(completed_configs) if search_spec is None else
             progress_str(len(completed_configs), len(all_configs))
             ))
         if completed_configs:
