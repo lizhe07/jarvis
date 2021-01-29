@@ -5,7 +5,7 @@ Created on Wed Oct 16 14:04:58 2019
 @author: zhe
 """
 
-import random, torch
+import argparse, random, torch
 import numpy as np
 
 
@@ -305,6 +305,21 @@ def tensor_dict(model_state):
     """
     return dict((name, torch.tensor(param, dtype=torch.float)) \
                 for name, param in model_state.items())
+
+
+def job_parser():
+    r"""Returns a base parser for job processing.
+
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--spec_pth')
+    parser.add_argument('--process_num', default=0, type=int,
+                        help='number of works to process')
+    parser.add_argument('--max_wait', default=1, type=float,
+                        help='seconds of wait before each job')
+    parser.add_argument('--tolerance', default=float('inf'), type=float,
+                        help='hours since start')
+    return parser
 
 
 def update_default(d_config, n_config=None):
