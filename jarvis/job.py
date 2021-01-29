@@ -287,7 +287,8 @@ class BaseJob:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
         return completed_configs
 
-    def random_search(self, search_spec, process_num=0, tolerance=float('inf'), verbose=True):
+    def random_search(self, search_spec, process_num=0,
+                      max_wait=1, tolerance=float('inf'), verbose=True):
         r"""Randomly processes work in the search space.
 
         Args
@@ -297,8 +298,10 @@ class BaseJob:
         process_num: int
             The number of works to process. `process_num=0` means to process
             all pending works.
+        max_wait: float
+            Maximum waiting time in the beginning, in seconds.
         tolerance: float
-            The maximum allowed hours.
+            The maximum allowed time for processing one work, in hours.
         verbose: bool
             Whether to display information.
 
@@ -316,6 +319,11 @@ class BaseJob:
                 return True # running time exceeds tolerance
             else:
                 return False
+
+        random_wait = random.random()*max_wait
+        if verbose:
+            print('random wait {:.1f}s'.format(random_wait))
+        time.sleep(random_wait)
 
         count = 0
         for config in self.conjunction_configs(search_spec):
