@@ -214,7 +214,10 @@ class BaseJob:
         """
         for key, stat in self.stats.items():
             if stat['completed']:
-                config = self.configs[key]
+                try:
+                    config = self.configs[key]
+                except:
+                    continue
                 if not strict or (key in self.results and key in self.previews):
                     yield key, config, stat
 
