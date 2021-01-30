@@ -36,7 +36,7 @@ class BaseJob:
         else:
             self.configs = Archive(os.path.join(self.store_dir, 'configs'), max_try=60, hashable=True)
             self.stats = Archive(os.path.join(self.store_dir, 'stats'))
-            self.results = Archive(os.path.join(self.store_dir, 'results'), pth_len=4, pause=5.)
+            self.results = Archive(os.path.join(self.store_dir, 'results'), pth_len=3, pause=5.)
             self.previews = Archive(os.path.join(self.store_dir, 'previews'), pause=1.)
 
     def prune(self):
