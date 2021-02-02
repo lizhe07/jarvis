@@ -194,6 +194,7 @@ def cyclic_scheduler(optimizer, epoch_num, cycle_num, phase_num, gamma):
     return scheduler
 
 
+def evaluate(model, dataset, batch_size, device, worker_num):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -202,10 +203,10 @@ def cyclic_scheduler(optimizer, epoch_num, cycle_num, phase_num, gamma):
         The model to be evaluated.
     dataset: Dataset
         The dataset to evaluate the model on.
-    device: str
-        The device used for evaluation.
     batch_size: int
         The batch size of the data loader.
+    device: str
+        The device used for evaluation.
     worker_num: int
         The number of workers of the data loader.
 
