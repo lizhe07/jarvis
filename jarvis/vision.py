@@ -124,7 +124,76 @@ def prepare_model(task, arch, **kwargs):
     return model
 
 
-def evaluate(model, dataset, device, batch_size, worker_num):
+def sgd_optimizer(model, lr, momentum, weight_decay):
+    r"""Returns a SGD optimizer.
+
+    Only parameters whose name ends with ``'weight'`` will be trained with
+    weight decay.
+
+    Args
+    ----
+    model: nn.Module
+        The pytorch model.
+    lr: float
+        Learning rate for all parameters.
+    momentum: float
+        The momentum parameter for SGD.
+    weight_decay: float
+        The weight decay parameter for layer weights but not biases.
+
+    Returns
+    -------
+    optimizer: optimizer
+        The SGD optimizer.
+
+    """
+    params = []
+    params.append({
+        'params': [param for name, param in model.named_parameters() if name.endswith('weight')],
+        'weight_decay': weight_decay,
+        })
+    params.append({
+        'params': [param for name, param in model.named_parameters() if not name.endswith('weight')],
+        })
+    optimizer = torch.optim.SGD(params, lr=lr, momentum=momentum)
+    return optimizer
+
+
+def cyclic_scheduler(optimizer, epoch_num, cycle_num, phase_num, gamma):
+    r"""Returns a simple cyclic scheduler.
+
+    The full training is divided into several cycles, within each learning
+    rates are adjusted as in StepLR scheduler. At the beginning of each cycle,
+    the learning rate is reset to the initial value.
+
+    Args
+    ----
+    optimizer: optimizer
+        The pytorch optimizer.
+    epoch_num: int
+        The number of epochs.
+    cycle_num: int
+        The number of cycles.
+    phase_num: int
+        The number of phasese within each cycle. Learning rate decays by a
+        fixed factor between phases.
+    gamma: float
+        The decay factor between phases, must be in `(0, 1]`.
+
+    Returns
+    -------
+    scheduler: scheduler
+        The cyclic scheculer.
+
+    """
+    cycle_len = -(-epoch_num//cycle_num)
+    phase_len = -(-cycle_len//phase_num)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len)
+        )
+    return scheduler
+
+
     r"""Evaluates the task performance of the model.
 
     Args
