@@ -157,38 +157,43 @@ def grouping(configs, nuisances=None):
         nuisances = set()
 
     # get union of all flat keys
-    flat_configs = [HashableDict(flatten(c)) for c in configs]
-    flat_keys = set().union(*[c.keys() for c in flat_configs])
+    f_configs = [HashableDict(flatten(c)) for c in configs]
+    f_keys = set().union(*[c.keys() for c in f_configs])
 
     # remove nuisance keys
     n_keys = set()
-    for key in flat_keys:
-        if key.endswith('seed'):
-            n_keys.add(key)
+    for f_key in f_keys:
+        if f_key.endswith('seed'):
+            n_keys.add(f_key)
         else:
             for nuisance in nuisances:
-                if key.startswith(nuisance):
-                    n_keys.add(key)
-    flat_keys -= n_keys
+                if f_key.startswith(nuisance):
+                    n_keys.add(f_key)
+    f_keys -= n_keys
 
     # remove keys with unique values
     u_keys = set()
-    for key in flat_keys:
+    for f_key in f_keys:
         in_all, vals = True, set()
-        for c in flat_configs:
-            if key in c:
-                vals.add(c[key])
+        for f_config in f_configs:
+            if f_key in f_config:
+                vals.add(to_hashable(f_config[f_key]))
             else:
                 in_all = False
         if in_all and len(vals)==1:
-            u_keys.add(key)
-    flat_keys -= u_keys
+            u_keys.add(f_key)
+    f_keys -= u_keys
 
     # group configs based on changing values
-    group_keys = set([HashableDict(nest(dict((key, c[key]) for key in flat_keys if key in c))) \
-                      for c in flat_configs])
-    groups = dict((key, [c for c in configs if match_cond(c, key)]) \
-                  for key in group_keys)
+    groups = {}
+    for config, f_config in zip(configs, f_configs):
+        g_key = HashableDict(nest(dict(
+            (f_key, f_config[f_key]) for f_key in f_keys if f_key in f_config
+            )))
+        if g_key in groups:
+            groups[g_key].append(config)
+        else:
+            groups[g_key] = [config]
     return groups
 
 
