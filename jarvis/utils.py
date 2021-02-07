@@ -120,10 +120,12 @@ def nest(flat_dict):
     return nested_dict
 
 
-def match_cond(config, cond):
+def match_cond(config, cond=None):
     r"""Checks if a configuration matched condition.
 
     """
+    if cond is None:
+        cond = {}
     flat_config, flat_cond = flatten(config), flatten(cond)
     for key in flat_cond:
         if flat_cond[key]!={} and (key not in flat_config or flat_cond[key]!=flat_config[key]):

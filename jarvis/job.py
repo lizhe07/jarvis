@@ -7,7 +7,7 @@ Created on Mon Nov 25 22:57:30 2019
 
 import os, random, time
 import numpy as np
-from .utils import time_str, progress_str, match_cond
+from .utils import time_str, progress_str, match_cond, grouping
 from .archive import Archive
 
 
@@ -261,6 +261,50 @@ class BaseJob:
         matcher = lambda config: match_cond(config, cond)
         for key, config in self.matched(matcher):
             yield key, config
+
+    def group_and_sort(self, cond, nuisances=None, p_key='acc_test', reverse=None):
+        r"""Groups and sorts works based on previews.
+
+        Args
+        ----
+        cond: dict
+            A dictionary specifying the conditioned values.
+        nuisances: set
+            The nuisance keys, in the flat form (e.g.
+            ``'train_config::batch_size'``).
+        p_key: str
+            The key of preview of interest.
+        reverse: bool
+            The order of sort. ``True`` indicates descending order.
+
+        Returns
+        -------
+        g_keys: list
+            A list of group keys. Each item is a dictionary containing the
+            unshared part of configurations. Sorted by the mean value of each
+            `p_vals` item.
+        configs: list
+            The grouped configurations. Each item is a list of dictionaries
+            that match the corresponding group key.
+        p_vals: list
+            The grouped preview values of `p_key`. Each item is a list of float
+            numbers fetched from `self.previews`.
+
+        """
+        if reverse is None:
+            if p_key.startswith('acc'):
+                reverse = True
+            else:
+                reverse = False
+        p_vals =  {}
+        for key, config in self.conditioned(cond):
+            p_vals[config] = self.previews[key][p_key]
+        groups = grouping(p_vals.keys(), nuisances)
+        g_keys, configs, p_vals = zip(*sorted([
+            (g_key, configs, [p_vals[config] for config in configs])
+            for g_key, configs in groups.items()
+            ], key=lambda x: np.mean(x[-1]), reverse=reverse))
+        return g_keys, configs, p_vals
 
     def overview(self, search_spec=None):
         r"""Displays an overview of the job.
