@@ -35,9 +35,9 @@ DEFAULT_DIGIT_AUG = lambda size: [
 
 # (dataset, t_aug, class_num, sample_num) for different datasets
 DATASETS_META = {
-    'MNIST': (torchvision.datasets.MNIST, DEFAULT_DIGIT_AUG(28), 10, 60000),
-    'CIFAR10': (torchvision.datasets.CIFAR10, DEFAULT_IMAGE_AUG(32), 10, 50000),
-    'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 100, 50000),
+    'MNIST': (torchvision.datasets.MNIST, DEFAULT_DIGIT_AUG(28), 1, 10, 60000),
+    'CIFAR10': (torchvision.datasets.CIFAR10, DEFAULT_IMAGE_AUG(32), 3, 10, 50000),
+    'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 3, 100, 50000),
     }
 
 
@@ -79,7 +79,7 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
         t_test = [transforms.Grayscale(), transforms.ToTensor()]
     else:
         t_test = [transforms.ToTensor()]
-    dataset, t_aug, _, sample_num = DATASETS_META[task]
+    dataset, t_aug, *_, sample_num = DATASETS_META[task]
     if augment:
         t_train = t_aug+t_test
     else:
@@ -99,7 +99,7 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
     return dataset_train, dataset_valid, dataset_test
 
 
-def prepare_model(task, arch, **kwargs):
+def prepare_model(task, arch, in_channels=None, **kwargs):
     r"""Prepares model.
 
     Args
@@ -109,6 +109,9 @@ def prepare_model(task, arch, **kwargs):
     arch: str or callable
         The name of model architecture, e.g. ``ResNet18``, or a function that
         returns a model object.
+    in_channels: int
+        The number of input channels. Default values are used if `in_channels`
+        is ``None``.
 
     Returns
     -------
@@ -116,11 +119,13 @@ def prepare_model(task, arch, **kwargs):
         A pytorch model that can be called by `logits = model(images)`.
 
     """
-    _, _, class_num, _ = DATASETS_META[task]
+    _, _, _in_channels, class_num, _ = DATASETS_META[task]
+    if in_channels is None:
+        in_channels = _in_channels
     if isinstance(arch, str):
-        model = MODELS[arch](class_num=class_num, **kwargs)
+        model = MODELS[arch](class_num=class_num, in_channels=in_channels, **kwargs)
     else:
-        model = arch(class_num=class_num, **kwargs)
+        model = arch(class_num=class_num, in_channels=in_channels, **kwargs)
     return model
 
 
