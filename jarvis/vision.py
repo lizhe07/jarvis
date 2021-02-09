@@ -10,9 +10,10 @@ import numpy as np
 from torch.utils.data import Subset, DataLoader
 from torchvision import transforms
 
-from .models import resnet
+from .models import alexnet, resnet
 
 MODELS = {
+    'AlexNet': alexnet.alexnet,
     'ResNet18': resnet.resnet18,
     'ResNet34': resnet.resnet34,
     'ResNet50': resnet.resnet50,
