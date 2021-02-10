@@ -177,7 +177,7 @@ class ResNet(ImageClassifier):
         in_channels, class_num = self.in_channels, self.class_num
 
         assert block_type in ['Basic', 'Bottleneck']
-        self.block_nums = block_nums
+        self.block_nums, self.block_type = block_nums, block_type
         self.section_num = len(block_nums)
 
         assert conv0_kernel_size%2==1
