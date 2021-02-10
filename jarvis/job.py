@@ -299,6 +299,8 @@ class BaseJob:
         p_vals =  {}
         for key, config in self.conditioned(cond):
             p_vals[config] = self.previews[key][p_key]
+        if not p_vals:
+            return [], [], []
         groups = grouping(p_vals.keys(), nuisances)
         g_keys, configs, p_vals = zip(*sorted([
             (g_key, configs, [p_vals[config] for config in configs])
