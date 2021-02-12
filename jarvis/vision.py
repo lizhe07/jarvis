@@ -38,7 +38,7 @@ DEFAULT_DIGIT_AUG = lambda size: [
 # (dataset, t_aug, in_channels, class_num, sample_num) for different datasets
 DATASETS_META = {
     'MNIST': (torchvision.datasets.MNIST, DEFAULT_DIGIT_AUG(28), 1, 10, 60000),
-    'FashionMNIST': (torchvision.datasets.FashionMNIST, DEFAULT_DIGIT_AUG(28), 1, 10, 60000),
+    'FashionMNIST': (torchvision.datasets.FashionMNIST, DEFAULT_IMAGE_AUG(28), 1, 10, 60000),
     'CIFAR10': (torchvision.datasets.CIFAR10, DEFAULT_IMAGE_AUG(32), 3, 10, 50000),
     'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 3, 100, 50000),
     }
