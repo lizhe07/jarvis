@@ -67,25 +67,6 @@ class BaseJob:
         """
         raise NotImplementedError
 
-    def get_config(self, arg_strs):
-        r"""Returns a configuratiion dictionary from argument strings.
-
-        The method needs to be implemented in the child class for batch
-        processing.
-
-        Args
-        ----
-        arg_strs: list
-            The argument strings as the input of an argument parser.
-
-        Returns
-        -------
-        config: dict
-            The configuration dictionary specified by `arg_strs`.
-
-        """
-        raise NotImplementedError
-
     def is_completed(self, key, strict=False):
         r"""Returns whether a work is completed.
 
@@ -149,50 +130,6 @@ class BaseJob:
         toc = time.time()
         self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
         return result, preview
-
-    def conjunction_configs(self, search_spec):
-        r"""Returns a generator iterates over a search specification randomly.
-
-        Args
-        ----
-        search_spec: dict
-            The work configuration search specification. Dictionary items are
-            `(key, vals)`, in which `vals` is a list containing possible
-            search values. Each key-val pair will be converted by `converter`.
-
-        Yields
-        ------
-            A work configuration dictionary in random order.
-
-        """
-        def idx2args(idx):
-            sub_idxs = np.unravel_index(idx, space_dim)
-            arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
-            return arg_vals
-
-        def converter(key, val):
-            if isinstance(val, bool):
-                if val:
-                    return ['--'+key]
-            elif isinstance(val, list):
-                if val:
-                    return ['--'+key]+[str(v) for v in val]
-            elif val is not None:
-                return ['--'+key, str(val)]
-            return []
-
-        arg_keys = list(search_spec.keys())
-        val_lists = [search_spec[key] for key in arg_keys]
-        space_dim = [len(v) for v in val_lists]
-        total_num = np.prod(space_dim)
-
-        for idx in random.sample(range(total_num), total_num):
-            arg_vals = idx2args(idx)
-            arg_strs = []
-            for arg_key, arg_val in zip(arg_keys, arg_vals):
-                arg_strs += converter(arg_key, arg_val)
-            config = self.get_config(arg_strs)
-            yield config
 
     def completed(self, strict=False):
         r"""Returns a generator for completed works.
@@ -273,7 +210,7 @@ class BaseJob:
             The nuisance keys, in the flat form (e.g.
             ``'train_config::batch_size'``).
         p_key: str
-            The key of preview of interest.
+            The key of work preview to be analyzed.
         reverse: bool
             The order of sort. ``True`` indicates descending order.
 
@@ -308,6 +245,69 @@ class BaseJob:
             ], key=lambda x: np.mean(x[-1]), reverse=reverse))
         return g_keys, configs, p_vals
 
+    def get_config(self, arg_strs):
+        r"""Returns a configuratiion dictionary from argument strings.
+
+        The method needs to be implemented in the child class for batch
+        processing.
+
+        Args
+        ----
+        arg_strs: list
+            The argument strings as the input of an argument parser.
+
+        Returns
+        -------
+        config: dict
+            The configuration dictionary specified by `arg_strs`.
+
+        """
+        raise NotImplementedError
+
+    def random_configs(self, search_spec):
+        r"""Returns a generator iterates over a search specification randomly.
+
+        Args
+        ----
+        search_spec: dict
+            The work configuration search specification. Dictionary items are
+            `(key, vals)`, in which `vals` is a list containing possible
+            search values. Each key-val pair will be converted by `converter`.
+
+        Yields
+        ------
+            A work configuration dictionary in random order.
+
+        """
+        def idx2args(idx):
+            sub_idxs = np.unravel_index(idx, space_dim)
+            arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
+            return arg_vals
+
+        def converter(key, val):
+            if isinstance(val, bool):
+                if val:
+                    return ['--'+key]
+            elif isinstance(val, list):
+                if val:
+                    return ['--'+key]+[str(v) for v in val]
+            elif val is not None:
+                return ['--'+key, str(val)]
+            return []
+
+        arg_keys = list(search_spec.keys())
+        val_lists = [search_spec[key] for key in arg_keys]
+        space_dim = [len(v) for v in val_lists]
+        total_num = np.prod(space_dim)
+
+        for idx in random.sample(range(total_num), total_num):
+            arg_vals = idx2args(idx)
+            arg_strs = []
+            for arg_key, arg_val in zip(arg_keys, arg_vals):
+                arg_strs += converter(arg_key, arg_val)
+            config = self.get_config(arg_strs)
+            yield config
+
     def overview(self, search_spec=None):
         r"""Displays an overview of the job.
 
@@ -322,7 +322,7 @@ class BaseJob:
 
         """
         if search_spec is not None:
-            all_configs = set([c for c in self.conjunction_configs(search_spec)])
+            all_configs = set([c for c in self.random_configs(search_spec)])
         completed_configs, time_costs = [], []
         for key, config, stat in self.completed():
             if search_spec is None or (config in all_configs):
@@ -336,8 +336,8 @@ class BaseJob:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
         return completed_configs
 
-    def random_search(self, search_spec, process_num=0,
-                      max_wait=1, tolerance=float('inf'), verbose=True):
+    def random_search(self, search_spec, process_num=0, max_wait=1,
+                      tolerance=float('inf'), verbose=True):
         r"""Randomly processes work in the search space.
 
         Args
@@ -375,7 +375,7 @@ class BaseJob:
         time.sleep(random_wait)
 
         count = 0
-        for config in self.conjunction_configs(search_spec):
+        for config in self.random_configs(search_spec):
             if to_run(config):
                 self.process(config, verbose=verbose)
                 count += 1
