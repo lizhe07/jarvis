@@ -52,21 +52,6 @@ class BaseJob:
         print('pruning previews...')
         self.previews.prune()
 
-    def main(self, config, verbose):
-        r"""Main function of work processing.
-
-        The method needs to be implemented in the child class.
-
-        Args
-        ----
-        config: dict
-            The configuration dictionary to process.
-        verbose: bool
-            Whether to display information.
-
-        """
-        raise NotImplementedError
-
     def is_completed(self, key, strict=False):
         r"""Returns whether a work is completed.
 
@@ -88,48 +73,6 @@ class BaseJob:
         if strict and not(key in self.results and key in self.previews):
             return False
         return True
-
-    def process(self, config, policy='preserve', verbose=True):
-        r"""Processes one work.
-
-        Args
-        ----
-        config: dict
-            The configuration dictionary to process.
-        policy: str
-            The process policy regarding the existing record, can be
-            ``'preserve'`` or ``'overwrite'``.
-        verbose: bool
-            Whether to display information.
-
-        Returns
-        -------
-        result, preview:
-            The result and preview of the processed work.
-
-        """
-        assert policy in ['overwrite', 'preserve']
-
-        key = self.configs.add(config)
-        if self.is_completed(key):
-            if policy=='preserve':
-                if verbose:
-                    print(f"{key} already exists, results and previews will be preserved")
-                return self.results[key], self.previews[key]
-            if policy=='overwrite':
-                if verbose:
-                    print(f"{key} already exists, results and previews will be overwritten")
-
-        if verbose:
-            print(f'processing {key}...')
-        tic = time.time()
-        self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
-        result, preview = self.main(config, verbose)
-        self.results[key] = result
-        self.previews[key] = preview
-        toc = time.time()
-        self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
-        return result, preview
 
     def completed(self, strict=False):
         r"""Returns a generator for completed works.
@@ -244,6 +187,63 @@ class BaseJob:
             for g_key, configs in groups.items()
             ], key=lambda x: np.mean(x[-1]), reverse=reverse))
         return g_keys, configs, p_vals
+
+    def main(self, config, verbose):
+        r"""Main function of work processing.
+
+        The method needs to be implemented in the child class.
+
+        Args
+        ----
+        config: dict
+            The configuration dictionary to process.
+        verbose: bool
+            Whether to display information.
+
+        """
+        raise NotImplementedError
+
+    def process(self, config, policy='preserve', verbose=True):
+        r"""Processes one work.
+
+        Args
+        ----
+        config: dict
+            The configuration dictionary to process.
+        policy: str
+            The process policy regarding the existing record, can be
+            ``'preserve'`` or ``'overwrite'``.
+        verbose: bool
+            Whether to display information.
+
+        Returns
+        -------
+        result, preview:
+            The result and preview of the processed work.
+
+        """
+        assert policy in ['overwrite', 'preserve']
+
+        key = self.configs.add(config)
+        if self.is_completed(key):
+            if policy=='preserve':
+                if verbose:
+                    print(f"{key} already exists, results and previews will be preserved")
+                return self.results[key], self.previews[key]
+            if policy=='overwrite':
+                if verbose:
+                    print(f"{key} already exists, results and previews will be overwritten")
+
+        if verbose:
+            print(f'processing {key}...')
+        tic = time.time()
+        self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
+        result, preview = self.main(config, verbose)
+        self.results[key] = result
+        self.previews[key] = preview
+        toc = time.time()
+        self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
+        return result, preview
 
     def get_config(self, arg_strs):
         r"""Returns a configuratiion dictionary from argument strings.
