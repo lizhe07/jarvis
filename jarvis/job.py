@@ -7,7 +7,9 @@ Created on Mon Nov 25 22:57:30 2019
 
 import os, random, time
 import numpy as np
-from .utils import time_str, progress_str, match_cond, grouping
+from .utils import (
+    time_str, match_cond, grouping, to_hashable
+    )
 from .archive import Archive
 
 
@@ -322,7 +324,7 @@ class BaseJob:
 
         """
         if search_spec is not None:
-            all_configs = set([c for c in self.random_configs(search_spec)])
+            all_configs = set([to_hashable(c) for c in self.random_configs(search_spec)])
         completed_configs, time_costs = [], []
         for key, config, stat in self.completed():
             if search_spec is None or (config in all_configs):
@@ -330,7 +332,7 @@ class BaseJob:
                 time_costs.append(stat['toc']-stat['tic'])
         print('{} works completed'.format(
             len(completed_configs) if search_spec is None else
-            progress_str(len(completed_configs), len(all_configs))
+            '{}/{}'.format(len(completed_configs), len(all_configs))
             ))
         if completed_configs:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
