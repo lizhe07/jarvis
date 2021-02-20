@@ -265,3 +265,23 @@ class Archive():
                 print('no corrupted files detected')
             else:
                 print('{} corrupted files removed'.format(count))
+
+    def get_duplicates(self):
+        r"""Returns all duplicate records.
+
+        Returns
+        -------
+        duplicates: dict
+            A dictionary of which the key is the archive record, while the
+            value is the list of archive keys associated with it.
+
+        """
+        assert self.hashable, "duplicate search is implemented for hashable records only"
+        inv_dict = {}
+        for key, val in self.items():
+            if val in inv_dict:
+                inv_dict[val].append(key)
+            else:
+                inv_dict[val] = [key]
+        duplicates = dict((val, keys) for val, keys in inv_dict.items() if len(keys)>1)
+        return duplicates
