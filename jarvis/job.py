@@ -144,7 +144,7 @@ class BaseJob:
         for key, config in self.matched(matcher):
             yield key, config
 
-    def group_and_sort(self, cond, nuisances=None, p_key='acc_test', reverse=None):
+    def group_and_sort(self, cond=None, nuisances=None, p_key='acc_test', reverse=None):
         r"""Groups and sorts works based on previews.
 
         Args
@@ -173,6 +173,8 @@ class BaseJob:
             numbers fetched from `self.previews`.
 
         """
+        if cond is None:
+            cond = {}
         if reverse is None:
             if p_key.startswith('acc'):
                 reverse = True
