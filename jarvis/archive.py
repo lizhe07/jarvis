@@ -230,7 +230,7 @@ class Archive():
         return key
 
     def pop(self, key):
-        r"""Pops out an item.
+        r"""Pops out an item by key.
 
         """
         assert key in self, f"{key} does not exist"

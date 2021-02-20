@@ -54,6 +54,28 @@ class BaseJob:
         print('pruning previews...')
         self.previews.prune()
 
+    def pop(self, key):
+        r"""Pops out a work by key.
+
+        """
+        try:
+            config = self.configs.pop(key)
+        except:
+            config = None
+        try:
+            stat = self.stats.pop(key)
+        except:
+            stat = None
+        try:
+            result = self.results.pop(key)
+        except:
+            result = None
+        try:
+            preview = self.previews.pop(key)
+        except:
+            preview = None
+        return config, stat, result, preview
+
     def is_completed(self, key, strict=False):
         r"""Returns whether a work is completed.
 
@@ -191,6 +213,25 @@ class BaseJob:
             for g_key, configs in groups.items()
             ], key=lambda x: np.mean(x[-1]), reverse=reverse))
         return g_keys, configs, p_vals
+
+    def remove_duplicates(self, check_val=False):
+        r"""Remove duplicate works.
+
+        Args
+        ----
+        check_val: bool
+            Whether to check `result` and `preview` for duplicate works.
+
+        """
+        duplicates = self.configs.get_duplicates()
+        for config, keys in duplicates.items():
+            if check_val:
+                raise NotImplementedError
+            else:
+                random.shuffle(keys)
+                for key in keys[1:]:
+                    self.pop(key)
+        print('all duplicates removed')
 
     def main(self, config, verbose):
         r"""Main function of work processing.
