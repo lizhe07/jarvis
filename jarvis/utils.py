@@ -85,7 +85,9 @@ def flatten(nested_dict):
     flat_dict = {}
     for key, val in nested_dict.items():
         if isinstance(val, dict) and val and isinstance(next(iter(val)), str):
-            flat_dict.update(dict((key+'::'+subkey, subval) for subkey, subval in flatten(val).items()))
+            flat_dict.update(dict(
+                (key+'::'+subkey, subval) for subkey, subval in flatten(val).items()
+                ))
         else:
             flat_dict[key] = val
     return flat_dict
@@ -114,8 +116,10 @@ def nest(flat_dict):
         if key in flat_dict:
             nested_dict[key] = flat_dict[key]
         else:
-            subdict = dict((key_full.replace(key+'::', '', 1), val) for key_full, val in flat_dict.items() \
-                           if key_full.startswith(key))
+            subdict = dict(
+                (key_full.replace(key+'::', '', 1), val) for key_full, val in flat_dict.items()
+                if key_full.startswith(key)
+                )
             nested_dict[key] = nest(subdict)
     return nested_dict
 
@@ -226,7 +230,12 @@ def _is_custom_hashable(val):
     All custom hashable class implements `native` method.
 
     """
-    return isinstance(val, HashableList) or isinstance(val, HashableTuple) or isinstance(val, HashableSet) or isinstance(val, HashableDict)
+    return (
+        isinstance(val, HashableList)
+        or isinstance(val, HashableTuple)
+        or isinstance(val, HashableSet)
+        or isinstance(val, HashableDict)
+        )
 
 
 class HashableList(list):
@@ -397,28 +406,3 @@ def cyclic_scheduler(optimizer, epoch_num, cycle_num=2, phase_num=3, gamma=0.1):
         optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len)
         )
     return scheduler
-
-
-def update_default(d_config, n_config=None):
-    r"""Updates default config from new config.
-
-    Unlike `update` method of dictionary, only keys in the default config will
-    be updated.
-
-    Args
-    ----
-    d_config: dict
-        The default configuration dictionary.
-    n_config: dict
-        The new configuration dictionary.
-
-    Returns
-    -------
-    u_config: dict
-        The updated configuration dictionary.
-
-    """
-    if n_config is None:
-        n_config = {}
-    u_config = dict((key, n_config[key] if n_config and key in n_config else d_config[key]) for key in d_config)
-    return u_config
