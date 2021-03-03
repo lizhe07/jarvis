@@ -125,7 +125,7 @@ class BaseJob:
                 if not strict or (key in self.results and key in self.previews):
                     yield key, config, stat
 
-    def matched(self, matcher):
+    def matched(self, matcher, strict=False):
         r"""Returns a generator for completed works matching certain pattern.
 
         Args
@@ -133,6 +133,8 @@ class BaseJob:
         matcher: callable
             `matcher(config)` returns ``True`` if `config` matches the pattern,
             ``False`` otherwise.
+        strict: bool
+            Whether to check `results` and `previews`.
 
         Yields
         ------
@@ -142,17 +144,19 @@ class BaseJob:
             The configuration dictionary.
 
         """
-        for key, config, _ in self.completed():
+        for key, config, _ in self.completed(strict):
             if matcher(config):
                 yield key, config
 
-    def conditioned(self, cond):
+    def conditioned(self, cond, strict=False):
         r"""Returns a generator for completed works matching a condition.
 
         Args
         ----
         cond: dict
             A dictionary specifying the condioned values of configurations.
+        strict: bool
+            Whether to check `results` and `previews`.
 
         Yields
         ------
@@ -163,7 +167,7 @@ class BaseJob:
 
         """
         matcher = lambda config: match_cond(config, cond)
-        for key, config in self.matched(matcher):
+        for key, config in self.matched(matcher, strict):
             yield key, config
 
     def group_and_sort(self, cond=None, nuisances=None, p_key='acc_test', reverse=None):
