@@ -100,8 +100,8 @@ class ResBlock(nn.Module):
 
         Returns
         -------
-        activations: list of tensors
-            The activations for each layer.
+        pre_acts, post_acts: list of tensors
+            The pre and post activations for each layer.
 
         """
         if self.block_type=='Basic':
@@ -177,7 +177,7 @@ class ResNet(ImageClassifier):
         in_channels, class_num = self.in_channels, self.class_num
 
         assert block_type in ['Basic', 'Bottleneck']
-        self.block_nums = block_nums
+        self.block_nums, self.block_type = block_nums, block_type
         self.section_num = len(block_nums)
 
         assert conv0_kernel_size%2==1
@@ -247,8 +247,10 @@ class ResNet(ImageClassifier):
 
         Returns
         -------
-        activations: list of tensors
-            The activations for each layer.
+        pre_acts, post_acts: list of tensors
+            The pre and post activations for each layer.
+        logits: tensor
+            The logits.
 
         """
         pre0 = self.conv0(x)

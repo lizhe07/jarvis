@@ -72,7 +72,7 @@ class ImageClassifier(nn.Module):
                 std = [0.2]
         self.normalizer = Normalizer(mean, std)
 
-    def layer_activations(self, images: torch.Tensor) -> List[torch.Tensor]:
+    def layer_activations(self, x: torch.Tensor) -> List[torch.Tensor]:
         raise NotImplementedError
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
