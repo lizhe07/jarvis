@@ -329,7 +329,7 @@ def job_parser():
     return parser
 
 
-def sgd_optimizer(model, lr, momentum, weight_decay):
+def sgd_optimizer(model, lr, momentum=0.9, weight_decay=5e-4):
     r"""Returns a SGD optimizer.
 
     Only parameters whose name ends with ``'weight'`` will be trained with
@@ -364,7 +364,7 @@ def sgd_optimizer(model, lr, momentum, weight_decay):
     return optimizer
 
 
-def cyclic_scheduler(optimizer, epoch_num, cycle_num, phase_num, gamma):
+def cyclic_scheduler(optimizer, epoch_num, cycle_num=2, phase_num=3, gamma=0.1):
     r"""Returns a simple cyclic scheduler.
 
     The full training is divided into several cycles, within each learning
