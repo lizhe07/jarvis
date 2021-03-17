@@ -338,7 +338,7 @@ def job_parser():
     return parser
 
 
-def sgd_optimizer(model, lr, momentum=0.9, weight_decay=5e-4):
+def sgd_optimizer(model, lr, momentum=0.9, weight_decay=0.):
     r"""Returns a SGD optimizer.
 
     Only parameters whose name ends with ``'weight'`` will be trained with
