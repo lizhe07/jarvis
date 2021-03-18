@@ -272,6 +272,8 @@ class BaseJob:
 
         """
         assert policy in ['overwrite', 'preserve']
+        if verbose:
+            print("--------")
 
         key = self.configs.add(config)
         if self.is_completed(key):
@@ -284,7 +286,7 @@ class BaseJob:
                     print(f"{key} already exists, results and previews will be overwritten")
 
         if verbose:
-            print(f'processing {key}...')
+            print(f"processing {key}...")
         tic = time.time()
         self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
         result, preview = self.main(config, verbose)
