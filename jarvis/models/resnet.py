@@ -266,6 +266,46 @@ class ResNet(ImageClassifier):
         logits = self.fc(self.avgpool(post_acts[-1]).flatten(1))
         return pre_acts, post_acts, logits
 
+    def load_pytorch_model(self, p_state, normalizer_mean=None, normalizer_std=None):
+        r"""Loads state dict from a pre-trained pytorch resnet model.
+
+        The key of state dictionary is renamed for compatiblity, and the fully
+        connected layer are only loaded when the number of classes is correct.
+
+        Args
+        ----
+        p_state: dict
+            The state dict of a pytorch resnet model.
+        normalizer_mean, normalizer_std: tensor
+            The mean and std for input normalizer. Default values will be used
+            if they are not provided.
+
+        """
+        self.cpu()
+        j_state = {}
+        if normalizer_mean is not None:
+            j_state['normalizer.mean'] = normalizer_mean.cpu().reshape(self.in_channels, 1, 1)
+        if normalizer_std is not None:
+            j_state['normalizer.std'] = normalizer_std.cpu().reshape(self.in_channels, 1, 1)
+
+        for key in p_state:
+            if key.startswith('module.conv1'):
+                new_key = key.replace('module.conv1', 'conv0.0')
+            elif key.startswith('module.bn1'):
+                new_key = key.replace('module.bn1', 'conv0.1')
+            elif key.startswith('module.fc'):
+                new_key = key.replace('module.fc', 'fc')
+                if p_state[key].shape[0]!=self.class_num:
+                    continue
+            elif key.startswith('module.layer'):
+                new_key = key.replace('module.layer', 'sections.')
+                new_key = new_key[:9]+str(int(new_key[9])-1)+new_key[10:]
+                for s, t in zip(['conv1', 'bn1', 'conv2', 'bn2', 'conv3', 'bn3', 'downsample'], ['layer0.0', 'layer0.1', 'layer1.0', 'layer1.1', 'layer2.0', 'layer2.1', 'shortcut']):
+                    new_key = new_key.replace(s, t)
+            j_state[new_key] = p_state[key].cpu()
+
+        self.load_state_dict(j_state, strict=False)
+
 
 def resnet18(**kwargs):
     return ResNet([2, 2, 2, 2], 'Basic', **kwargs)
