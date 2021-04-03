@@ -5,7 +5,8 @@ Created on Fri Jul 31 21:59:48 2020
 @author: Zhe
 """
 
-import random, torch, torchvision
+import os, random, pickle, torch, torchvision
+from importlib import resources
 import numpy as np
 from torch.utils.data import Subset, DataLoader
 from torchvision import transforms
@@ -35,12 +36,54 @@ DEFAULT_DIGIT_AUG = lambda size: [
     transforms.RandomCrop(size),
     ]
 
+IMAGENET_TRAIN = [
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(
+        brightness=0.1, contrast=0.1, saturation=0.1
+        ),
+    ]
+IMAGENET_TEST = [
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    ]
+
+
+def imagenet_dataset(datasets_dir, train=False, transform=None):
+    r"""Returns dataset for ImageNet dataset.
+
+    Args
+    ----
+    datasets_dir: str
+        The directory of the datasets, must includes 'ILSVRC2012'.
+    train: bool
+        Whether returns training set or testing set.
+    transform: callable
+        The input transformation that takes an PIL image as input.
+
+    Returns
+    -------
+    dataset:
+        An ImageFolder dataset.
+
+    """
+    if train:
+        dataset = torchvision.datasets.ImageFolder(
+            os.path.join(datasets_dir, 'ILSVRC2012', 'train'), transform,
+            )
+    else:
+        dataset = torchvision.datasets.ImageFolder(
+            os.path.join(datasets_dir, 'ILSVRC2012', 'val'), transform,
+            )
+    return dataset
+
 # (dataset, t_aug, in_channels, class_num, sample_num) for different datasets
 DATASETS_META = {
     'MNIST': (torchvision.datasets.MNIST, DEFAULT_DIGIT_AUG(28), 1, 10, 60000),
     'FashionMNIST': (torchvision.datasets.FashionMNIST, DEFAULT_IMAGE_AUG(28), 1, 10, 60000),
     'CIFAR10': (torchvision.datasets.CIFAR10, DEFAULT_IMAGE_AUG(32), 3, 10, 50000),
     'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 3, 100, 50000),
+    'ImageNet': (imagenet_dataset, None, 3, 1000, 14197122),
     }
 
 
@@ -83,14 +126,27 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
     else:
         t_test = [transforms.ToTensor()]
     dataset, t_aug, *_, sample_num = DATASETS_META[task]
-    if augment:
-        t_train = t_aug+t_test
+    if task!='ImageNet':
+        if augment:
+            t_train = t_aug+t_test
+        else:
+            t_train = t_test
     else:
-        t_train = t_test
+        if augment:
+            t_train = IMAGENET_TRAIN+t_test
+        else:
+            t_train = IMAGENET_TEST+t_test
+        t_test = IMAGENET_TEST+t_test
     t_test = transforms.Compose(t_test)
     t_train = transforms.Compose(t_train)
 
     dataset_test = dataset(datasets_dir, train=False, transform=t_test)
+    if task=='ImageNet':
+        idxs = pickle.loads(resources.read_binary('jarvis.resources', 'imagenet_test_idxs'))
+        classes, class_to_idx = dataset_test.classes, dataset_test.class_to_idx
+        dataset_test = Subset(dataset_test, idxs)
+        dataset_test.classes = classes
+        dataset_test.class_to_idx = class_to_idx
     if split_ratio is None:
         return dataset_test
 
