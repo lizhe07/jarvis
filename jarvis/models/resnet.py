@@ -181,13 +181,15 @@ class ResNet(ImageClassifier):
         self.section_num = len(block_nums)
 
         assert conv0_kernel_size%2==1
+        stride = 1 if conv0_kernel_size<7 else 2
         self.conv0 = nn.Sequential(
             nn.Conv2d(in_channels, conv0_channels,
                       kernel_size=conv0_kernel_size,
-                      padding=conv0_kernel_size//2, bias=False),
+                      padding=conv0_kernel_size//2, stride=stride, bias=False),
             nn.BatchNorm2d(conv0_channels),
             )
         self.nonlinear0 = nn.ReLU()
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1) if stride>1 else nn.Sequential()
 
         in_channels = conv0_channels
         base_channels = [base_channels*(2**i) for i in range(self.section_num)]
@@ -254,7 +256,7 @@ class ResNet(ImageClassifier):
 
         """
         pre0 = self.conv0(x)
-        post0 = self.nonlinear0(pre0)
+        post0 = self.maxpool(self.nonlinear0(pre0))
         pre_acts, post_acts = [pre0], [post0]
 
         for section in self.sections:
