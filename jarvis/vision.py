@@ -143,10 +143,9 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
     dataset_test = dataset(datasets_dir, train=False, transform=t_test)
     if task=='ImageNet':
         idxs = pickle.loads(resources.read_binary('jarvis.resources', 'imagenet_test_idxs'))
-        classes, class_to_idx = dataset_test.classes, dataset_test.class_to_idx
-        dataset_test = Subset(dataset_test, idxs)
-        dataset_test.classes = classes
-        dataset_test.class_to_idx = class_to_idx
+        dataset_test.samples = [dataset_test.samples[idx] for idx in idxs]
+        dataset_test.targets = [s[1] for s in dataset_test.samples]
+        dataset_test.imgs = dataset_test.samples
     if split_ratio is None:
         return dataset_test
 
