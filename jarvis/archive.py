@@ -6,7 +6,7 @@ Created on Sat Nov 23 23:03:10 2019
 """
 
 import os, pickle, random, time
-from .utils import to_hashable
+from .utils import to_hashable, progress_str, time_str
 
 
 class Archive():
@@ -249,22 +249,40 @@ class Archive():
     def prune(self):
         r"""Removes corrupted files.
 
+        Returns
+        -------
+        removed: list
+            The name of removed files.
+
         """
+        removed = []
         if self.store_dir is None:
             print('no external store detected')
         else:
-            count = 0
-            for store_pth in self._store_pths():
+            store_pths = self._store_pths()
+            verbose, tic = None, time.time()
+            for i, store_pth in enumerate(store_pths, 1):
                 try:
                     self._safe_read(store_pth)
                 except:
-                    print('{} corrupted, will be removed'.format(store_pth))
+                    print("{} corrupted, will be removed".format(store_pth))
                     os.remove(store_pth)
-                    count += 1
-            if count==0:
-                print('no corrupted files detected')
+                    removed.append(store_pth[(-4-self.pth_len):-4])
+                if i%(-(-len(store_pths)//10))==0 or i==len(store_pths):
+                    toc = time.time()
+                    if verbose is None:
+                        # display progress if estimated time is longer than 20 mins
+                        verbose = (toc-tic)/i*len(store_pths)>1200
+                    if verbose:
+                        print("{} ({})".format(
+                            progress_str(i, len(store_pths)),
+                            time_str(toc-tic, progress=i/len(store_pths))
+                            ))
+            if removed:
+                print("{} corrupted files removed".format(len(removed)))
             else:
-                print('{} corrupted files removed'.format(count))
+                print("no corrupted files detected")
+        return removed
 
     def get_duplicates(self):
         r"""Returns all duplicate records.

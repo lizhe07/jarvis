@@ -45,14 +45,26 @@ class BaseJob:
         r"""Removes corrupted files.
 
         """
-        print('pruning configs...')
+        print("pruning configs...")
         self.configs.prune()
-        print('pruning stats...')
-        self.stats.prune()
-        print('pruning results...')
-        self.results.prune()
-        print('pruning previews...')
-        self.previews.prune()
+        removed = []
+        print("pruning stats...")
+        removed += self.stats.prune()
+        print("pruning results...")
+        removed += self.results.prune()
+        print("pruning previews...")
+        removed += self.previews.prune()
+
+        print("clearing records of removed files...")
+        to_remove = set()
+        for key in self.configs:
+            for r in removed:
+                if key.startswith(r):
+                    to_remove.add(key)
+        for key in to_remove:
+            for axv in [self.stats, self.results, self.previews]:
+                if key in axv:
+                    axv.pop(key)
 
     def pop(self, key):
         r"""Pops out a work by key.
