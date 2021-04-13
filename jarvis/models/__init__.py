@@ -78,3 +78,18 @@ class ImageClassifier(nn.Module):
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         *_, logits = self.layer_activations(self.normalizer(images))
         return logits
+
+
+class WrappedClassifier(ImageClassifier):
+
+    def __init__(
+            self,
+            model: nn.Module,
+            **kwargs: Any,
+            ) -> None:
+        super(WrappedClassifier, self).__init__(**kwargs)
+        self.raw_model = model
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        logits = self.raw_model(self.normalizer(images))
+        return logits
