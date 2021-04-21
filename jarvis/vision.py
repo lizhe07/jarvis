@@ -146,10 +146,15 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
         dataset_test.samples = [dataset_test.samples[idx] for idx in idxs]
         dataset_test.targets = [s[1] for s in dataset_test.samples]
         dataset_test.imgs = dataset_test.samples
+        # load class names from https://github.com/anishathalye/imagenet-simple-labels
+        dataset_test.class_names = pickle.loads(
+            resources.read_binary('jarvis.resources', 'imagenet_class_names')
+            )
     if split_ratio is None:
         return dataset_test
 
     assert split_ratio>0 and split_ratio<1
+    # TODO: add ImageNet training set
     idxs_train = np.array(random.sample(range(sample_num), int(sample_num*split_ratio)))
     idxs_valid = np.setdiff1d(np.arange(sample_num), idxs_train, assume_unique=True)
     dataset_train = Subset(dataset(datasets_dir, train=True, transform=t_train), idxs_train)
