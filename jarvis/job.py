@@ -218,7 +218,7 @@ class BaseJob:
                 reverse = True
             else:
                 reverse = False
-        p_vals =  {}
+        p_vals = {}
         for key, config in self.conditioned(cond):
             p_vals[config] = self.previews[key][p_key]
         if not p_vals:

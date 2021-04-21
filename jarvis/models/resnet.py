@@ -284,25 +284,28 @@ class ResNet(ImageClassifier):
 
         """
         self.cpu()
-        j_state = {}
+        j_state = {} # state dict of jarvis resnet model
         if normalizer_mean is not None:
             j_state['normalizer.mean'] = normalizer_mean.cpu().reshape(self.in_channels, 1, 1)
         if normalizer_std is not None:
             j_state['normalizer.std'] = normalizer_std.cpu().reshape(self.in_channels, 1, 1)
 
         for key in p_state:
-            if key.startswith('module.conv1'):
-                new_key = key.replace('module.conv1', 'conv0.0')
-            elif key.startswith('module.bn1'):
-                new_key = key.replace('module.bn1', 'conv0.1')
-            elif key.startswith('module.fc'):
-                new_key = key.replace('module.fc', 'fc')
+            if key.startswith('conv1'):
+                new_key = key.replace('conv1', 'conv0.0')
+            elif key.startswith('bn1'):
+                new_key = key.replace('bn1', 'conv0.1')
+            elif key.startswith('fc'):
                 if p_state[key].shape[0]!=self.class_num:
-                    continue
-            elif key.startswith('module.layer'):
-                new_key = key.replace('module.layer', 'sections.')
-                new_key = new_key[:9]+str(int(new_key[9])-1)+new_key[10:]
-                for s, t in zip(['conv1', 'bn1', 'conv2', 'bn2', 'conv3', 'bn3', 'downsample'], ['layer0.0', 'layer0.1', 'layer1.0', 'layer1.1', 'layer2.0', 'layer2.1', 'shortcut']):
+                    continue # load the core only when fc layer has different shape
+                new_key = key
+            elif key.startswith('layer'):
+                new_key = key.replace('layer', 'sections.')
+                new_key = new_key[:9]+str(int(new_key[9])-1)+new_key[10:] # can only handle sections fewer than 10
+                for s, t in zip(
+                        ['conv1', 'bn1', 'conv2', 'bn2', 'conv3', 'bn3', 'downsample'],
+                        ['layer0.0', 'layer0.1', 'layer1.0', 'layer1.1', 'layer2.0', 'layer2.1', 'shortcut']
+                        ):
                     new_key = new_key.replace(s, t)
             j_state[new_key] = p_state[key].cpu()
 
