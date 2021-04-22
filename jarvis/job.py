@@ -398,6 +398,69 @@ class BaseJob:
         if completed_configs:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
 
+    def review(self, search_spec):
+        r"""Displays a detailed review of search.
+
+        """
+        def idx2args(idx):
+            sub_idxs = np.unravel_index(idx, space_dim)
+            arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
+            return sub_idxs, arg_vals
+
+        def converter(key, val):
+            if isinstance(val, bool):
+                if val:
+                    return ['--'+key]
+            elif isinstance(val, list):
+                if val:
+                    return ['--'+key]+[str(v) for v in val]
+            elif val is not None:
+                return ['--'+key, str(val)]
+            return []
+
+        arg_keys = list(search_spec.keys())
+        val_lists = [search_spec[key] for key in arg_keys]
+        space_dim = [len(v) for v in val_lists]
+        total_num = np.prod(space_dim)
+
+        total, completed = {}, {}
+        for arg_key in arg_keys:
+            if arg_key.endswith('seed'):
+                continue
+            val_num = len(search_spec[arg_key])
+            if val_num==1:
+                continue
+            total[arg_key] = [set() for _ in range(val_num)]
+            completed[arg_key] = [set() for _ in range(val_num)]
+
+        for idx in range(total_num):
+            sub_idxs, arg_vals = idx2args(idx)
+            arg_strs = []
+            for arg_key, arg_val in zip(arg_keys, arg_vals):
+                arg_strs += converter(arg_key, arg_val)
+            config = to_hashable(self.get_config(arg_strs))
+
+            for arg_key, sub_idx in zip(arg_keys, sub_idxs):
+                if arg_key in total:
+                    total[arg_key][sub_idx].add(config)
+
+        for _, config, _ in self.completed():
+            for arg_key in total:
+                for sub_idx in range(len(search_spec[arg_key])):
+                    if config in total[arg_key][sub_idx]:
+                        completed[arg_key][sub_idx].add(config)
+
+        for arg_key in total:
+            print(arg_key)
+            strs = []
+            for sub_idx in range(len(search_spec[arg_key])):
+                strs.append('{}: {}/{}'.format(
+                    search_spec[arg_key][sub_idx],
+                    len(completed[arg_key][sub_idx]),
+                    len(total[arg_key][sub_idx]),
+                    ))
+            print('\n'.join(strs))
+
     def random_search(self, search_spec, process_num=0, max_wait=1,
                       tolerance=float('inf'), verbose=True):
         r"""Randomly processes work in the search space.
