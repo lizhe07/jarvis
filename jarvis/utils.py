@@ -5,7 +5,7 @@ Created on Wed Oct 16 14:04:58 2019
 @author: zhe
 """
 
-import argparse, random, torch, subprocess
+import argparse, random, torch
 import numpy as np
 
 
@@ -406,11 +406,3 @@ def cyclic_scheduler(optimizer, epoch_num, cycle_num=2, phase_num=3, gamma=0.1):
         optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len)
         )
     return scheduler
-
-
-def get_cuda_version():
-    r"""Returns CUDA version.
-
-    """
-    strs = subprocess.check_output('nvidia-smi').decode().split()
-    return strs[strs.index('CUDA')+2]
