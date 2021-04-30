@@ -186,9 +186,8 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
     if in_channels is None:
         in_channels = _in_channels
     if isinstance(arch, str):
-        model = MODELS[arch](class_num=class_num, in_channels=in_channels, **kwargs)
-    else:
-        model = arch(class_num=class_num, in_channels=in_channels, **kwargs)
+        arch = MODELS[arch]
+    model = arch(class_num=class_num, in_channels=in_channels, **kwargs)
     return model
 
 
