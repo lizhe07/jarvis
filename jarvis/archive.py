@@ -9,7 +9,7 @@ import os, pickle, random, time
 from .utils import to_hashable, progress_str, time_str
 
 
-class Archive():
+class Archive:
     r"""Dictionary-like class that stores data externally.
 
     Args
