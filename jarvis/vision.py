@@ -150,6 +150,8 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
         dataset_test.class_names = pickle.loads(
             resources.read_binary('jarvis.resources', 'imagenet_class_names')
             )
+    else:
+        dataset_test.class_names = dataset_test.classes
     if split_ratio is None:
         return dataset_test
 
