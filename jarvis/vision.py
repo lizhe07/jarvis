@@ -11,11 +11,10 @@ import numpy as np
 from torch.utils.data import Subset, DataLoader
 from torchvision import transforms
 
-from .models import lenet, alexnet, resnet
+from .models import lenet, resnet
 
 MODELS = {
     'LeNet': lenet.lenet,
-    'AlexNet': alexnet.alexnet,
     'ResNet18': resnet.resnet18,
     'ResNet34': resnet.resnet34,
     'ResNet50': resnet.resnet50,
@@ -36,17 +35,19 @@ DEFAULT_DIGIT_AUG = lambda size: [
     transforms.RandomCrop(size),
     ]
 
-IMAGENET_TRAIN = [
+IMAGENET_TRAIN = transforms.Compose([
     transforms.RandomResizedCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.ColorJitter(
-        brightness=0.1, contrast=0.1, saturation=0.1
+        brightness=0.1, contrast=0.1, saturation=0.1,
         ),
-    ]
-IMAGENET_TEST = [
+    transforms.ToTensor(),
+    ])
+IMAGENET_TEST = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
-    ]
+    transforms.ToTensor(),
+    ])
 
 
 def imagenet_dataset(datasets_dir, train=False, transform=None):
@@ -87,8 +88,7 @@ DATASETS_META = {
     }
 
 
-def prepare_datasets(task, datasets_dir, split_ratio=None,
-                     augment=True, grayscale=False):
+def prepare_datasets(task, datasets_dir, split_ratio=None, t_train=None, t_test=None):
     r"""Prepares vision datasets.
 
     Args
@@ -121,27 +121,16 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
             )
 
     """
-    if grayscale:
-        t_test = [transforms.Grayscale(), transforms.ToTensor()]
-    else:
-        t_test = [transforms.ToTensor()]
-    dataset, t_aug, *_, sample_num = DATASETS_META[task]
-    if task!='ImageNet':
-        if augment:
-            t_train = t_aug+t_test
+    if t_test is None: # load default testing transform
+        if task=='ImageNet':
+            t_test = IMAGENET_TEST
         else:
-            t_train = t_test
-    else:
-        if augment:
-            t_train = IMAGENET_TRAIN+t_test
-        else:
-            t_train = IMAGENET_TEST+t_test
-        t_test = IMAGENET_TEST+t_test
-    t_test = transforms.Compose(t_test)
-    t_train = transforms.Compose(t_train)
+            t_test = transforms.ToTensor()
+    dataset, augs, *_, sample_num = DATASETS_META[task]
 
     dataset_test = dataset(datasets_dir, train=False, transform=t_test)
     if task=='ImageNet':
+        # load a random fixed shuffle of testing images
         idxs = pickle.loads(resources.read_binary('jarvis.resources', 'imagenet_test_idxs'))
         dataset_test.samples = [dataset_test.samples[idx] for idx in idxs]
         dataset_test.targets = [s[1] for s in dataset_test.samples]
@@ -156,7 +145,11 @@ def prepare_datasets(task, datasets_dir, split_ratio=None,
         return dataset_test
 
     assert split_ratio>0 and split_ratio<1
-    # TODO: add ImageNet training set
+    if t_train is None:
+        if task=='ImageNet':
+            t_train = IMAGENET_TRAIN
+        else:
+            t_train = transforms.Compose(augs+[transforms.ToTensor()])
     idxs_train = np.array(random.sample(range(sample_num), int(sample_num*split_ratio)))
     idxs_valid = np.setdiff1d(np.arange(sample_num), idxs_train, assume_unique=True)
     dataset_train = Subset(dataset(datasets_dir, train=True, transform=t_train), idxs_train)
@@ -193,7 +186,7 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
     return model
 
 
-def evaluate(model, dataset, batch_size, device, worker_num):
+def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -222,7 +215,7 @@ def evaluate(model, dataset, batch_size, device, worker_num):
     model.eval().to(device)
     criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
 
-    loader = DataLoader(dataset, batch_size=batch_size, num_workers=worker_num)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=worker_num)
     loss, count = 0., 0.
     for images, labels in loader:
         with torch.no_grad():
