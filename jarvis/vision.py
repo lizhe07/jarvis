@@ -5,12 +5,13 @@ Created on Fri Jul 31 21:59:48 2020
 @author: Zhe
 """
 
-import os, random, pickle, torch, torchvision
+import os, time, random, pickle, torch, torchvision
 from importlib import resources
 import numpy as np
 from torch.utils.data import Subset, DataLoader
 from torchvision import transforms
 
+from .utils import time_str
 from .models import lenet, resnet
 
 MODELS = {
@@ -186,7 +187,7 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
     return model
 
 
-def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2):
+def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbose=False):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -217,6 +218,8 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2):
 
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=worker_num)
     loss, count = 0., 0.
+    if verbose:
+        tic = time.time()
     for images, labels in loader:
         with torch.no_grad():
             logits = model(images.to(device))
@@ -225,4 +228,7 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2):
             count += (predicts.cpu()==labels).to(torch.float).sum().item()
     loss = loss/len(dataset)
     acc = count/len(dataset)
+    if verbose:
+        toc = time.time()
+        print('loss: {:4.2f}, acc:{:7.2%} ({})'.format(loss, acc, time_str(toc-tic)))
     return loss, acc
