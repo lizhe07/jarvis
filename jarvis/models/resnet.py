@@ -171,6 +171,7 @@ class ResNet(ImageClassifier):
             conv0_channels: int = 64,
             conv0_kernel_size: int = 7,
             base_channels: int = 64,
+            res_block = ResBlock,
             **kwargs: Any,
             ) -> None:
         super(ResNet, self).__init__(**kwargs)
@@ -198,14 +199,15 @@ class ResNet(ImageClassifier):
         self.sections = nn.ModuleList()
         for i in range(self.section_num):
             section, in_channels = self._make_section(
-                block_nums[i], block_type, in_channels, base_channels[i], strides[i],
+                res_block, block_nums[i], block_type,
+                in_channels, base_channels[i], strides[i],
                 )
             self.sections.append(section)
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(in_channels, class_num)
 
-    def _make_section(self, block_num, block_type, in_channels, base_channels, stride):
+    def _make_section(self, res_block, block_num, block_type, in_channels, base_channels, stride):
         r"""Constructs one ResNet section.
 
         Args
@@ -229,10 +231,10 @@ class ResNet(ImageClassifier):
             The output channel number.
 
         """
-        blocks = [ResBlock(block_type, in_channels, base_channels, stride)]
+        blocks = [res_block(block_type, in_channels, base_channels, stride)]
         out_channels = blocks[0].out_channels
         for _ in range(block_num-1):
-            blocks.append(ResBlock(block_type, out_channels, base_channels))
+            blocks.append(res_block(block_type, out_channels, base_channels))
         section = nn.ModuleList(blocks)
         return section, out_channels
 
