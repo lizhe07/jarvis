@@ -303,3 +303,11 @@ class Archive:
                 inv_dict[val] = [key]
         duplicates = dict((val, keys) for val, keys in inv_dict.items() if len(keys)>1)
         return duplicates
+
+    def to_internal(self):
+        r"""Moves external storage to internal.
+
+        """
+        if self.store_dir is not None:
+            self.__store__ =  dict((key, val) for key, val in self.items())
+            self.store_dir = None

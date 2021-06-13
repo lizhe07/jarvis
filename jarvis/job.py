@@ -28,7 +28,7 @@ class BaseJob:
 
     """
 
-    def __init__(self, store_dir=None):
+    def __init__(self, store_dir=None, readonly=False):
         self.store_dir = store_dir
         if self.store_dir is None:
             self.configs = Archive(hashable=True)
@@ -41,10 +41,17 @@ class BaseJob:
             self.results = Archive(os.path.join(self.store_dir, 'results'), pth_len=3, pause=5.)
             self.previews = Archive(os.path.join(self.store_dir, 'previews'), pause=1.)
 
+        self.readonly = readonly
+        if self.store_dir is not None and readonly:
+            for axv in [self.configs, self.stats, self.previews]:
+                axv.to_internal()
+
     def prune(self):
         r"""Removes corrupted files.
 
         """
+        assert not self.readonly, "this is a read-only job"
+
         print("pruning configs...")
         self.configs.prune()
         removed = []
@@ -283,6 +290,8 @@ class BaseJob:
             The result and preview of the processed work.
 
         """
+        assert not self.readonly, "this is a read-only job"
+
         assert policy in ['overwrite', 'preserve']
         if verbose:
             print("--------")
