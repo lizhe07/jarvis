@@ -5,7 +5,7 @@ Created on Sun Jul 26 12:15:55 2020
 @author: Zhe
 """
 
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Optional
 
 import torch
 import torch.nn as nn
@@ -170,6 +170,7 @@ class ResNet(ImageClassifier):
             block_type: str,
             conv0_channels: int = 64,
             conv0_kernel_size: int = 7,
+            conv0_stride: Optional[int] = None,
             base_channels: int = 64,
             res_block = ResBlock,
             **kwargs: Any,
@@ -182,15 +183,17 @@ class ResNet(ImageClassifier):
         self.section_num = len(block_nums)
 
         assert conv0_kernel_size%2==1
-        stride = 1 if conv0_kernel_size<7 else 2
+        if conv0_stride is None:
+            conv0_stride = 1 if conv0_kernel_size<7 else 2
         self.conv0 = nn.Sequential(
             nn.Conv2d(in_channels, conv0_channels,
                       kernel_size=conv0_kernel_size,
-                      padding=conv0_kernel_size//2, stride=stride, bias=False),
+                      padding=conv0_kernel_size//2,
+                      stride=conv0_stride, bias=False),
             nn.BatchNorm2d(conv0_channels),
             )
         self.nonlinear0 = nn.ReLU()
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1) if stride>1 else nn.Sequential()
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1) if conv0_stride>1 else nn.Sequential()
 
         in_channels = conv0_channels
         base_channels = [base_channels*(2**i) for i in range(self.section_num)]
