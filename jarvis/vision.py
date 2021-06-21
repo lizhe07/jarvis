@@ -122,11 +122,18 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, t_train=None, t_test=
             )
 
     """
+    if task.endswith('-Gray'):
+        task = task[:-5]
+        to_grayscale = True
+    else:
+        to_grayscale = False
     if t_test is None: # load default testing transform
         if task=='ImageNet':
             t_test = IMAGENET_TEST
         else:
             t_test = transforms.ToTensor()
+        if to_grayscale:
+            t_test = transforms.Compose([t_test, transforms.Grayscale()])
     dataset, augs, *_, sample_num = DATASETS_META[task]
 
     dataset_test = dataset(datasets_dir, train=False, transform=t_test)
@@ -134,7 +141,7 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, t_train=None, t_test=
         # load a random fixed shuffle of testing images
         idxs = pickle.loads(resources.read_binary('jarvis.resources', 'imagenet_test_idxs'))
         dataset_test.samples = [dataset_test.samples[idx] for idx in idxs]
-        dataset_test.targets = [s[1] for s in dataset_test.samples]
+        dataset_test.targets = [t for _, t in dataset_test.samples]
         dataset_test.imgs = dataset_test.samples
         # load class names from https://github.com/anishathalye/imagenet-simple-labels
         dataset_test.class_names = pickle.loads(
@@ -151,6 +158,8 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, t_train=None, t_test=
             t_train = IMAGENET_TRAIN
         else:
             t_train = transforms.Compose(augs+[transforms.ToTensor()])
+        if to_grayscale:
+            t_train = transforms.Compose([t_train, transforms.Grayscale()])
     idxs_train = np.array(random.sample(range(sample_num), int(sample_num*split_ratio)))
     idxs_valid = np.setdiff1d(np.arange(sample_num), idxs_train, assume_unique=True)
     dataset_train = Subset(dataset(datasets_dir, train=True, transform=t_train), idxs_train)
