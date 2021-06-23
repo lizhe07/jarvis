@@ -85,7 +85,7 @@ DATASETS_META = {
     'FashionMNIST': (torchvision.datasets.FashionMNIST, DEFAULT_IMAGE_AUG(28), 1, 10, 60000),
     'CIFAR10': (torchvision.datasets.CIFAR10, DEFAULT_IMAGE_AUG(32), 3, 10, 50000),
     'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 3, 100, 50000),
-    'ImageNet': (imagenet_dataset, None, 3, 1000, 14197122),
+    'ImageNet': (imagenet_dataset, None, 3, 1000, 1281167),
     }
 
 
