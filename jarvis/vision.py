@@ -152,7 +152,7 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, t_train=None, t_test=
     if split_ratio is None:
         return dataset_test
 
-    assert split_ratio>0 and split_ratio<1
+    assert split_ratio>0 and split_ratio<=1
     if t_train is None:
         if task=='ImageNet':
             t_train = IMAGENET_TRAIN
@@ -239,5 +239,5 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbos
     acc = count/len(dataset)
     if verbose:
         toc = time.time()
-        print('loss: {:4.2f}, acc:{:7.2%} ({})'.format(loss, acc, time_str(toc-tic)))
+        print('loss: {:5.3f}, acc:{:7.2%} ({})'.format(loss, acc, time_str(toc-tic)))
     return loss, acc
