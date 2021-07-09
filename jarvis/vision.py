@@ -89,7 +89,7 @@ DATASETS_META = {
     }
 
 
-def prepare_datasets(task, datasets_dir, split_ratio=None, t_train=None, t_test=None):
+def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_test=None):
     r"""Prepares vision datasets.
 
     Args
@@ -163,7 +163,9 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, t_train=None, t_test=
     idxs_train = np.array(random.sample(range(sample_num), int(sample_num*split_ratio)))
     idxs_valid = np.setdiff1d(np.arange(sample_num), idxs_train, assume_unique=True)
     dataset_train = Subset(dataset(datasets_dir, train=True, transform=t_train), idxs_train)
+    dataset_train.targets = list(np.array(dataset_train.dataset.targets)[idxs_train])
     dataset_valid = Subset(dataset(datasets_dir, train=True, transform=t_test), idxs_valid)
+    dataset_valid.targets = list(np.array(dataset_valid.dataset.targets)[idxs_valid])
     return dataset_train, dataset_valid, dataset_test
 
 

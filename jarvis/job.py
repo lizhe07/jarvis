@@ -235,7 +235,7 @@ class BaseJob:
             (g_key, configs, [p_vals[config] for config in configs])
             for g_key, configs in groups.items()
             ], key=lambda x: np.mean(x[-1]), reverse=reverse))
-        return g_keys, configs, p_vals
+        return list(g_keys), list(configs), list(p_vals)
 
     def remove_duplicates(self, check_val=False):
         r"""Remove duplicate works.
