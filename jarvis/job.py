@@ -372,7 +372,8 @@ class BaseJob:
         space_dim = [len(v) for v in val_lists]
         total_num = np.prod(space_dim)
 
-        for idx in random.sample(range(total_num), total_num):
+        while True:
+            idx = random.randint(0, total_num-1)
             arg_vals = idx2args(idx)
             arg_strs = []
             for arg_key, arg_val in zip(arg_keys, arg_vals):
@@ -407,7 +408,7 @@ class BaseJob:
         if completed_configs:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
 
-    def random_search(self, search_spec, process_num=0, max_wait=1,
+    def random_search(self, search_spec, process_num=1, max_wait=1,
                       tolerance=float('inf'), verbose=True):
         r"""Randomly processes work in the search space.
 
@@ -450,7 +451,7 @@ class BaseJob:
             if to_run(config):
                 self.process(config, verbose=verbose)
                 count += 1
-            if process_num>0 and count==process_num:
+            if count==process_num:
                 if verbose:
                     print('\n{} works processed'.format(process_num))
                 return
