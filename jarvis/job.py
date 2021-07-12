@@ -408,7 +408,7 @@ class BaseJob:
         if completed_configs:
             print('average processing time {}'.format(time_str(np.mean(time_costs))))
 
-    def random_search(self, search_spec, process_num=1, max_wait=1,
+    def random_search(self, search_spec, process_num=0, max_wait=1,
                       tolerance=float('inf'), verbose=True):
         r"""Randomly processes work in the search space.
 
@@ -451,7 +451,7 @@ class BaseJob:
             if to_run(config):
                 self.process(config, verbose=verbose)
                 count += 1
-            if count==process_num:
+            if process_num>0 and count==process_num:
                 if verbose:
                     print('\n{} works processed'.format(process_num))
                 return

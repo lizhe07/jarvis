@@ -329,7 +329,7 @@ def job_parser():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--spec_pth')
-    parser.add_argument('--process_num', default=1, type=int,
+    parser.add_argument('--process_num', default=0, type=int,
                         help='number of works to process')
     parser.add_argument('--max_wait', default=1, type=float,
                         help='seconds of wait before each job')
