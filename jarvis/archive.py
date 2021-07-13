@@ -174,7 +174,9 @@ class Archive:
             for key in self.__store__.keys():
                 yield key
         else:
-            for store_pth in sorted(self._store_pths()):
+            store_pths = self._store_pth()
+            random.shuffle(store_pths)
+            for store_pth in store_pths:
                 records = self._safe_read(store_pth)
                 for key in records.keys():
                     yield key
@@ -187,7 +189,9 @@ class Archive:
             for val in self.__store__.values():
                 yield val
         else:
-            for store_pth in sorted(self._store_pths()):
+            store_pths = self._store_pth()
+            random.shuffle(store_pths)
+            for store_pth in store_pths:
                 records = self._safe_read(store_pth)
                 for val in records.values():
                     yield val
@@ -200,7 +204,9 @@ class Archive:
             for key, val in self.__store__.items():
                 yield key, val
         else:
-            for store_pth in sorted(self._store_pths()):
+            store_pths = self._store_pth()
+            random.shuffle(store_pths)
+            for store_pth in store_pths:
                 records = self._safe_read(store_pth)
                 for key, val in records.items():
                     yield key, val
