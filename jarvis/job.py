@@ -28,7 +28,8 @@ class BaseJob:
 
     """
 
-    def __init__(self, store_dir=None, readonly=False):
+    def __init__(self, store_dir=None, readonly=False,
+                 c_pth_len=2, c_pause=0.5, r_pth_len=3, r_pause=5):
         self.store_dir = store_dir
         if self.store_dir is None:
             self.configs = Archive(hashable=True)
@@ -36,10 +37,14 @@ class BaseJob:
             self.results = Archive()
             self.previews = Archive()
         else:
-            self.configs = Archive(os.path.join(self.store_dir, 'configs'), max_try=60, hashable=True)
-            self.stats = Archive(os.path.join(self.store_dir, 'stats'))
-            self.results = Archive(os.path.join(self.store_dir, 'results'), pth_len=3, pause=5.)
-            self.previews = Archive(os.path.join(self.store_dir, 'previews'), pause=1.)
+            self.configs = Archive(os.path.join(self.store_dir, 'configs'),
+                                   pth_len=c_pth_len, max_try=60, pause=c_pause, hashable=True)
+            self.stats = Archive(os.path.join(self.store_dir, 'stats'),
+                                 pth_len=c_pth_len, pause=c_pause)
+            self.results = Archive(os.path.join(self.store_dir, 'results'),
+                                   pth_len=r_pth_len, pause=r_pause)
+            self.previews = Archive(os.path.join(self.store_dir, 'previews'),
+                                    pth_len=c_pth_len, pause=c_pause)
 
         self.readonly = readonly
         if self.store_dir is not None and readonly:
