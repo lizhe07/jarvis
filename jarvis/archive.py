@@ -126,7 +126,7 @@ class Archive:
                     records = pickle.load(f)
             except:
                 count += 1
-                time.sleep(self.pause)
+                time.sleep(self.pause*(0.8+random.random()*0.4))
             else:
                 break
         if count==self.max_try:
@@ -144,7 +144,7 @@ class Archive:
                     pickle.dump(records, f)
             except:
                 count += 1
-                time.sleep(self.pause)
+                time.sleep(self.pause*(0.8+random.random()*0.4))
             else:
                 break
         if count==self.max_try:
