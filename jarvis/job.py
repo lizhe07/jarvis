@@ -447,8 +447,8 @@ class BaseJob:
                 return False
 
         random_wait = random.random()*max_wait
-        if verbose:
-            print('random wait {:.1f}s'.format(random_wait))
+        if random_wait>0 and verbose:
+            print('random wait {:.1f}s...'.format(random_wait))
         time.sleep(random_wait)
 
         count = 0
