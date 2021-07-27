@@ -317,21 +317,21 @@ class ResNet(ImageClassifier):
         self.load_state_dict(j_state, strict=False)
 
 
-def resnet18(**kwargs):
-    return ResNet([2, 2, 2, 2], 'Basic', **kwargs)
+def resnet18(resnet=ResNet, **kwargs):
+    return resnet(block_nums=[2, 2, 2, 2], block_type='Basic', **kwargs)
 
 
-def resnet34(**kwargs):
-    return ResNet([3, 4, 6, 3], 'Basic', **kwargs)
+def resnet34(resnet=ResNet, **kwargs):
+    return resnet(block_nums=[3, 4, 6, 3], block_type='Basic', **kwargs)
 
 
-def resnet50(**kwargs):
-    return ResNet([3, 4, 6, 3], 'Bottleneck', **kwargs)
+def resnet50(resnet=ResNet, **kwargs):
+    return resnet(block_nums=[3, 4, 6, 3], block_type='Bottleneck', **kwargs)
 
 
-def resnet101(**kwargs):
-    return ResNet([3, 4, 23, 3], 'Bottleneck', **kwargs)
+def resnet101(resnet=ResNet, **kwargs):
+    return resnet(block_nums=[3, 4, 23, 3], block_type='Bottleneck', **kwargs)
 
 
-def resnet152(**kwargs):
-    return ResNet([3, 8, 36, 3], 'Bottleneck', **kwargs)
+def resnet152(resnet=ResNet, **kwargs):
+    return resnet(block_nums=[3, 8, 36, 3], block_type='Bottleneck', **kwargs)
