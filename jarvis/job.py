@@ -385,8 +385,7 @@ class BaseJob:
         space_dim = [len(v) for v in val_lists]
         total_num = np.prod(space_dim)
 
-        while True:
-            idx = random.randint(0, total_num-1)
+        for idx in random.sample(range(total_num), total_num):
             arg_vals = idx2args(idx)
             arg_strs = []
             for arg_key, arg_val in zip(arg_keys, arg_vals):
