@@ -51,7 +51,7 @@ class BaseJob:
             for axv in [self.configs, self.stats, self.previews]:
                 axv.to_internal()
 
-    def prune(self):
+    def prune(self, check_completed=False):
         r"""Removes corrupted files.
 
         """
@@ -77,6 +77,14 @@ class BaseJob:
             for axv in [self.stats, self.results, self.previews]:
                 if key in axv:
                     axv.pop(key)
+
+        if check_completed:
+            to_pop = []
+            for key, stat in self.stats.items():
+                if stat['completed'] and not(key in self.previews and key in self.results):
+                    to_pop.append(key)
+            for key in to_pop:
+                self.pop(key)
 
     def pop(self, key):
         r"""Pops out a work by key.
