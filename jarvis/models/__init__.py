@@ -90,6 +90,6 @@ class WrappedClassifier(ImageClassifier):
         super(WrappedClassifier, self).__init__(**kwargs)
         self.raw_model = model
 
-    def forward(self, images: torch.Tensor) -> torch.Tensor:
-        logits = self.raw_model(self.normalizer(images))
+    def forward(self, images: torch.Tensor, **kwargs) -> torch.Tensor:
+        logits = self.raw_model(self.normalizer(images), **kwargs)
         return logits

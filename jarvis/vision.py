@@ -79,6 +79,45 @@ def imagenet_dataset(datasets_dir, train=False, transform=None):
             )
     return dataset
 
+def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
+    with open(os.path.join(datasets_dir, 'tiny-imagenet-200', 'words.txt'), 'r') as f:
+        lines = f.readlines()
+    class_name_dict = {}
+    for line in lines:
+        key, val = line.split('\t')
+        class_name_dict[key] = val[:-1]
+
+    dataset_train = torchvision.datasets.ImageFolder(
+        os.path.join(datasets_dir, 'tiny-imagenet-200', 'train'), transform,
+        )
+    dataset_train.class_names = [class_name_dict[c] for c in dataset_train.classes]
+    if train:
+        return dataset_train
+    else:
+        with open(os.path.join(datasets_dir, 'tiny-imagenet-200', 'val', 'val_annotations.txt'), 'r') as f:
+            lines = f.readlines()
+        img_pths, img_classes = [], []
+        for line in lines:
+            img_pth, img_class, *_ = line.split('\t')
+            img_pths.append(img_pth)
+            img_classes.append(img_class)
+
+        _dataset = torchvision.datasets.ImageFolder(
+            os.path.join(datasets_dir, 'tiny-imagenet-200', 'val'), transform,
+            )
+        images, labels = [], []
+        for i in range(len(_dataset)):
+            images.append(_dataset[i][0])
+            labels.append(dataset_train.classes.index(
+                img_classes[img_pths.index(_dataset.imgs[i][0].split(os.sep)[-1])]
+                ))
+        images = torch.stack(images).to(torch.float)
+        labels = torch.tensor(labels, dtype=torch.long)
+        dataset_test = torch.utils.data.TensorDataset(images, labels)
+        dataset_test.class_names = dataset_train.class_names
+        return dataset_test
+
+
 # (dataset, t_aug, in_channels, class_num, sample_num) for different datasets
 DATASETS_META = {
     'MNIST': (torchvision.datasets.MNIST, DEFAULT_DIGIT_AUG(28), 1, 10, 60000),
@@ -86,6 +125,7 @@ DATASETS_META = {
     'CIFAR10': (torchvision.datasets.CIFAR10, DEFAULT_IMAGE_AUG(32), 3, 10, 50000),
     'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 3, 100, 50000),
     'ImageNet': (imagenet_dataset, None, 3, 1000, 1281167),
+    'TinyImageNet': (tinyimagenet_dataset, DEFAULT_IMAGE_AUG(64), 3, 200, 100000),
     }
 
 
@@ -147,7 +187,7 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
         dataset_test.class_names = pickle.loads(
             resources.read_binary('jarvis.resources', 'imagenet_class_names')
             )
-    else:
+    elif task!='TinyImageNet':
         dataset_test.class_names = dataset_test.classes
     if split_ratio is None:
         return dataset_test
@@ -164,8 +204,10 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
     idxs_valid = np.setdiff1d(np.arange(sample_num), idxs_train, assume_unique=True)
     dataset_train = Subset(dataset(datasets_dir, train=True, transform=t_train), idxs_train)
     dataset_train.targets = list(np.array(dataset_train.dataset.targets)[idxs_train])
+    dataset_train.class_names = dataset_test.class_names
     dataset_valid = Subset(dataset(datasets_dir, train=True, transform=t_test), idxs_valid)
     dataset_valid.targets = list(np.array(dataset_valid.dataset.targets)[idxs_valid])
+    dataset_valid.class_names = dataset_test.class_names
     return dataset_train, dataset_valid, dataset_test
 
 
