@@ -107,9 +107,12 @@ def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
             )
         images, labels = [], []
         for i in range(len(_dataset)):
+            img_pth = _dataset.imgs[i][0].split(os.sep)[-1]
+            if img_pth not in img_pths:
+                continue
             images.append(_dataset[i][0])
             labels.append(dataset_train.classes.index(
-                img_classes[img_pths.index(_dataset.imgs[i][0].split(os.sep)[-1])]
+                img_classes[img_pths.index(img_pth)]
                 ))
         dataset_test = torch.utils.data.TensorDataset(
             torch.stack(images).to(torch.float), torch.tensor(labels, dtype=torch.long)
