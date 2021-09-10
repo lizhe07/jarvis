@@ -91,5 +91,7 @@ class WrappedClassifier(ImageClassifier):
         self.raw_model = model
 
     def forward(self, images: torch.Tensor, **kwargs) -> torch.Tensor:
+        if images.shape[1]==1 and self.in_channels==3:
+            images = images.expand(-1, 3, -1, -1)
         logits = self.raw_model(self.normalizer(images), **kwargs)
         return logits
