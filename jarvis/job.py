@@ -328,6 +328,9 @@ class BaseJob:
         self.previews[key] = preview
         toc = time.time()
         self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
+        if verbose:
+            print("{} processed ({})".format(key, time_str(toc-tic)))
+            print("--------")
         return result, preview
 
     def get_config(self, arg_strs):
