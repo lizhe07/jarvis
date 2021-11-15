@@ -202,7 +202,8 @@ class BaseJob:
         for key, config in self.matched(matcher, strict):
             yield key, config
 
-    def group_and_sort(self, cond=None, nuisances=None, p_key='acc_test', reverse=None):
+    def group_and_sort(self, cond=None, nuisances=None, p_key='acc_test',
+                       in_group='mean', reverse=None):
         r"""Groups and sorts works based on previews.
 
         Args
@@ -214,6 +215,8 @@ class BaseJob:
             ``'train_config::batch_size'``).
         p_key: str
             The key of work preview to be analyzed.
+        in_group: str
+            The candidate mode within one group, can be 'mean', 'min' or 'max'.
         reverse: bool
             The order of sort. ``True`` indicates descending order.
 
@@ -244,10 +247,16 @@ class BaseJob:
         if not p_vals:
             return [], [], []
         groups = grouping(p_vals.keys(), nuisances)
+        if in_group=='mean':
+            sort_key = lambda x: np.mean(x[-1])
+        if in_group=='min':
+            sort_key = lambda x: np.min(x[-1])
+        if in_group=='max':
+            sort_key = lambda x: np.max(x[-1])
         g_keys, configs, p_vals = zip(*sorted([
             (g_key, configs, [p_vals[config] for config in configs])
             for g_key, configs in groups.items()
-            ], key=lambda x: np.mean(x[-1]), reverse=reverse))
+            ], key=sort_key, reverse=reverse))
         return list(g_keys), list(configs), list(p_vals)
 
     def remove_duplicates(self, check_val=False):
