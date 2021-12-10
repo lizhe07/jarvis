@@ -481,3 +481,14 @@ class BaseJob:
                 return
         if verbose:
             print('\nall works processed or being processed')
+
+    def copy_to(self, config, dest_job, overwrite=False):
+        r"""Copies a work to the new job"""
+        sour_key = self.configs.get_key(config)
+        dest_key = dest_job.configs.add(config)
+        if overwrite or dest_key not in dest_job.stats:
+            dest_job.stats[dest_key] = self.stats[sour_key]
+        if overwrite or dest_key not in dest_job.results:
+            dest_job.results[dest_key] = self.results[sour_key]
+        if overwrite or dest_key not in dest_job.previews:
+            dest_job.previews[dest_key] = self.previews[sour_key]
