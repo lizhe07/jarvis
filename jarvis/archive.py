@@ -36,8 +36,7 @@ class Archive:
         if self.store_dir is None:
             self.__store__ = {}
         else:
-            if not os.path.exists(self.store_dir):
-                os.makedirs(self.store_dir)
+            os.makedirs(self.store_dir, exist_ok=True)
             self.pth_len, self.max_try, self.pause = pth_len, max_try, pause
             assert key_len>=pth_len, "file name length should be no greater than key length"
         self.hashable = hashable
