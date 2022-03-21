@@ -450,6 +450,11 @@ class BaseJob:
         verbose: bool
             Whether to display information.
 
+        Returns
+        -------
+        count: int
+            Number or works processed.
+
         """
         def to_run(config):
             r"""Determines whether to run a work.
@@ -478,9 +483,10 @@ class BaseJob:
             if process_num>0 and count==process_num:
                 if verbose:
                     print('\n{} works processed'.format(process_num))
-                return
+                return count
         if verbose:
             print('\nall works processed or being processed')
+        return count
 
     def copy_to(self, config, dest_job, overwrite=False):
         r"""Copies a work to the new job"""
