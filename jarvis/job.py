@@ -472,7 +472,7 @@ class BaseJob:
 
         random_wait = random.random()*max_wait
         if random_wait>0 and verbose:
-            print('random wait {:.1f}s...'.format(random_wait))
+            print("random wait {:.1f}s...".format(random_wait))
         time.sleep(random_wait)
 
         count = 0
@@ -482,10 +482,10 @@ class BaseJob:
                 count += 1
             if process_num>0 and count==process_num:
                 if verbose:
-                    print('\n{} works processed'.format(process_num))
+                    print("{} works processed".format(process_num))
                 return count
         if verbose:
-            print('\nall works processed or being processed')
+            print("all works processed or being processed")
         return count
 
     def copy_to(self, config, dest_job, overwrite=False):
