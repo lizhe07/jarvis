@@ -1,12 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Oct 16 14:04:58 2019
-
-@author: zhe
-"""
-
 import argparse, random, torch
 import numpy as np
+
+Array = np.ndarray
 
 
 def time_str(t_elapse, progress=1.):
@@ -215,6 +210,8 @@ def to_hashable(val):
         return HashableSet(val)
     if isinstance(val, dict):
         return HashableDict(val)
+    if isinstance(val, Array):
+        return HashableArray(val)
 
     try:
         hash(val)
@@ -235,6 +232,7 @@ def _is_custom_hashable(val):
         or isinstance(val, HashableTuple)
         or isinstance(val, HashableSet)
         or isinstance(val, HashableDict)
+        or isinstance(val, HashableArray)
         )
 
 
@@ -305,6 +303,18 @@ class HashableDict(dict):
         for key, val in self.items():
             converted[key] = val.native() if _is_custom_hashable(val) else val
         return converted
+
+
+class HashableArray(HashableList):
+
+    def __init__(self, x: Array):
+        self.shape = x.shape
+        self.dtype = x.dtype
+        vals = list(x.reshape(-1))
+        super(HashableArray, self).__init__(vals)
+
+    def native(self):
+        return np.array(self, dtype=self.dtype).reshape(self.shape)
 
 
 def numpy_dict(model_state):
