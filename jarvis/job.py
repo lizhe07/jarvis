@@ -1,15 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Nov 25 22:57:30 2019
-
-@author: Zhe
-"""
-
-import os, random, time
-import numpy as np
-from .utils import (
-    time_str, match_cond, grouping, to_hashable
-    )
+import random, time
+from collections.abc import Iterable
+from .utils import time_str
 from .archive import Archive
 
 
@@ -18,18 +9,31 @@ class BaseJob:
 
     The job is associated with different directories storing configurations,
     status, results and previews of all works. Method `main` need to be
-    implemented by child class. Method `get_config` need to be implemented by
-    child class in order to process works in batch.
-
-    Args
-    ----
-    store_dir: str
-        The directory for storing data.
+    implemented by child class.
 
     """
 
-    def __init__(self, store_dir=None, readonly=False,
-                 c_pth_len=2, c_pause=0.5, r_pth_len=3, r_pause=5):
+    def __init__(self,
+        store_dir: Optional[str] = None,
+        read_only: bool = False,
+        c_path_len: int = 2, c_pause: float = 0.5,
+        r_path_len: int = 3, r_pause: float = 5.,
+    ):
+        r"""
+        Args
+        ----
+        store_dir:
+            Directory for storage. Archives including `configs`, `stats`,
+            `results` and `previews` will be saved in separate directories.
+        read_only:
+            If the job is read-only or not.
+        c_pth_len, c_pause:
+            Path length and pause time for `configs`, as well as `stats` and
+            `previews`.
+        r_path_len, r_pause:
+            Path length and pause time for `results`.
+
+        """
         self.store_dir = store_dir
         if self.store_dir is None:
             self.configs = Archive(hashable=True)
@@ -37,76 +41,43 @@ class BaseJob:
             self.results = Archive()
             self.previews = Archive()
         else:
-            self.configs = Archive(os.path.join(self.store_dir, 'configs'),
-                                   pth_len=c_pth_len, max_try=60, pause=c_pause, hashable=True)
-            self.stats = Archive(os.path.join(self.store_dir, 'stats'),
-                                 pth_len=c_pth_len, pause=c_pause)
-            self.results = Archive(os.path.join(self.store_dir, 'results'),
-                                   pth_len=r_pth_len, pause=r_pause)
-            self.previews = Archive(os.path.join(self.store_dir, 'previews'),
-                                    pth_len=c_pth_len, pause=c_pause)
-
-        self.readonly = readonly
-        if self.store_dir is not None and readonly:
+            self.configs = Archive(
+                f'{self.store_dir}/configs', path_len=c_path_len, max_try=60,
+                pause=c_pause, hashable=True,
+            )
+            self.stats = Archive(
+                f'{self.store_dir}/stats', path_len=c_path_len, pause=c_pause,
+            )
+            self.results = Archive(
+                f'{self.store_dir}/results', path_len=r_path_len, pause=r_pause,
+            )
+            self.previews = Archive(
+                f'{self.store_dir}/previews', path_len=c_path_len, pause=c_pause,
+            )
+        self.read_only = read_only
+        if self.store_dir is not None and self.read_only:
             for axv in [self.configs, self.stats, self.previews]:
                 axv.to_internal()
 
-    def prune(self, check_completed=False):
-        r"""Removes corrupted files.
+    def main(self, config, verbose: int = 1):
+        r"""Main function that needs implementation by subclasses.
+
+        Args
+        ----
+        config:
+            A configuration dict for the work.
+        verbose:
+            Level of information display. No message will be printed when
+            'verbose' is no greater than 0.
+
+        Returns
+        -------
+        result, preview:
+            Archive records that will be saved in `self.results` and
+            `self.previews` respectively.
 
         """
-        assert not self.readonly, "this is a read-only job"
-
-        print("pruning configs...")
-        self.configs.prune()
-        removed = []
-        print("pruning stats...")
-        removed += self.stats.prune()
-        print("pruning results...")
-        removed += self.results.prune()
-        print("pruning previews...")
-        removed += self.previews.prune()
-
-        print("clearing records of removed files...")
-        to_remove = set()
-        for key in self.configs:
-            for r in removed:
-                if key.startswith(r):
-                    to_remove.add(key)
-        for key in to_remove:
-            for axv in [self.stats, self.results, self.previews]:
-                if key in axv:
-                    axv.pop(key)
-
-        if check_completed:
-            to_pop = []
-            for key, stat in self.stats.items():
-                if stat['completed'] and not(key in self.previews and key in self.results):
-                    to_pop.append(key)
-            for key in to_pop:
-                self.pop(key)
-
-    def pop(self, key):
-        r"""Pops out a work by key.
-
-        """
-        try:
-            config = self.configs.pop(key)
-        except:
-            config = None
-        try:
-            stat = self.stats.pop(key)
-        except:
-            stat = None
-        try:
-            result = self.results.pop(key)
-        except:
-            result = None
-        try:
-            preview = self.previews.pop(key)
-        except:
-            preview = None
-        return config, stat, result, preview
+        raise NotImplementedError
 
     def is_completed(self, key, strict=False):
         r"""Returns whether a work is completed.
@@ -114,7 +85,7 @@ class BaseJob:
         Args
         ----
         key: str
-            The work key.
+            Key of the work.
         strict: bool
             Whether to check `results` and `previews`.
 
@@ -130,206 +101,18 @@ class BaseJob:
             return False
         return True
 
-    def completed(self, strict=False):
-        r"""Returns a generator for completed works.
-
-        Args
-        ----
-        strict: bool
-            Whether to check `results` and `previews`.
-
-        Yields
-        ------
-        key: str
-            The key of a completed work.
-        config: dict
-            The configuration dictionary.
-        stat: dict
-            The status dictionary.
-
-        """
-        for key, stat in self.stats.items():
-            if stat['completed']:
-                try:
-                    config = self.configs[key]
-                except:
-                    continue
-                if not strict or (key in self.results and key in self.previews):
-                    yield key, config, stat
-
-    def matched(self, matcher, strict=False):
-        r"""Returns a generator for completed works matching certain pattern.
-
-        Args
-        ----
-        matcher: callable
-            `matcher(config)` returns ``True`` if `config` matches the pattern,
-            ``False`` otherwise.
-        strict: bool
-            Whether to check `results` and `previews`.
-
-        Yields
-        ------
-        key: str
-            The key of a completed work that matches `matcher`.
-        config: dict
-            The configuration dictionary.
-
-        """
-        for key, config, _ in self.completed(strict):
-            if matcher(config):
-                yield key, config
-
-    def conditioned(self, cond, strict=False):
-        r"""Returns a generator for completed works matching a condition.
-
-        Args
-        ----
-        cond: dict
-            A dictionary specifying the condioned values of configurations.
-        strict: bool
-            Whether to check `results` and `previews`.
-
-        Yields
-        ------
-        key: str
-            The key of a completed work that is correctly conditioned.
-        config: dict
-            The configuration dictionary.
-
-        """
-        matcher = lambda config: match_cond(config, cond)
-        for key, config in self.matched(matcher, strict):
-            yield key, config
-
-    def group_and_sort(self, cond=None, nuisances=None, p_key='acc_test',
-                       in_group='mean', reverse=None):
-        r"""Groups and sorts works based on previews.
-
-        Args
-        ----
-        cond: dict
-            A dictionary specifying the conditioned values.
-        nuisances: set
-            The nuisance keys, in the flat form (e.g.
-            ``'train_config::batch_size'``).
-        p_key: str
-            The key of work preview to be analyzed.
-        in_group: str
-            The candidate mode within one group, can be 'mean', 'min' or 'max'.
-        reverse: bool
-            The order of sort. ``True`` indicates descending order.
-
-        Returns
-        -------
-        g_keys: list
-            A list of group keys. Each item is a dictionary containing the
-            unshared part of configurations. Sorted by the mean value of each
-            `p_vals` item.
-        configs: list
-            The grouped configurations. Each item is a list of dictionaries
-            that match the corresponding group key.
-        p_vals: list
-            The grouped preview values of `p_key`. Each item is a list of float
-            numbers fetched from `self.previews`.
-
-        """
-        if cond is None:
-            cond = {}
-        if reverse is None:
-            if p_key.startswith('acc'):
-                reverse = True
-            else:
-                reverse = False
-        p_vals = {}
-        for key, config in self.conditioned(cond):
-            p_vals[config] = self.previews[key][p_key]
-        if not p_vals:
-            return [], [], []
-        groups = grouping(p_vals.keys(), nuisances)
-        if in_group=='mean':
-            sort_key = lambda x: np.mean(x[-1])
-        if in_group=='min':
-            sort_key = lambda x: np.min(x[-1])
-        if in_group=='max':
-            sort_key = lambda x: np.max(x[-1])
-        g_keys, configs, p_vals = zip(*sorted([
-            (g_key, configs, [p_vals[config] for config in configs])
-            for g_key, configs in groups.items()
-            ], key=sort_key, reverse=reverse))
-        return list(g_keys), list(configs), list(p_vals)
-
-    def remove_duplicates(self, check_val=False):
-        r"""Remove duplicate works.
-
-        Args
-        ----
-        check_val: bool
-            Whether to check `result` and `preview` for duplicate works.
-
-        """
-        duplicates = self.configs.get_duplicates()
-        for config, keys in duplicates.items():
-            if check_val:
-                raise NotImplementedError
-            else:
-                random.shuffle(keys)
-                for key in keys[1:]:
-                    self.pop(key)
-        print('all duplicates removed')
-
-    def main(self, config, verbose):
-        r"""Main function of work processing.
-
-        The method needs to be implemented in the child class.
-
-        Args
-        ----
-        config: dict
-            The configuration dictionary to process.
-        verbose: bool
-            Whether to display information.
-
-        """
-        raise NotImplementedError
-
-    def process(self, config, policy='preserve', verbose=True):
-        r"""Processes one work.
-
-        Args
-        ----
-        config: dict
-            The configuration dictionary to process.
-        policy: str
-            The process policy regarding the existing record, can be
-            ``'preserve'`` or ``'overwrite'``.
-        verbose: bool
-            Whether to display information.
-
-        Returns
-        -------
-        result, preview:
-            The result and preview of the processed work.
-
-        """
-        assert not self.readonly, "this is a read-only job"
-
-        assert policy in ['overwrite', 'preserve']
+    def process(self, config, verbose=1):
+        r"""Processes one work."""
+        assert not self.read_only, "This is a read-only job."
         if verbose:
             print("--------")
-
         key = self.configs.add(config)
         if self.is_completed(key):
-            if policy=='preserve':
-                if verbose:
-                    print(f"{key} already exists, results and previews will be preserved")
-                return self.results[key], self.previews[key]
-            if policy=='overwrite':
-                if verbose:
-                    print(f"{key} already exists, results and previews will be overwritten")
-
+            if verbose:
+                print(f"{key} already exists.")
+            return self.results[key], self.previews[key]
         if verbose:
-            print(f"processing {key}...")
+            print(f"Processing {key}...")
         tic = time.time()
         self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
         result, preview = self.main(config, verbose)
@@ -338,163 +121,60 @@ class BaseJob:
         toc = time.time()
         self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
         if verbose:
-            print("{} processed ({})".format(key, time_str(toc-tic)))
+            print("{} processed ({}).".format(key, time_str(toc-tic)))
             print("--------")
         return result, preview
 
-    def get_config(self, arg_strs):
-        r"""Returns a configuratiion dictionary from argument strings.
+    def to_process(self, config, patience=float('inf')):
+        r"""Returns whether to process a work."""
+        key = self.configs.add(config)
+        try:
+            stat = self.stats[key]
+        except:
+            return True # stats[key] does not exist
+        t_last = stat['tic'] if stat['toc'] is None else stat['toc']
+        if not stat['completed'] and (time.time()-t_last)/3600>patience:
+            return True # running time exceeds patience
+        else:
+            return False # work is being processed
 
-        The method needs to be implemented in the child class for batch
-        processing.
-
-        Args
-        ----
-        arg_strs: list
-            The argument strings as the input of an argument parser.
-
-        Returns
-        -------
-        config: dict
-            The configuration dictionary specified by `arg_strs`.
-
-        """
-        raise NotImplementedError
-
-    def random_configs(self, search_spec):
-        r"""Returns a generator iterates over a search specification randomly.
-
-        Args
-        ----
-        search_spec: dict
-            The work configuration search specification. Dictionary items are
-            `(key, vals)`, in which `vals` is a list containing possible
-            search values. Each key-val pair will be converted by `converter`.
-
-        Yields
-        ------
-            A work configuration dictionary in random order.
-
-        """
-        def idx2args(idx):
-            sub_idxs = np.unravel_index(idx, space_dim)
-            arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
-            return arg_vals
-
-        def converter(key, val):
-            if isinstance(val, bool):
-                if val:
-                    return ['--'+key]
-            elif isinstance(val, list):
-                if val:
-                    return ['--'+key]+[str(v) for v in val]
-            elif val is not None:
-                return ['--'+key, str(val)]
-            return []
-
-        arg_keys = list(search_spec.keys())
-        val_lists = [search_spec[key] for key in arg_keys]
-        space_dim = [len(v) for v in val_lists]
-        total_num = np.prod(space_dim)
-
-        for idx in random.sample(range(total_num), total_num):
-            arg_vals = idx2args(idx)
-            arg_strs = []
-            for arg_key, arg_val in zip(arg_keys, arg_vals):
-                arg_strs += converter(arg_key, arg_val)
-            config = self.get_config(arg_strs)
-            yield config
-
-    def overview(self, search_spec=None):
-        r"""Displays an overview of the job.
-
-        Progress of the whole job will be displayed, along with the average
-        process time.
+    def batch(self,
+        configs: Iterable,
+        num_works: int = 0,
+        max_wait: float = 1.,
+        patience: float = float('inf'),
+        verbose: int = 1,
+    ):
+        r"""Batch processing.
 
         Args
         ----
-        search_spec: dict
-            The work configuration search specification. If ``None``, all
-            completed works will be shown.
-
-        """
-        if search_spec is not None:
-            all_configs = set([to_hashable(c) for c in self.random_configs(search_spec)])
-        completed_configs, time_costs = [], []
-        for key, config, stat in self.completed():
-            if search_spec is None or (config in all_configs):
-                completed_configs.append(config)
-                time_costs.append(stat['toc']-stat['tic'])
-        print('{} works completed'.format(
-            len(completed_configs) if search_spec is None else
-            '{}/{}'.format(len(completed_configs), len(all_configs))
-            ))
-        if completed_configs:
-            print('average processing time {}'.format(time_str(np.mean(time_costs))))
-
-    def random_search(self, search_spec, process_num=0, max_wait=1,
-                      tolerance=float('inf'), verbose=True):
-        r"""Randomly processes work in the search space.
-
-        Args
-        ----
-        search_spec: dict
-            The work configuration search specification.
-        process_num: int
-            The number of works to process. `process_num=0` means to process
-            all pending works.
-        max_wait: float
+        configs:
+            An iterable object containing work configurations. Some are
+            potentially processed already.
+        num_works:
+            The number of works to process. If it is 0, the processing stops
+            when no work is left in `configs`.
+        max_wait:
             Maximum waiting time in the beginning, in seconds.
-        tolerance: float
-            The maximum allowed time for processing one work, in hours.
-        verbose: bool
-            Whether to display information.
-
-        Returns
-        -------
-        count: int
-            Number or works processed.
+        patience:
+            Patience time for processing an incomplete work, in hours. The last
+            modified time of a work is recorded in `self.stats`.
 
         """
-        def to_run(config):
-            r"""Determines whether to run a work.
-
-            """
-            key = self.configs.add(config)
-            try:
-                stat = self.stats[key]
-            except:
-                return True # stats[key] does not exist
-            if not stat['completed'] and (time.time()-stat['tic'])/3600>tolerance:
-                return True # running time exceeds tolerance
-            else:
-                return False
-
         random_wait = random.random()*max_wait
         if random_wait>0 and verbose:
-            print("random wait {:.1f}s...".format(random_wait))
+            print("Random wait {:.1f}s...".format(random_wait))
         time.sleep(random_wait)
 
         count = 0
-        for config in self.random_configs(search_spec):
-            if to_run(config):
-                self.process(config, verbose=verbose)
+        for config in configs:
+            if self.to_process(config, patience):
+                self.process(config, verbose)
                 count += 1
-            if process_num>0 and count==process_num:
+            if num_works>0 and count==num_works:
                 if verbose:
-                    print("{} works processed".format(process_num))
+                    print("{} works processed".format(num_works))
                 return count
         if verbose:
-            print("all works processed or being processed")
-        return count
-
-    def copy_to(self, config, dest_job, overwrite=False):
-        r"""Copies a work to the new job"""
-        sour_key = self.configs.get_key(config)
-        dest_key = dest_job.configs.add(config)
-        if overwrite or dest_key not in dest_job.stats:
-            dest_job.stats[dest_key] = self.stats[sour_key]
-        if overwrite or dest_key not in dest_job.results:
-            dest_job.results[dest_key] = self.results[sour_key]
-        if overwrite or dest_key not in dest_job.previews:
-            dest_job.previews[dest_key] = self.previews[sour_key]
+            print("All works are processed or being processed.")
