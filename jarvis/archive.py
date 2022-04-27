@@ -1,6 +1,7 @@
 import os, pickle, random, time
 from typing import Optional
-from .utils import to_hashable, progress_str, time_str
+from .hashable import to_hashable
+from .utils import progress_str, time_str
 
 
 class Archive:

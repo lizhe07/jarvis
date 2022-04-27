@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Jul 31 21:59:48 2020
-
-@author: Zhe
-"""
-
 import os, time, random, pickle, torch, torchvision
 from importlib import resources
 import numpy as np
@@ -244,7 +237,7 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
     return model
 
 
-def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbose=False):
+def evaluate(model, dataset, batch_size=100, device='cuda', num_workers=2, verbose=1):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -257,7 +250,7 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbos
         The batch size of the data loader.
     device: str
         The device used for evaluation.
-    worker_num: int
+    num_workers: int
         The number of workers of the data loader.
 
     Returns
@@ -268,15 +261,13 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbos
         The classification accuracy averaged over the dataset.
 
     """
-    if device=='cuda' and not torch.cuda.is_available():
-        device = 'cpu'
+    device = torch.device(device) if torch.cuda.is_available() else torch.device('cpu')
     model.eval().to(device)
     criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
 
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=worker_num)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     loss, count = 0., 0.
-    if verbose:
-        tic = time.time()
+    tic = time.time()
     for images, labels in loader:
         with torch.no_grad():
             logits = model(images.to(device))
@@ -285,7 +276,7 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbos
             count += (predicts.cpu()==labels).to(torch.float).sum().item()
     loss = loss/len(dataset)
     acc = count/len(dataset)
-    if verbose:
-        toc = time.time()
+    toc = time.time()
+    if verbose>0:
         print('loss: {:5.3f}, acc:{:7.2%} ({})'.format(loss, acc, time_str(toc-tic)))
     return loss, acc
