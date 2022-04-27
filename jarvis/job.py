@@ -143,7 +143,6 @@ class BaseJob:
     def batch(self,
         configs: Iterable,
         num_works: int = 0,
-        max_wait: float = 1.,
         patience: float = float('inf'),
         verbose: int = 1,
     ):
@@ -157,18 +156,11 @@ class BaseJob:
         num_works:
             The number of works to process. If it is 0, the processing stops
             when no work is left in `configs`.
-        max_wait:
-            Maximum waiting time in the beginning, in seconds.
         patience:
             Patience time for processing an incomplete work, in hours. The last
             modified time of a work is recorded in `self.stats`.
 
         """
-        random_wait = random.random()*max_wait
-        if random_wait>0 and verbose>0:
-            print("Random wait {:.1f}s...".format(random_wait))
-        time.sleep(random_wait)
-
         count = 0
         for config in configs:
             if self.to_process(config, patience):
