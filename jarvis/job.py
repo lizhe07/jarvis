@@ -2,7 +2,7 @@ import random, time
 import numpy as np
 from collections.abc import Iterable
 from typing import Optional
-from .utils import time_str
+from .utils import time_str, flatten
 from .archive import Archive
 
 
@@ -256,3 +256,70 @@ class BaseJob:
         self.results[key] = ckpt
         if verbose>0:
             print(f"Checkpoint ({key}) saved.")
+
+    @staticmethod
+    def _is_matched(config, cond=None):
+        r"""Checks if a configuration matches condition."""
+        if cond is None:
+            return True
+        flat_config, flat_cond = flatten(config), flatten(cond)
+        for key in flat_cond:
+            if not(key in flat_config and flat_config[key]==flat_cond[key]):
+                return False
+        return True
+
+    def completed(self, cond=None):
+        r"""A generator for completed works."""
+        for key, stat in self.stats.items():
+            if stat['completed']:
+                try:
+                    config = self.configs[key]
+                except:
+                    continue
+                if self._is_matched(config, cond):
+                    yield key
+
+    def best_work(self,
+        cond: Optional[dict] = None,
+        p_key: str = 'loss_test',
+        reverse: Optional[bool] = None,
+        verbose: int = 1,
+    ):
+        r"""Returns the best work given conditions.
+
+        Args
+        ----
+        cond:
+            Conditioned value of work configurations. Only completed work with
+            matching values will be considered.
+        p_key:
+            The key of `preview` for comparing works.
+        reverse:
+            Returns work with the largest value of ``'p_key'`` when `reverse` is
+            ``True``, otherwise the smallest.
+
+        Returns
+        -------
+        best_key: str
+            The key of best work.
+
+        """
+        if reverse is None:
+            reverse = p_key.startswith('acc')
+        best_val = -float('inf') if reverse else float('inf')
+        best_key = None
+        count = 0
+        for key in self.completed(cond):
+            val = self.previews[key][p_key]
+            if reverse:
+                if val>best_val:
+                    best_val = val
+                    best_key = key
+            else:
+                if val<best_val:
+                    best_val = val
+                    best_key = key
+            count += 1
+        if verbose>0:
+            print(f"{count} completed works found.")
+        return best_key
