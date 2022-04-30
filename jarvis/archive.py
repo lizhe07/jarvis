@@ -233,7 +233,8 @@ class Archive:
 
     def pop(self, key):
         r"""Pops out an item by key."""
-        assert key in self, f"{key} does not exist."
+        if key not in self:
+            raise KeyError(key)
         if self.store_dir is None:
             return self.__store__.pop(key)
         else:

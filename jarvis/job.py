@@ -323,3 +323,17 @@ class BaseJob:
         if verbose>0:
             print(f"{count} completed works found.")
         return best_key
+
+    def pop(self, key):
+        r"""Pops out a work by key."""
+        def _pop(axv, key):
+            try:
+                val = axv.pop(key)
+            except:
+                val = None
+            return val
+        config = _pop(self.configs, key)
+        stat = _pop(self.stats, key)
+        result = _pop(self.results, key)
+        preview = _pop(self.previews, key)
+        return config, stat, result, preview
