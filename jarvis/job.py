@@ -10,7 +10,7 @@ class BaseJob:
     r"""Base class for batch processing.
 
     The job is associated with different directories storing configurations,
-    status, results and previews of all works. Method `main` need to be
+    status, ckpts and previews of all works. Method `main` need to be
     implemented by child class.
 
     """
@@ -18,64 +18,67 @@ class BaseJob:
     def __init__(self,
         store_dir: Optional[str] = None,
         read_only: bool = False,
-        c_path_len: int = 2, c_pause: float = 0.5,
-        r_path_len: int = 3, r_pause: float = 5.,
+        s_path_len: int = 2, s_pause: float = 0.5,
+        l_path_len: int = 3, l_pause: float = 5.,
     ):
         r"""
         Args
         ----
         store_dir:
             Directory for storage. Archives including `configs`, `stats`,
-            `results` and `previews` will be saved in separate directories.
+            `ckpts` and `previews` will be saved in separate directories.
         read_only:
             If the job is read-only or not.
-        c_pth_len, c_pause:
-            Path length and pause time for `configs`, as well as `stats` and
-            `previews`.
-        r_path_len, r_pause:
-            Path length and pause time for `results`.
+        s_path_len, s_pause:
+            Short path length and pause time for `configs`, as well as `stats`
+            and `previews`.
+        l_path_len, l_pause:
+            Long path length and pause time for `ckpts`.
 
         """
         self.store_dir = store_dir
         if self.store_dir is None:
             self.configs = Archive(hashable=True)
             self.stats = Archive()
-            self.results = Archive()
+            self.ckpts = Archive()
             self.previews = Archive()
         else:
             self.configs = Archive(
-                f'{self.store_dir}/configs', path_len=c_path_len, max_try=60,
-                pause=c_pause, hashable=True,
+                f'{self.store_dir}/configs', path_len=s_path_len, max_try=60,
+                pause=s_pause, hashable=True,
             )
             self.stats = Archive(
-                f'{self.store_dir}/stats', path_len=c_path_len, pause=c_pause,
+                f'{self.store_dir}/stats', path_len=s_path_len, pause=s_pause,
             )
-            self.results = Archive(
-                f'{self.store_dir}/results', path_len=r_path_len, pause=r_pause,
+            self.ckpts = Archive(
+                f'{self.store_dir}/ckpts', path_len=l_path_len, pause=l_pause,
             )
             self.previews = Archive(
-                f'{self.store_dir}/previews', path_len=c_path_len, pause=c_pause,
+                f'{self.store_dir}/previews', path_len=s_path_len, pause=s_pause,
             )
         self.read_only = read_only
         if self.store_dir is not None and self.read_only:
             for axv in [self.configs, self.stats, self.previews]:
                 axv.to_internal()
 
-    def main(self, config: dict, verbose: int = 1):
+    def main(self, config: dict, num_epochs: int = 1, verbose: int = 1):
         r"""Main function that needs implementation by subclasses.
 
         Args
         ----
         config:
             A configuration dict for the work.
+        num_epochs:
+            Number of epochs of the work. If not explicit epochs can be defined,
+            use `num_epochs=1` for a single pass.
         verbose:
             Level of information display. No message will be printed when
             'verbose' is no greater than 0.
 
         Returns
         -------
-        result, preview:
-            Archive records that will be saved in `self.results` and
+        ckpt, preview:
+            Archive records that will be saved in `self.ckpts` and
             `self.previews` respectively.
 
         """
@@ -89,7 +92,7 @@ class BaseJob:
         key:
             Key of the work.
         strict:
-            Whether to check `results` and `previews`.
+            Whether to check `ckpts` and `previews`.
 
         """
         try:
@@ -97,51 +100,25 @@ class BaseJob:
         except:
             return False
         else:
-            if not stat['completed']:
+            if not stat['completed']: # TODO to fix
                 return False
-        if strict and not(key in self.results and key in self.previews):
+        if strict and not(key in self.ckpts and key in self.previews):
             return False
         return True
 
-    def to_process(self, config: dict, patience: float = float('inf')):
+    def to_process(self, config, patience=float('inf')):
         r"""Returns whether to process a work."""
         key = self.configs.add(config)
         try:
             stat = self.stats[key]
+            assert (time.time()-stat['toc'])<3600<patience
+            return False # config is being processed
         except:
-            return True # stats[key] does not exist
-        t_last = stat['tic'] if stat['toc'] is None else stat['toc']
-        if not stat['completed'] and (time.time()-t_last)/3600>patience:
-            return True # running time exceeds patience
-        else:
-            return False # work is being processed
-
-    def process(self, config: dict, verbose: int = 1):
-        r"""Processes one work."""
-        assert not self.read_only, "This is a read-only job."
-        if verbose>0:
-            print("--------")
-        key = self.configs.add(config)
-        if self.is_completed(key):
-            if verbose>0:
-                print(f"{key} already exists.")
-            return self.results[key], self.previews[key]
-        if verbose>0:
-            print(f"Processing {key}...")
-        tic = time.time()
-        self.stats[key] = {'tic': tic, 'toc': None, 'completed': False}
-        result, preview = self.main(config, verbose)
-        self.results[key] = result
-        self.previews[key] = preview
-        toc = time.time()
-        self.stats[key] = {'tic': tic, 'toc': toc, 'completed': True}
-        if verbose>0:
-            print("{} processed ({}).".format(key, time_str(toc-tic)))
-            print("--------")
-        return result, preview
+            return True
 
     def batch(self,
         configs: Iterable,
+        num_epochs: int = 1,
         num_works: int = 0,
         patience: float = float('inf'),
         verbose: int = 1,
@@ -164,7 +141,7 @@ class BaseJob:
         count = 0
         for config in configs:
             if self.to_process(config, patience):
-                self.process(config, verbose)
+                self.main(config, num_epochs, verbose)
                 count += 1
             if num_works>0 and count==num_works:
                 if verbose>0:
@@ -234,28 +211,22 @@ class BaseJob:
 
         self.batch(config_gen(), **kwargs)
 
-    def load_ckpt(self, config: dict, verbose: int = 1):
+    def load_ckpt(self, config):
         r"""Loads checkpoint."""
         try:
             key = self.configs.get_key(config)
-            result = self.results[key]
-            if verbose>0:
-                print(f"Checkpoint ({key}) loaded.")
-            return result
+            epoch = self.stats[key]['epoch']
+            ckpt = self.ckpts[key]
+            return epoch, ckpt
         except:
-            if verbose>0:
-                print("No checkpoints found.")
-            return None
+            raise NotImplementedError
 
-    def save_ckpt(self, ckpt, config: dict, verbose: int = 1):
+    def save_ckpt(self, config, epoch, ckpt, preview):
         r"""Saves checkpoint."""
         key = self.configs.get_key(config)
-        stat = self.stats[key]
-        stat['toc'] = time.time()
-        self.stats[key] = stat
-        self.results[key] = ckpt
-        if verbose>0:
-            print(f"Checkpoint ({key}) saved.")
+        self.stats[key] = {'epoch': epoch, 'toc': time.time()}
+        self.ckpts[key] = ckpt
+        self.previews[key] = preview
 
     @staticmethod
     def _is_matched(config, cond=None):
@@ -334,6 +305,6 @@ class BaseJob:
             return val
         config = _pop(self.configs, key)
         stat = _pop(self.stats, key)
-        result = _pop(self.results, key)
+        ckpt = _pop(self.ckpts, key)
         preview = _pop(self.previews, key)
-        return config, stat, result, preview
+        return config, stat, ckpt, preview
