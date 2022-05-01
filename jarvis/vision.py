@@ -237,7 +237,7 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
     return model
 
 
-def evaluate(model, dataset, batch_size=100, device='cuda', num_workers=2, verbose=1):
+def evaluate(model, dataset, batch_size=100, device='cuda', verbose=1):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -250,8 +250,6 @@ def evaluate(model, dataset, batch_size=100, device='cuda', num_workers=2, verbo
         The batch size of the data loader.
     device: str
         The device used for evaluation.
-    num_workers: int
-        The number of workers of the data loader.
 
     Returns
     -------
@@ -265,7 +263,7 @@ def evaluate(model, dataset, batch_size=100, device='cuda', num_workers=2, verbo
     model.eval().to(device)
     criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
 
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     loss, count = 0., 0.
     tic = time.time()
     for images, labels in loader:
