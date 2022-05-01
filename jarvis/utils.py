@@ -61,7 +61,7 @@ def flatten(nested_dict):
     r"""Flattens a nested dictionary.
 
     A nested dictionary like `{'A': {'B', val}}` will be converted to
-    `{'A::B', val}`.
+    `{('B', '@', 'A'), val}`.
 
     Args
     ----
@@ -71,15 +71,14 @@ def flatten(nested_dict):
     Returns
     -------
     flat_dict: dict
-        A flat dictionary with keys containing ``'::'`` for hierarchy.
+        A flat dictionary with tuple keys for hierarchy.
 
     """
     flat_dict = {}
     for key, val in nested_dict.items():
-        if isinstance(val, dict) and val and isinstance(next(iter(val)), str):
-            flat_dict.update(dict(
-                (key+'::'+subkey, subval) for subkey, subval in flatten(val).items()
-                ))
+        if isinstance(val, dict):
+            for subkey, subval in flatten(val).items():
+                flat_dict[(subkey, '@', key)] = subval
         else:
             flat_dict[key] = val
     return flat_dict
@@ -88,13 +87,13 @@ def flatten(nested_dict):
 def nest(flat_dict):
     r"""Nests a flat dictionary.
 
-    A flat dictionary like `{'A::B', val}` will be converted to
+    A flat dictionary like `{('B', '@', 'A'), val}` will be converted to
     `{'A': {'B', val}}`.
 
     Args
     ----
     flat_dict: dict
-        A flat dictionary with keys containing ``'::'`` for hierarchy.
+        A flat dictionary with tuple keys for hierarchy.
 
     Returns
     -------
@@ -102,28 +101,60 @@ def nest(flat_dict):
         A nested dictionary possibly contains dictionaries as values.
 
     """
-    keys = set([k.split('::')[0] if isinstance(k, str) and '::' in k else k for k in flat_dict])
     nested_dict = {}
-    for key in keys:
-        if key in flat_dict:
-            nested_dict[key] = flat_dict[key]
+    for key, val in flat_dict.items():
+        if isinstance(key, tuple) and len(key)==3 and key[1]=='@':
+            subkey, _, parkey = key
+            if parkey not in nested_dict:
+                nested_dict[parkey] = {}
+            nested_dict[parkey].update(nest({subkey: val}))
         else:
-            subdict = dict(
-                (key_full.replace(key+'::', '', 1), val) for key_full, val in flat_dict.items()
-                if key_full.startswith(key)
-                )
-            nested_dict[key] = nest(subdict)
+            nested_dict[key] = val
     return nested_dict
 
 
-def numpy_dict(model_state):
-    r"""Converts state dict to numpy arrays."""
-    return dict((name, param.data.cpu().clone().numpy()) for name, param in model_state.items())
+def numpy_dict(state):
+    r"""Returns a state dictionary with tensors replaced by numpy arrays.
+
+    Each tensor is converted to a tuple containing the numpy array and tensor
+    dtype.
+
+    Args
+    ----
+    state: dict
+        State dictionary potentially containing tensors, returned by torch
+        module, optimizer or scheduler.
+
+    Returns
+    -------
+    A dictionary with same structure, with tensors converted to numpy arrays.
+
+    """
+    f_state = flatten(state)
+    for key, val in f_state.items():
+        if isinstance(val, torch.Tensor):
+            f_state[key] = (val.data.cpu().clone().numpy(), val.dtype)
+    return nest(f_state)
 
 
-def tensor_dict(model_state):
-    r"""Converts state dict to pytorch tensors."""
-    return dict((name, torch.tensor(param, dtype=torch.float)) for name, param in model_state.items())
+def tensor_dict(state, device='cpu'):
+    r"""Returns a state dictionary with numpy arrays replaced by tensors.
+
+    This is the inverted function of `numpy_dict`.
+
+    Args
+    ----
+    state: dict
+        The state dictionary converted by `numpy_dict`.
+    device:
+        Tensor device of the converted state dictionary.
+
+    """
+    f_state = flatten(state)
+    for key, val in f_state.items():
+        if isinstance(val, tuple) and len(val)==2 and isinstance(val[0], np.ndarray) and isinstance(val[1], torch.dtype):
+            f_state[key] = torch.tensor(val[0], dtype=val[1], device=device)
+    return nest(f_state)
 
 
 def job_parser():
@@ -174,21 +205,19 @@ def sgd_optimizer(model, lr, momentum=0.9, weight_decay=0.):
     return optimizer
 
 
-def cyclic_scheduler(optimizer, num_epochs, num_cycles=2, num_phases=3, gamma=0.1):
+def cyclic_scheduler(optimizer, phase_len=4, num_phases=3, gamma=0.3):
     r"""Returns a simple cyclic scheduler.
 
-    The full training is divided into several cycles, within each learning
-    rates are adjusted as in StepLR scheduler. At the beginning of each cycle,
-    the learning rate is reset to the initial value.
+    Learning rate is scheduled to follow cycles, each of which contains a fixed
+    number of phases. At the beginning of each cycle the learning rate is reset
+    to the initial value.
 
     Args
     ----
     optimizer: optimizer
         The pytorch optimizer.
-    num_epochs: int
-        The number of epochs.
-    num_cycles: int
-        The number of cycles.
+    phase_len:
+        The length of each phase, during which the learning rate is fixed.
     num_phases: int
         The number of phasese within each cycle. Learning rate decays by a
         fixed factor between phases.
@@ -201,8 +230,7 @@ def cyclic_scheduler(optimizer, num_epochs, num_cycles=2, num_phases=3, gamma=0.
         The cyclic scheculer.
 
     """
-    cycle_len = -(-num_epochs//num_cycles)
-    phase_len = -(-cycle_len//num_phases)
+    cycle_len = phase_len*num_phases
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len)
         )
