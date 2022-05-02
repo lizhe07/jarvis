@@ -117,6 +117,15 @@ def nest(flat_dict):
     return nested_dict
 
 
+def fill_defaults(spec, d_spec):
+    r"""Fills in default values of specification dictionary."""
+    f_spec = flatten(spec)
+    for key, val in flatten(d_spec).items():
+        if key not in f_spec:
+            f_spec[key] = val
+    return nest(f_spec)
+
+
 def numpy_dict(state):
     r"""Returns a state dictionary with tensors replaced by numpy arrays.
 
