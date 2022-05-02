@@ -89,7 +89,7 @@ class BaseJob:
         key = self.configs.add(config)
         try:
             stat = self.stats[key]
-            assert stat[key]['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience
+            assert stat['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience
             return False # config is processed or being processed
         except:
             return True
