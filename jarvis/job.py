@@ -192,7 +192,7 @@ class BaseJob:
     def load_ckpt(self, config):
         r"""Loads checkpoint."""
         try:
-            key = self.configs.get_key(config)
+            key = self.configs.add(config)
             epoch = self.stats[key]['epoch']
             ckpt = self.ckpts[key]
             return epoch, ckpt
@@ -201,7 +201,7 @@ class BaseJob:
 
     def save_ckpt(self, config, epoch, ckpt, preview):
         r"""Saves checkpoint."""
-        key = self.configs.get_key(config)
+        key = self.configs.add(config)
         self.stats[key] = {'epoch': epoch, 'toc': time.time()}
         self.ckpts[key] = ckpt
         self.previews[key] = preview
