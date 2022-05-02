@@ -76,7 +76,7 @@ def flatten(nested_dict):
     """
     flat_dict = {}
     for key, val in nested_dict.items():
-        if isinstance(val, dict):
+        if isinstance(val, dict) and len(val)>0:
             for subkey, subval in flatten(val).items():
                 flat_dict[(subkey, '@', key)] = subval
         else:
