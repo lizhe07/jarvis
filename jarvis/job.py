@@ -84,13 +84,13 @@ class BaseJob:
         """
         raise NotImplementedError
 
-    def to_process(self, config, patience=float('inf')):
+    def to_process(self, config, num_epochs, patience):
         r"""Returns whether to process a work."""
         key = self.configs.add(config)
         try:
             stat = self.stats[key]
-            assert (time.time()-stat['toc'])<3600<patience
-            return False # config is being processed
+            assert stat[key]['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience
+            return False # config is processed or being processed
         except:
             return True
 
@@ -118,7 +118,7 @@ class BaseJob:
         """
         count = 0
         for config in configs:
-            if self.to_process(config, patience):
+            if self.to_process(config, num_epochs, patience):
                 self.main(config, num_epochs, verbose)
                 count += 1
             if num_works>0 and count==num_works:
