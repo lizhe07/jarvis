@@ -84,28 +84,6 @@ class BaseJob:
         """
         raise NotImplementedError
 
-    def is_completed(self, key: str, strict: bool = False):
-        r"""Returns whether a work is completed.
-
-        Args
-        ----
-        key:
-            Key of the work.
-        strict:
-            Whether to check `ckpts` and `previews`.
-
-        """
-        try:
-            stat = self.stats[key]
-        except:
-            return False
-        else:
-            if not stat['completed']: # TODO to fix
-                return False
-        if strict and not(key in self.ckpts and key in self.previews):
-            return False
-        return True
-
     def to_process(self, config, patience=float('inf')):
         r"""Returns whether to process a work."""
         key = self.configs.add(config)
@@ -239,10 +217,10 @@ class BaseJob:
                 return False
         return True
 
-    def completed(self, cond=None):
+    def completed(self, num_epochs=1, cond=None):
         r"""A generator for completed works."""
         for key, stat in self.stats.items():
-            if stat['completed']:
+            if stat['epoch']>=num_epochs:
                 try:
                     config = self.configs[key]
                 except:
@@ -251,6 +229,7 @@ class BaseJob:
                     yield key
 
     def best_work(self,
+        num_epochs: int = 1,
         cond: Optional[dict] = None,
         p_key: str = 'loss_test',
         reverse: Optional[bool] = None,
@@ -275,12 +254,13 @@ class BaseJob:
             The key of best work.
 
         """
+        assert num_epochs>0
         if reverse is None:
             reverse = p_key.startswith('acc')
         best_val = -float('inf') if reverse else float('inf')
         best_key = None
         count = 0
-        for key in self.completed(cond):
+        for key in self.completed(num_epochs, cond):
             val = self.previews[key][p_key]
             if reverse:
                 if val>best_val:
@@ -292,7 +272,10 @@ class BaseJob:
                     best_key = key
             count += 1
         if verbose>0:
-            print(f"{count} completed works found.")
+            if num_epochs==1:
+                print(f"{count} completed works found.")
+            else:
+                print(f"{count} works trained with at least {num_epochs} epochs found.")
         return best_key
 
     def pop(self, key):
