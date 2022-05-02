@@ -107,9 +107,13 @@ def nest(flat_dict):
             subkey, _, parkey = key
             if parkey not in nested_dict:
                 nested_dict[parkey] = {}
-            nested_dict[parkey].update(nest({subkey: val}))
+            # nested_dict[parkey].update(nest({subkey: val}))
+            nested_dict[parkey][subkey] = val
         else:
             nested_dict[key] = val
+    for key, val in nested_dict.items():
+        if isinstance(val, dict):
+            nested_dict[key] = nest(val)
     return nested_dict
 
 
