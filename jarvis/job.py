@@ -18,7 +18,7 @@ class BaseJob:
     def __init__(self,
         store_dir: Optional[str] = None,
         read_only: bool = False,
-        s_path_len: int = 2, s_pause: float = 0.5,
+        s_path_len: int = 2, s_pause: float = 1.,
         l_path_len: int = 3, l_pause: float = 5.,
     ):
         r"""
@@ -44,8 +44,7 @@ class BaseJob:
             self.previews = Archive()
         else:
             self.configs = Archive(
-                f'{self.store_dir}/configs', path_len=s_path_len, max_try=60,
-                pause=s_pause, hashable=True,
+                f'{self.store_dir}/configs', path_len=s_path_len, pause=s_pause, hashable=True,
             )
             self.stats = Archive(
                 f'{self.store_dir}/stats', path_len=s_path_len, pause=s_pause,
@@ -84,7 +83,7 @@ class BaseJob:
         """
         raise NotImplementedError
 
-    def to_process(self, config, num_epochs, patience):
+    def _to_process(self, config, num_epochs, patience):
         r"""Returns whether to process a work."""
         key = self.configs.add(config)
         try:
@@ -118,9 +117,18 @@ class BaseJob:
         """
         count = 0
         for config in configs:
-            if self.to_process(config, num_epochs, patience):
+            if self._to_process(config, num_epochs, patience):
+                if verbose>0:
+                    key = self.configs.get_key(config)
+                    print("------------")
+                    print(f"Processing {key}...")
+                tic = time.time()
                 self.main(config, num_epochs, verbose)
+                toc = time.time()
                 count += 1
+                if verbose>0:
+                    print("{} processed. ({})".format(key, time_str(toc-tic)))
+                    print("------------")
             if num_works>0 and count==num_works:
                 if verbose>0:
                     print("{} works processed.".format(num_works))
@@ -128,7 +136,7 @@ class BaseJob:
         if verbose>0:
             print("All works are processed or being processed.")
 
-    def get_config(self, arg_strs: Optional[list[str]] =None):
+    def strs2config(self, arg_strs: Optional[list[str]] =None):
         r"""Returns work configuration.
 
         Args
@@ -148,7 +156,7 @@ class BaseJob:
         r"""Grid hyper-parameter search.
 
         Random argument strings are prepared based on search specification, and
-        converted to work configuration by `get_config`. The configuration
+        converted to work configuration by `strs2config`. The configuration
         generator is passed to batch processing method.
 
         search_spec:
@@ -184,20 +192,17 @@ class BaseJob:
                 arg_strs = []
                 for arg_key, arg_val in zip(arg_keys, arg_vals):
                     arg_strs += converter(arg_key, arg_val)
-                config = self.get_config(arg_strs)
+                config = self.strs2config(arg_strs)
                 yield config
 
         self.batch(config_gen(), **kwargs)
 
     def load_ckpt(self, config):
         r"""Loads checkpoint."""
-        try:
-            key = self.configs.add(config)
-            epoch = self.stats[key]['epoch']
-            ckpt = self.ckpts[key]
-            return epoch, ckpt
-        except:
-            raise NotImplementedError
+        key = self.configs.add(config)
+        epoch = self.stats[key]['epoch']
+        ckpt = self.ckpts[key]
+        return epoch, ckpt
 
     def save_ckpt(self, config, epoch, ckpt, preview):
         r"""Saves checkpoint."""
@@ -217,10 +222,10 @@ class BaseJob:
                 return False
         return True
 
-    def completed(self, num_epochs=1, cond=None):
+    def completed(self, min_epochs=1, cond=None):
         r"""A generator for completed works."""
         for key, stat in self.stats.items():
-            if stat['epoch']>=num_epochs:
+            if stat['epoch']>=min_epochs:
                 try:
                     config = self.configs[key]
                 except:
@@ -229,7 +234,7 @@ class BaseJob:
                     yield key
 
     def best_work(self,
-        num_epochs: int = 1,
+        min_epochs: int = 1,
         cond: Optional[dict] = None,
         p_key: str = 'loss_test',
         reverse: Optional[bool] = None,
@@ -239,6 +244,8 @@ class BaseJob:
 
         Args
         ----
+        min_epochs:
+            Minimum number of epochs.
         cond:
             Conditioned value of work configurations. Only completed work with
             matching values will be considered.
@@ -254,13 +261,13 @@ class BaseJob:
             The key of best work.
 
         """
-        assert num_epochs>0
+        assert min_epochs>0
         if reverse is None:
             reverse = p_key.startswith('acc')
         best_val = -float('inf') if reverse else float('inf')
         best_key = None
         count = 0
-        for key in self.completed(num_epochs, cond):
+        for key in self.completed(min_epochs, cond):
             val = self.previews[key][p_key]
             if reverse:
                 if val>best_val:
@@ -272,22 +279,16 @@ class BaseJob:
                     best_key = key
             count += 1
         if verbose>0:
-            if num_epochs==1:
+            if min_epochs==1:
                 print(f"{count} completed works found.")
             else:
-                print(f"{count} works trained with at least {num_epochs} epochs found.")
+                print(f"{count} works trained with at least {min_epochs} epochs found.")
         return best_key
 
     def pop(self, key):
         r"""Pops out a work by key."""
-        def _pop(axv, key):
-            try:
-                val = axv.pop(key)
-            except:
-                val = None
-            return val
-        config = _pop(self.configs, key)
-        stat = _pop(self.stats, key)
-        ckpt = _pop(self.ckpts, key)
-        preview = _pop(self.previews, key)
+        config = self.configs.pop(key)
+        stat = self.stats.pop(key)
+        ckpt = self.ckpts.pop(key)
+        preview = self.previews.pop(key)
         return config, stat, ckpt, preview

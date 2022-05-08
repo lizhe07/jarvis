@@ -66,9 +66,9 @@ class Archive:
             assert key in self.__store__, _no_exist_msg
             return self.__store__[key]
         else:
-            store_pth = self._store_path(key)
-            assert os.path.exists(store_pth), _no_exist_msg
-            records = self._safe_read(store_pth)
+            store_path = self._store_path(key)
+            assert os.path.exists(store_path), _no_exist_msg
+            records = self._safe_read(store_path)
             assert key in records, _no_exist_msg
             return records[key]
 
@@ -112,7 +112,7 @@ class Archive:
             if f.endswith('.axv') and len(f)==(self.path_len+4)
             ]
 
-    def _safe_read(self, store_pth):
+    def _safe_read(self, store_path):
         r"""Safely reads a file.
 
         This is designed for cluster use. An error is raised when too many
@@ -122,7 +122,7 @@ class Archive:
         count = 0
         while count<self.max_try:
             try:
-                with open(store_pth, 'rb') as f:
+                with open(store_path, 'rb') as f:
                     records = pickle.load(f)
             except:
                 count += 1
@@ -130,15 +130,15 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            raise RuntimeError(f"Max number ({count}) of reading tried and failed")
+            raise RuntimeError(f"Max number ({count}) of reading tried and failed.")
         return records
 
-    def _safe_write(self, records, store_pth):
+    def _safe_write(self, records, store_path):
         r"""Safely writes a file."""
         count = 0
         while count<self.max_try:
             try:
-                with open(store_pth, 'wb') as f:
+                with open(store_path, 'wb') as f:
                     pickle.dump(records, f)
             except:
                 count += 1
@@ -146,7 +146,7 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            raise RuntimeError(f"Max number ({count}) of writing tried and failed")
+            raise RuntimeError(f"Max number ({count}) of writing tried and failed.")
 
     def _random_key(self):
         r"""Returns a random key."""
@@ -166,10 +166,10 @@ class Archive:
             for key in self.__store__.keys():
                 yield key
         else:
-            store_pths = self._store_paths()
-            random.shuffle(store_pths) # randomization to avoid cluster conflict
-            for store_pth in store_pths:
-                records = self._safe_read(store_pth)
+            store_paths = self._store_paths()
+            random.shuffle(store_paths) # randomization to avoid cluster conflict
+            for store_path in store_paths:
+                records = self._safe_read(store_path)
                 for key in records.keys():
                     yield key
 
@@ -179,10 +179,10 @@ class Archive:
             for val in self.__store__.values():
                 yield val
         else:
-            store_pths = self._store_paths()
-            random.shuffle(store_pths)
-            for store_pth in store_pths:
-                records = self._safe_read(store_pth)
+            store_paths = self._store_paths()
+            random.shuffle(store_paths)
+            for store_path in store_paths:
+                records = self._safe_read(store_path)
                 for val in records.values():
                     yield val
 
@@ -192,10 +192,10 @@ class Archive:
             for key, val in self.__store__.items():
                 yield key, val
         else:
-            store_pths = self._store_paths()
-            random.shuffle(store_pths)
-            for store_pth in store_pths:
-                records = self._safe_read(store_pth)
+            store_paths = self._store_paths()
+            random.shuffle(store_paths)
+            for store_path in store_paths:
+                records = self._safe_read(store_path)
                 for key, val in records.items():
                     yield key, val
 
@@ -233,18 +233,16 @@ class Archive:
 
     def pop(self, key):
         r"""Pops out an item by key."""
-        if key not in self:
-            raise KeyError(key)
         if self.store_dir is None:
-            return self.__store__.pop(key)
+            return self.__store__.pop(key, None)
         else:
-            store_pth = self._store_path(key)
-            records = self._safe_read(store_pth)
-            val = records.pop(key)
+            store_path = self._store_path(key)
+            records = self._safe_read(store_path)
+            val = records.pop(key, None)
             if records:
-                self._safe_write(records, store_pth)
+                self._safe_write(records, store_path)
             else:
-                os.remove(store_pth) # remove empty external file
+                os.remove(store_path) # remove empty external file
             return val
 
     def prune(self):
@@ -260,24 +258,24 @@ class Archive:
         if self.store_dir is None:
             print("No external store detected.")
         else:
-            store_pths = self._store_paths()
+            store_paths = self._store_paths()
             verbose, tic = None, time.time()
-            for i, store_pth in enumerate(store_pths, 1):
+            for i, store_path in enumerate(store_paths, 1):
                 try:
-                    self._safe_read(store_pth)
+                    self._safe_read(store_path)
                 except:
-                    print("{} corrupted, will be removed".format(store_pth))
-                    os.remove(store_pth)
-                    removed.append(store_pth[(-4-self.path_len):-4])
-                if i%(-(-len(store_pths)//10))==0 or i==len(store_pths):
+                    print("{} corrupted, will be removed".format(store_path))
+                    os.remove(store_path)
+                    removed.append(store_path[(-4-self.path_len):-4])
+                if i%(-(-len(store_paths)//10))==0 or i==len(store_paths):
                     toc = time.time()
                     if verbose is None:
                         # display progress if estimated time is longer than 20 mins
-                        verbose = (toc-tic)/i*len(store_pths)>1200
+                        verbose = (toc-tic)/i*len(store_paths)>1200
                     if verbose:
                         print("{} ({})".format(
-                            progress_str(i, len(store_pths)),
-                            time_str(toc-tic, progress=i/len(store_pths))
+                            progress_str(i, len(store_paths)),
+                            time_str(toc-tic, progress=i/len(store_paths))
                             ))
             if removed:
                 print("{} corrupted files removed.".format(len(removed)))
