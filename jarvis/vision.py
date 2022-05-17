@@ -228,12 +228,12 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
         A pytorch model that can be called by `logits = model(images)`.
 
     """
-    _, _, _in_channels, class_num, _ = DATASETS_META[task]
+    _, _, _in_channels, num_classes, _ = DATASETS_META[task]
     if in_channels is None:
         in_channels = _in_channels
     if isinstance(arch, str):
         arch = MODELS[arch]
-    model = arch(class_num=class_num, in_channels=in_channels, **kwargs)
+    model = arch(num_classes=num_classes, in_channels=in_channels, **kwargs)
     return model
 
 
