@@ -87,7 +87,7 @@ class BaseJob:
         configs: Iterable,
         num_epochs: int = 1,
         num_works: int = 0,
-        patience: float = float('inf'),
+        patience: float = 168,
         verbose: int = 1,
     ):
         r"""Batch processing.
