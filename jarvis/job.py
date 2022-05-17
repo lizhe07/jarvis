@@ -83,16 +83,6 @@ class BaseJob:
         """
         raise NotImplementedError
 
-    def _to_process(self, config, num_epochs, patience):
-        r"""Returns whether to process a work."""
-        key = self.configs.add(config)
-        try:
-            stat = self.stats[key]
-            assert stat['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience
-            return False # config is processed or being processed
-        except:
-            return True
-
     def batch(self,
         configs: Iterable,
         num_epochs: int = 1,
@@ -117,9 +107,17 @@ class BaseJob:
         """
         count = 0
         for config in configs:
-            if self._to_process(config, num_epochs, patience):
+            try:
+                key = self.configs.add(config)
+                try:
+                    stat = self.stats[key]
+                except:
+                    stat = {'epoch': 0, 'toc': -float('inf')}
+                assert stat['epoch']<num_epochs and (time.time()-stat['toc'])/3600>patience
+                stat['toc'] = time.time()
+                self.stats[key] = stat
+
                 if verbose>0:
-                    key = self.configs.get_key(config)
                     print("------------")
                     print(f"Processing {key}...")
                 tic = time.time()
@@ -129,14 +127,16 @@ class BaseJob:
                 if verbose>0:
                     print("{} processed. ({})".format(key, time_str(toc-tic)))
                     print("------------")
+            except:
+                continue
             if num_works>0 and count==num_works:
-                if verbose>0:
-                    print("{} works processed.".format(num_works))
-                return count
+                break
         if verbose>0:
-            print("All works are processed or being processed.")
+            print("{} works processed.".format(num_works))
+            if num_works==0:
+                print("All works are processed or being processed.")
 
-    def strs2config(self, arg_strs: Optional[list[str]] =None):
+    def strs2config(self, arg_strs: Optional[list[str]] = None):
         r"""Returns work configuration.
 
         Args
