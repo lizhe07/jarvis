@@ -105,7 +105,7 @@ class BaseJob:
             modified time of a work is recorded in `self.stats`.
 
         """
-        count = 0
+        count, interrupted = 0, False
         for config in configs:
             try:
                 key = self.configs.add(config)
@@ -127,13 +127,17 @@ class BaseJob:
                 if verbose>0:
                     print("{} processed. ({})".format(key, time_str(toc-tic)))
                     print("------------")
+            except KeyboardInterrupt:
+                interrupted = True
+                break
             except:
                 continue
-            if num_works>0 and count==num_works:
-                break
+            else:
+                if num_works>0 and count==num_works:
+                    break
         if verbose>0:
-            print("{} works processed.".format(num_works))
-            if num_works==0:
+            print("\n{} works processed.".format(count))
+            if not interrupted and (num_works==0 or count<num_works):
                 print("All works are processed or being processed.")
 
     def strs2config(self, arg_strs: Optional[list[str]] = None):
