@@ -276,7 +276,7 @@ class ResNet(ImageClassifier):
             elif key.startswith('bn1'):
                 new_key = key.replace('bn1', 'conv0.1')
             elif key.startswith('fc'):
-                if p_state[key].shape[0]!=self.class_num:
+                if p_state[key].shape[0]!=self.num_classes:
                     continue # load the core only when fc layer has different shape
                 new_key = key
             elif key.startswith('layer'):

@@ -259,7 +259,6 @@ def evaluate(model, dataset, batch_size=100, device='cuda', verbose=1):
         The classification accuracy averaged over the dataset.
 
     """
-    device = torch.device(device) if torch.cuda.is_available() else torch.device('cpu')
     model.eval().to(device)
     criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
 
