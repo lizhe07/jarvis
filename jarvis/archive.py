@@ -237,6 +237,8 @@ class Archive:
             return self.__store__.pop(key, None)
         else:
             store_path = self._store_path(key)
+            if not os.path.exists(store_path):
+                return None
             records = self._safe_read(store_path)
             val = records.pop(key, None)
             if records:
