@@ -114,7 +114,8 @@ class BaseJob:
                     stat = self.stats[key]
                 except:
                     stat = {'epoch': 0, 'toc': -float('inf')}
-                assert stat['epoch']<num_epochs and (time.time()-stat['toc'])/3600>patience
+                if stat['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience:
+                    continue
                 stat['toc'] = time.time()
                 self.stats[key] = stat
 
