@@ -173,12 +173,11 @@ def tensor_dict(state, device='cpu'):
 def job_parser():
     r"""Returns a base parser for job processing."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--spec-path')
     parser.add_argument('--max-wait', default=1, type=float,
                         help="seconds of wait before each job")
     parser.add_argument('--num-works', default=0, type=int,
                         help="number of works to process")
-    parser.add_argument('--patience', default=float('inf'), type=float,
+    parser.add_argument('--patience', default=168, type=float,
                         help="hours since last modification")
     return parser
 

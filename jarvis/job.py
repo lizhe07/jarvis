@@ -88,6 +88,7 @@ class BaseJob:
         num_epochs: int = 1,
         num_works: int = 0,
         patience: float = 168,
+        max_errors: int = 128,
         verbose: int = 1,
     ):
         r"""Batch processing.
@@ -105,7 +106,7 @@ class BaseJob:
             modified time of a work is recorded in `self.stats`.
 
         """
-        count, interrupted = 0, False
+        w_count, e_count, interrupted = 0, 0, False
         for config in configs:
             try:
                 key = self.configs.add(config)
@@ -121,9 +122,10 @@ class BaseJob:
                     print("------------")
                     print(f"Processing {key}...")
                 tic = time.time()
-                self.main(config, num_epochs, verbose)
+                ckpt, preview = self.main(config, num_epochs, verbose)
+                self.save_ckpt(config, num_epochs, ckpt, preview)
                 toc = time.time()
-                count += 1
+                w_count += 1
                 if verbose>0:
                     print("{} processed. ({})".format(key, time_str(toc-tic)))
                     print("------------")
@@ -131,13 +133,18 @@ class BaseJob:
                 interrupted = True
                 break
             except:
-                continue
+                e_count += 1
+                if e_count==max_errors:
+                    interrupted = True
+                    break
+                else:
+                    continue
             else:
-                if num_works>0 and count==num_works:
+                if num_works>0 and w_count==num_works:
                     break
         if verbose>0:
-            print("\n{} works processed.".format(count))
-            if not interrupted and (num_works==0 or count<num_works):
+            print("\n{} works processed.".format(w_count))
+            if not interrupted and (num_works==0 or w_count<num_works):
                 print("All works are processed or being processed.")
 
     def strs2config(self, arg_strs: Optional[list[str]] = None):
