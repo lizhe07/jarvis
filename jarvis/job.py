@@ -214,7 +214,8 @@ class BaseJob:
         key = self.configs.add(config)
         epoch = self.stats[key]['epoch']
         ckpt = self.ckpts[key]
-        return epoch, ckpt
+        preview = self.previews[key]
+        return epoch, ckpt, preview
 
     def save_ckpt(self, config, epoch, ckpt, preview):
         r"""Saves checkpoint."""
