@@ -133,7 +133,9 @@ class BaseJob:
             except KeyboardInterrupt:
                 interrupted = True
                 break
-            except:
+            except Exception as e:
+                if max_errors==0:
+                    raise
                 e_count += 1
                 if e_count==max_errors:
                     interrupted = True
