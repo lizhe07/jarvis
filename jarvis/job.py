@@ -235,10 +235,10 @@ class BaseJob:
                 return False
         return True
 
-    def completed(self, min_epochs=1, cond=None):
+    def completed(self, min_epoch=1, cond=None):
         r"""A generator for completed works."""
         for key, stat in self.stats.items():
-            if stat['epoch']>=min_epochs:
+            if stat['epoch']>=min_epoch:
                 try:
                     config = self.configs[key]
                 except:
