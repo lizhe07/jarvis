@@ -7,6 +7,7 @@ Tensor = torch.Tensor
 
 
 class Normalizer(nn.Module):
+    r"""Image normalizer."""
 
     def __init__(self,
         mean: list[float],
