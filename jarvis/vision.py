@@ -183,7 +183,7 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
         # load class names from https://github.com/anishathalye/imagenet-simple-labels
         dataset_test.class_names = pickle.loads(
             resources.read_binary('jarvis.resources', 'imagenet_class_names')
-            )
+        )
     elif task!='TinyImageNet':
         dataset_test.class_names = dataset_test.classes
     if split_ratio is None:
