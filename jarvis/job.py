@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from typing import Optional
 from .utils import time_str, flatten
 from .archive import Archive
+from .hashable import HashableDict
 
 
 class BaseJob:
@@ -60,7 +61,12 @@ class BaseJob:
             for axv in [self.configs, self.stats, self.previews]:
                 axv.to_internal()
 
-    def main(self, config: dict, num_epochs: int = 1, verbose: int = 1):
+    def main(self,
+        config: dict,
+        num_epochs: int = 1,
+        resume: bool = True,
+        verbose: int = 1,
+    ):
         r"""Main function that needs implementation by subclasses.
 
         Args
@@ -70,6 +76,9 @@ class BaseJob:
         num_epochs:
             Number of epochs of the work. If not explicit epochs can be defined,
             use `num_epochs=1` for a single pass.
+        resume:
+            Whether to resume from existing checkpoint. If ``False``, compute
+            from scratch.
         verbose:
             Level of information display. No message will be printed when
             'verbose' is no greater than 0.
@@ -82,6 +91,34 @@ class BaseJob:
 
         """
         raise NotImplementedError
+
+    def process(self,
+        config: HashableDict,
+        num_epochs: int = 1,
+        resume: bool = True,
+        verbose: int = 1,
+    ):
+        key = self.configs.add(config)
+        if verbose>0:
+            print(f"Processing {key}...")
+        try:
+            assert resume
+            epoch, ckpt, preview = self.load_ckpt(config)
+            assert epoch>=num_epochs
+            if verbose>0:
+                print("Checkpoint{} loaded.".format(
+                    '' if epoch==1 else f' (epoch {epoch})',
+                ))
+        except:
+            tic = time.time()
+            ckpt, preview = self.main(config, num_epochs, resume, verbose)
+            self.save_ckpt(config, num_epochs, ckpt, preview)
+            toc = time.time()
+            if verbose>0:
+                print("Checkpoint{} saved. ({})".format(
+                    '' if num_epochs==1 else f' (epoch {num_epochs})', time_str(toc-tic),
+                ))
+        return ckpt, preview
 
     def batch(self,
         configs: Iterable,
@@ -121,21 +158,16 @@ class BaseJob:
 
                 if verbose>0:
                     print("------------")
-                    print(f"Processing {key}...")
-                tic = time.time()
-                ckpt, preview = self.main(config, num_epochs, verbose)
-                self.save_ckpt(config, num_epochs, ckpt, preview)
-                toc = time.time()
+                self.process(config, num_epochs, verbose=verbose)
                 w_count += 1
                 if verbose>0:
-                    print("{} processed. ({})".format(key, time_str(toc-tic)))
                     print("------------")
             except KeyboardInterrupt:
                 interrupted = True
                 break
             except Exception as e:
                 if max_errors==0:
-                    raise
+                    raise e
                 e_count += 1
                 if e_count==max_errors:
                     interrupted = True
