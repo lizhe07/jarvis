@@ -2,7 +2,7 @@ import random, time
 import numpy as np
 from collections.abc import Iterable
 from typing import Optional
-from .utils import time_str, flatten
+from .utils import time_str, flatten, nest
 from .archive import Archive
 from .hashable import HashableDict
 
@@ -125,7 +125,7 @@ class BaseJob:
         num_epochs: int = 1,
         num_works: int = 0,
         patience: float = 168,
-        max_errors: int = 128,
+        max_errors: int = 0,
         verbose: int = 1,
     ):
         r"""Batch processing.
@@ -198,49 +198,53 @@ class BaseJob:
         """
         raise NotImplementedError
 
+    def get_config(self, config: Optional[dict] = None) -> dict:
+        r"""Returns work configuration.
+
+        This method fills in default values of necessary keys, and check the
+        consistency of values if necessary. Needs to be implemented by child
+        class.
+
+        Args
+        ----
+        config:
+            Potentially partial configuration for a work.
+
+        Returns
+        -------
+        config:
+            Full configuration for `main` method.
+
+        """
+
     def grid_search(self, search_spec: dict, **kwargs):
         r"""Grid hyper-parameter search.
 
-        Random argument strings are prepared based on search specification, and
-        converted to work configuration by `strs2config`. The configuration
-        generator is passed to batch processing method.
+        Work configurations are constructed randomly from `search_spec`, using
+        the method `get_config`. The configuration generator is passed to the
+        method `batch`.
 
         search_spec:
-            The work configuration search specification. Dictionary items are
-            `(key, vals)`, in which `vals` is a list containing possible
-            search values.
+            The work configuration search specification, can be nested. It has
+            the same key structure and a valid `config` for `main` method, and
+            values at the leaf level are lists containing possible values of a
+            `config`.
 
         """
-        def idx2args(idx):
-            sub_idxs = np.unravel_index(idx, space_dim)
-            arg_vals = [val_list[sub_idx] for sub_idx, val_list in zip(sub_idxs, val_lists)]
-            return arg_vals
-
-        def converter(key, val):
-            if isinstance(val, bool):
-                if val:
-                    return ['--'+key]
-            elif isinstance(val, list):
-                if val:
-                    return ['--'+key]+[str(v) for v in val]
-            elif val is not None:
-                return ['--'+key, str(val)]
-            return []
-
-        arg_keys = list(search_spec.keys())
-        val_lists = [search_spec[key] for key in arg_keys]
+        f_spec = flatten(search_spec)
+        f_keys = list(f_spec.keys())
+        val_lists = [f_spec[key] for key in f_keys]
         space_dim = [len(v) for v in val_lists]
         total_num = np.prod(space_dim)
 
         def config_gen():
             for idx in random.sample(range(total_num), total_num):
-                arg_vals = idx2args(idx)
-                arg_strs = []
-                for arg_key, arg_val in zip(arg_keys, arg_vals):
-                    arg_strs += converter(arg_key, arg_val)
-                config = self.strs2config(arg_strs)
+                sub_idxs = np.unravel_index(idx, space_dim)
+                f_config = {}
+                for i, f_key in enumerate(f_keys):
+                    f_config[f_key] = val_lists[i][sub_idxs[i]]
+                config = self.get_config(nest(f_config))
                 yield config
-
         self.batch(config_gen(), **kwargs)
 
     def load_ckpt(self, config):
