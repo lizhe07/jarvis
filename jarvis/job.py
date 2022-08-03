@@ -123,6 +123,7 @@ class BaseJob:
     def batch(self,
         configs: Iterable,
         num_epochs: int = 1,
+        resume: bool = True,
         num_works: int = 0,
         patience: float = 168,
         max_errors: int = 0,
@@ -158,7 +159,7 @@ class BaseJob:
 
                 if verbose>0:
                     print("------------")
-                self.process(config, num_epochs, verbose=verbose)
+                self.process(config, num_epochs, resume, verbose)
                 w_count += 1
                 if verbose>0:
                     print("------------")
