@@ -174,11 +174,14 @@ def job_parser():
     r"""Returns a base parser for job processing."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--max-wait', default=1, type=float,
-                        help="seconds of wait before each job")
+        help="Maximum seconds of random wait before computation, to avoid file I/O conficts."
+    )
     parser.add_argument('--num-works', default=0, type=int,
-                        help="number of works to process")
+        help="Number of agents to be trained before exit. '0' means to train all agents."
+    )
     parser.add_argument('--patience', default=168, type=float,
-                        help="hours since last modification")
+        help="Number of hours from last modification of a training to be considered as running."
+    )
     return parser
 
 
@@ -244,6 +247,6 @@ def cyclic_scheduler(optimizer, phase_len=4, num_phases=3, gamma=0.3):
     """
     cycle_len = phase_len*num_phases
     scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len)
-        )
+        optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len),
+    )
     return scheduler

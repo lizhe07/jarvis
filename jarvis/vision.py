@@ -14,7 +14,7 @@ MODELS = {
     'ResNet50': resnet.resnet50,
     'ResNet101': resnet.resnet101,
     'ResNet152': resnet.resnet152,
-    }
+}
 
 DEFAULT_IMAGE_AUG = lambda size: [
     transforms.Pad(4, padding_mode='reflect'),
@@ -22,26 +22,26 @@ DEFAULT_IMAGE_AUG = lambda size: [
     transforms.RandomCrop(size),
     transforms.RandomHorizontalFlip(),
     transforms.ColorJitter(.25, .25, .25),
-    ]
+]
 DEFAULT_DIGIT_AUG = lambda size: [
     transforms.Pad(4, padding_mode='reflect'),
     transforms.RandomRotation(2),
     transforms.RandomCrop(size),
-    ]
+]
 
 IMAGENET_TRAIN = transforms.Compose([
     transforms.RandomResizedCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.ColorJitter(
         brightness=0.1, contrast=0.1, saturation=0.1,
-        ),
+    ),
     transforms.ToTensor(),
-    ])
+])
 IMAGENET_TEST = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
-    ])
+])
 
 
 def imagenet_dataset(datasets_dir, train=False, transform=None):
