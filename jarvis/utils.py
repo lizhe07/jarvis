@@ -1,8 +1,6 @@
 import argparse, random, torch
 import numpy as np
 
-Array = np.ndarray
-
 
 def time_str(t_elapse, progress=1.):
     r"""Returns a formatted string for a duration.
