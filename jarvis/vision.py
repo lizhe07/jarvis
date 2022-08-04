@@ -123,7 +123,7 @@ DATASETS_META = {
     'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 3, 100, 50000),
     'ImageNet': (imagenet_dataset, None, 3, 1000, 1281167),
     'TinyImageNet': (tinyimagenet_dataset, DEFAULT_IMAGE_AUG(64), 3, 200, 100000),
-    }
+}
 
 
 def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_test=None):
