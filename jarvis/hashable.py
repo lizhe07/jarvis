@@ -37,7 +37,7 @@ def _is_custom_hashable(val):
 class HashableList(list):
     r"""Hashable list class."""
 
-    def __init__(self, native_list):
+    def __init__(self, native_list: list):
         super(HashableList, self).__init__([to_hashable(val) for val in native_list])
 
     def __hash__(self):
@@ -53,7 +53,7 @@ class HashableList(list):
 class HashableTuple(tuple):
     r"""Hashable tuple class."""
 
-    def __new__(cls, native_tuple):
+    def __new__(cls, native_tuple: tuple):
         return super(HashableTuple, cls).__new__(cls, tuple(to_hashable(val) for val in native_tuple))
 
     def native(self) -> tuple:
@@ -66,7 +66,7 @@ class HashableTuple(tuple):
 class HashableSet(set):
     r"""Hashable set class."""
 
-    def __init__(self, native_set):
+    def __init__(self, native_set: set):
         super(HashableSet, self).__init__([to_hashable(val) for val in native_set])
 
     def __hash__(self):
@@ -82,7 +82,7 @@ class HashableSet(set):
 class HashableDict(dict):
     r"""Hashable dictionary class."""
 
-    def __init__(self, native_dict):
+    def __init__(self, native_dict: dict):
         super(HashableDict, self).__init__({key: to_hashable(val) for key, val in native_dict.items()})
 
     def __hash__(self):
