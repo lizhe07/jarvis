@@ -55,7 +55,7 @@ class Config(HashableDict):
                 nested_config[key] = Config(val).nest()
         return nested_config
 
-    def update(self, config: dict, ignore_unknown: bool = False):
+    def update(self, config: dict, ignore_unknown: bool = True):
         r"""Returns an updated configuration.
 
         Args
@@ -68,7 +68,6 @@ class Config(HashableDict):
         """
         f_config = self.flatten()
         for key, val in Config(config).flatten().items():
-            if ignore_unknown and key not in f_config:
-                continue
-            f_config[key] = val
+            if key in f_config or not ignore_unknown:
+                f_config[key] = val
         return f_config.nest()
