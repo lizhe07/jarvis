@@ -1,5 +1,8 @@
 import argparse, random, torch
 import numpy as np
+import yaml
+
+from .config import Config
 
 
 def time_str(t_elapse, progress=1.):
@@ -35,6 +38,12 @@ def progress_str(i, total, show_percent=False):
     if show_percent:
         disp_str += ', ({:6.1%})'.format(i/total)
     return disp_str
+
+
+def read_yaml_config(yaml_path):
+    with open(yaml_path) as f:
+        config = Config(yaml.safe_load(f))
+    return config
 
 
 def get_seed(seed=None, max_seed=1000):
