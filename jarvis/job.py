@@ -39,13 +39,13 @@ class BaseJob:
         """
         self.store_dir = store_dir
         if self.store_dir is None:
-            self.configs = Archive(hashable=True)
+            self.configs = Archive(is_config=True)
             self.stats = Archive()
             self.ckpts = Archive()
             self.previews = Archive()
         else:
             self.configs = Archive(
-                f'{self.store_dir}/configs', path_len=s_path_len, pause=s_pause, hashable=True,
+                f'{self.store_dir}/configs', path_len=s_path_len, pause=s_pause, is_config=True,
             )
             self.stats = Archive(
                 f'{self.store_dir}/stats', path_len=s_path_len, pause=s_pause,

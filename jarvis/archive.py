@@ -1,5 +1,7 @@
 import os, pickle, random, time
 from typing import Optional
+
+from .config import Config
 from .hashable import to_hashable
 from .utils import progress_str, time_str
 
@@ -14,7 +16,7 @@ class Archive:
         path_len: int = 2,
         max_try: int = 30,
         pause: float = 0.5,
-        hashable: bool = False,
+        is_config: bool = False,
     ):
         r"""
         Args
@@ -31,9 +33,8 @@ class Archive:
             The maximum number of trying to read/write external files.
         pause:
             The time (seconds) between two consecutive read/write attempts.
-        hashable:
-            Whether the record value should be hashable. Useful when saving
-            configuration dictionaries.
+        is_config:
+            Whether the records are configurations.
 
         """
         self.store_dir, self.key_len = store_dir, key_len
@@ -43,7 +44,7 @@ class Archive:
             assert key_len>=path_len, "File name length should be no greater than key length."
             os.makedirs(self.store_dir, exist_ok=True)
             self.path_len, self.max_try, self.pause = path_len, max_try, pause
-        self.hashable = hashable
+        self.is_config = is_config
 
     def __repr__(self):
         if self.store_dir is None:
@@ -52,38 +53,33 @@ class Archive:
             return f"Archive object stored in {self.store_dir}."
 
     def __setitem__(self, key, val):
+        val = Config(val) if self.is_config else val
         if self.store_dir is None:
-            self.__store__[key] = to_hashable(val) if self.hashable else val
+            self.__store__[key] = val
         else:
             store_path = self._store_path(key)
             records = self._safe_read(store_path) if os.path.exists(store_path) else {}
-            records[key] = to_hashable(val) if self.hashable else val
+            records[key] = val
             self._safe_write(records, store_path)
 
     def __getitem__(self, key):
-        _no_exist_msg = f"{key} does not exist."
-        if self.store_dir is None:
-            assert key in self.__store__, _no_exist_msg
-            return self.__store__[key]
-        else:
-            store_path = self._store_path(key)
-            assert os.path.exists(store_path), _no_exist_msg
-            records = self._safe_read(store_path)
-            assert key in records, _no_exist_msg
-            return records[key]
+        try:
+            if self.store_dir is None:
+                return self.__store__[key]
+            else:
+                store_path = self._store_path(key)
+                records = self._safe_read(store_path)
+                return records[key]
+        except:
+            raise KeyError(key)
 
     def __contains__(self, key):
-        if self.store_dir is None:
-            return key in self.__store__
+        try:
+            self[key]
+        except:
+            return False
         else:
-            try:
-                store_path = self._store_path(key)
-            except:
-                return False # invalid key
-            if not os.path.exists(store_path):
-                return False
-            records = self._safe_read(store_path)
-            return key in records
+            return True
 
     def __iter__(self):
         return iter(self.keys())
@@ -103,7 +99,7 @@ class Archive:
     def _store_path(self, key):
         r"""Returns the path of external file associated with a key."""
         assert self._is_valid_key(key), f"Invalid key '{key}' encountered."
-        return '{}/{}.axv'.format(self.store_dir, key[:self.path_len])
+        return f'{self.store_dir}/{key[:self.path_len]}.axv'
 
     def _store_paths(self):
         r"""Returns all valid external files in the directory."""
@@ -111,6 +107,9 @@ class Archive:
             f'{self.store_dir}/{f}' for f in os.listdir(self.store_dir)
             if f.endswith('.axv') and len(f)==(self.path_len+4)
         ]
+
+    def _sleep(self):
+        time.sleep(self.pause*(0.8+random.random()*0.4))
 
     def _safe_read(self, store_path):
         r"""Safely reads a file.
@@ -126,7 +125,7 @@ class Archive:
                     records = pickle.load(f)
             except:
                 count += 1
-                time.sleep(self.pause*(0.8+random.random()*0.4))
+                self._sleep()
             else:
                 break
         if count==self.max_try:
@@ -142,7 +141,7 @@ class Archive:
                     pickle.dump(records, f)
             except:
                 count += 1
-                time.sleep(self.pause*(0.8+random.random()*0.4))
+                self._sleep()
             else:
                 break
         if count==self.max_try:
@@ -208,8 +207,8 @@ class Archive:
             The key of record being searched for. ``None`` if not found.
 
         """
-        assert self.hashable, "Key search is implemented for hashable records only."
-        h_val = to_hashable(val)
+        assert self.is_config, "Key search is implemented for config records only."
+        h_val = Config(val)
         for key, val in self.items():
             if val==h_val:
                 return key
@@ -224,7 +223,7 @@ class Archive:
             The key of added record.
 
         """
-        assert self.hashable, "Value addition is implemented for hashable records only."
+        assert self.is_config, "Value addition is implemented for config records only."
         key = self.get_key(val)
         if key is None:
             key = self._new_key()
@@ -277,7 +276,7 @@ class Archive:
                     if verbose:
                         print("{} ({})".format(
                             progress_str(i, len(store_paths)),
-                            time_str(toc-tic, progress=i/len(store_paths))
+                            time_str(toc-tic, progress=i/len(store_paths)),
                         ))
             if removed:
                 print(f"{len(removed)} corrupted files removed.")
@@ -285,17 +284,17 @@ class Archive:
                 print("No corrupted files detected.")
         return removed
 
-    def get_duplicates(self):
+    def get_duplicates(self) -> dict(Config, list[str]):
         r"""Returns all duplicate records.
 
         Returns
         -------
-        duplicates: dict[Hashable, list[str]]
+        duplicates:
             A dictionary of which the key is the duplicate record value, while
             the value is the list of keys associated with it.
 
         """
-        assert self.hashable, "Duplicate detection is implemented for hashable records only."
+        assert self.is_config, "Duplicate detection is implemented for config records only."
         inv_dict = {} # dictionary for inverse archive
         for key, val in self.items():
             if val in inv_dict:
