@@ -19,19 +19,19 @@ class Archive:
         r"""
         Args
         ----
-        store_dir: str
+        store_dir:
             The directory for storing data. If `store_dir` is ``None``, an
             internal dictionary `__store__` is used.
-        key_len: int
+        key_len:
             The length of keys.
-        path_len: int
+        path_len:
             The length of external file names, should be no greater than
             `key_len`.
-        max_try: int
+        max_try:
             The maximum number of trying to read/write external files.
-        pause: float
+        pause:
             The time (seconds) between two consecutive read/write attempts.
-        hashable: bool
+        hashable:
             Whether the record value should be hashable. Useful when saving
             configuration dictionaries.
 
@@ -47,9 +47,9 @@ class Archive:
 
     def __repr__(self):
         if self.store_dir is None:
-            return 'Archive object with no external storage'
+            return "Archive object with no external storage."
         else:
-            return 'Archive object stored in {}'.format(self.store_dir)
+            return f"Archive object stored in {self.store_dir}."
 
     def __setitem__(self, key, val):
         if self.store_dir is None:
@@ -110,7 +110,7 @@ class Archive:
         return [
             f'{self.store_dir}/{f}' for f in os.listdir(self.store_dir)
             if f.endswith('.axv') and len(f)==(self.path_len+4)
-            ]
+        ]
 
     def _safe_read(self, store_path):
         r"""Safely reads a file.
@@ -199,12 +199,12 @@ class Archive:
                 for key, val in records.items():
                     yield key, val
 
-    def get_key(self, val):
+    def get_key(self, val) -> Optional[str]:
         r"""Returns the key of a record.
 
         Returns
         -------
-        key: Optional[str]
+        key:
             The key of record being searched for. ``None`` if not found.
 
         """
@@ -215,12 +215,12 @@ class Archive:
                 return key
         return None
 
-    def add(self, val):
+    def add(self, val) -> str:
         r"""Adds a new item if it has not already existed.
 
         Returns
         -------
-        key: str
+        key:
             The key of added record.
 
         """
@@ -247,12 +247,12 @@ class Archive:
                 os.remove(store_path) # remove empty external file
             return val
 
-    def prune(self):
+    def prune(self) -> list[str]:
         r"""Removes corrupted files.
 
         Returns
         -------
-        removed: list[str]
+        removed:
             The name of removed files.
 
         """
@@ -278,9 +278,9 @@ class Archive:
                         print("{} ({})".format(
                             progress_str(i, len(store_paths)),
                             time_str(toc-tic, progress=i/len(store_paths))
-                            ))
+                        ))
             if removed:
-                print("{} corrupted files removed.".format(len(removed)))
+                print(f"{len(removed)} corrupted files removed.")
             else:
                 print("No corrupted files detected.")
         return removed
