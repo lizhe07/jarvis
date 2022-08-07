@@ -284,7 +284,7 @@ class Archive:
                 print("No corrupted files detected.")
         return removed
 
-    def get_duplicates(self) -> dict(Config, list[str]):
+    def get_duplicates(self) -> dict[Config, list[str]]:
         r"""Returns all duplicate records.
 
         Returns

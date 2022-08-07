@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Optional
 from .utils import time_str, flatten, nest
 from .archive import Archive
-from .hashable import HashableDict
+from .config import Config
 
 
 class BaseJob:
@@ -61,8 +61,27 @@ class BaseJob:
             for axv in [self.configs, self.stats, self.previews]:
                 axv.to_internal()
 
+    def get_config(self, config: Optional[Config] = None) -> Config:
+        r"""Returns work configuration.
+
+        This method fills in default values of necessary keys, and check the
+        consistency of values if necessary. Needs to be implemented by child
+        class.
+
+        Args
+        ----
+        config:
+            Potentially partial configuration for a work.
+
+        Returns
+        -------
+        config:
+            Full configuration for `main` method.
+
+        """
+
     def main(self,
-        config: dict,
+        config: Config,
         num_epochs: int = 1,
         resume: bool = True,
         verbose: int = 1,
@@ -93,7 +112,7 @@ class BaseJob:
         raise NotImplementedError
 
     def process(self,
-        config: HashableDict,
+        config: Config,
         num_epochs: int = 1,
         resume: bool = True,
         verbose: int = 1,
@@ -121,7 +140,7 @@ class BaseJob:
         return ckpt, preview
 
     def batch(self,
-        configs: Iterable,
+        configs: Iterable[Config],
         num_epochs: int = 1,
         resume: bool = True,
         num_works: int = 0,
@@ -183,41 +202,6 @@ class BaseJob:
             if not interrupted and (num_works==0 or w_count<num_works):
                 print("All works are processed or being processed.")
 
-    def strs2config(self, arg_strs: Optional[list[str]] = None):
-        r"""Returns work configuration.
-
-        Args
-        ----
-        arg_strs:
-            A string list that can be parsed to argument parser.
-
-        Returns
-        -------
-        config: dict
-            A dictionary specified by `arg_strs`.
-
-        """
-        raise NotImplementedError
-
-    def get_config(self, config: Optional[dict] = None) -> dict:
-        r"""Returns work configuration.
-
-        This method fills in default values of necessary keys, and check the
-        consistency of values if necessary. Needs to be implemented by child
-        class.
-
-        Args
-        ----
-        config:
-            Potentially partial configuration for a work.
-
-        Returns
-        -------
-        config:
-            Full configuration for `main` method.
-
-        """
-
     def grid_search(self, search_spec: dict, **kwargs):
         r"""Grid hyper-parameter search.
 
@@ -225,6 +209,8 @@ class BaseJob:
         the method `get_config`. The configuration generator is passed to the
         method `batch`.
 
+        Args
+        ----
         search_spec:
             The work configuration search specification, can be nested. It has
             the same key structure and a valid `config` for `main` method, and
@@ -232,31 +218,34 @@ class BaseJob:
             `config`.
 
         """
-        f_spec = flatten(search_spec)
+        f_spec = Config(search_spec).flatten()
         f_keys = list(f_spec.keys())
-        val_lists = [f_spec[key] for key in f_keys]
-        space_dim = [len(v) for v in val_lists]
-        total_num = np.prod(space_dim)
+        vals, dims = [], []
+        for key in f_keys:
+            assert isinstance(f_spec[key], list)
+            vals.append(f_spec[key])
+            dims.append(len(f_spec[key]))
+        total_num = np.prod(dims)
 
         def config_gen():
             for idx in random.sample(range(total_num), total_num):
-                sub_idxs = np.unravel_index(idx, space_dim)
-                f_config = {}
+                sub_idxs = np.unravel_index(idx, dims)
+                f_config = Config()
                 for i, f_key in enumerate(f_keys):
-                    f_config[f_key] = val_lists[i][sub_idxs[i]]
-                config = self.get_config(nest(f_config))
+                    f_config[f_key] = vals[i][sub_idxs[i]]
+                config = self.get_config(f_config.nest())
                 yield config
         self.batch(config_gen(), **kwargs)
 
-    def load_ckpt(self, config):
+    def load_ckpt(self, config: Config) -> tuple[int, dict, dict]:
         r"""Loads checkpoint."""
-        key = self.configs.add(config)
+        key = self.configs.get_key(config)
         epoch = self.stats[key]['epoch']
         ckpt = self.ckpts[key]
         preview = self.previews[key]
         return epoch, ckpt, preview
 
-    def save_ckpt(self, config, epoch, ckpt, preview):
+    def save_ckpt(self, config: Config, epoch: int, ckpt: dict, preview: dict):
         r"""Saves checkpoint."""
         key = self.configs.add(config)
         self.stats[key] = {'epoch': epoch, 'toc': time.time()}
@@ -264,17 +253,15 @@ class BaseJob:
         self.previews[key] = preview
 
     @staticmethod
-    def _is_matched(config, cond=None):
+    def _is_matched(config: Config, cond: Config) -> bool:
         r"""Checks if a configuration matches condition."""
-        if cond is None:
-            return True
-        flat_config, flat_cond = flatten(config), flatten(cond)
+        flat_config, flat_cond = config.flatten(), cond.flatten()
         for key in flat_cond:
             if not(key in flat_config and flat_config[key]==flat_cond[key]):
                 return False
         return True
 
-    def completed(self, min_epoch=1, cond=None):
+    def completed(self, min_epoch: int = 1, cond: Optional[dict] = None) -> str:
         r"""A generator for completed works."""
         for key, stat in self.stats.items():
             if stat['epoch']>=min_epoch:
@@ -282,21 +269,21 @@ class BaseJob:
                     config = self.configs[key]
                 except:
                     continue
-                if self._is_matched(config, cond):
+                if cond is None or self._is_matched(config, Config(cond)):
                     yield key
 
     def best_work(self,
-        min_epochs: int = 1,
+        min_epoch: int = 1,
         cond: Optional[dict] = None,
         p_key: str = 'loss_test',
         reverse: Optional[bool] = None,
         verbose: int = 1,
-    ):
+    ) -> str:
         r"""Returns the best work given conditions.
 
         Args
         ----
-        min_epochs:
+        min_epoch:
             Minimum number of epochs.
         cond:
             Conditioned value of work configurations. Only completed work with
@@ -306,20 +293,22 @@ class BaseJob:
         reverse:
             Returns work with the largest value of ``'p_key'`` when `reverse` is
             ``True``, otherwise the smallest.
+        verbose:
+            Level of information display.
 
         Returns
         -------
-        best_key: str
+        best_key:
             The key of best work.
 
         """
-        assert min_epochs>0
+        assert min_epoch>0
         if reverse is None:
-            reverse = p_key.startswith('acc')
+            reverse = p_key.startswith('acc') or p_key.startswith('return')
         best_val = -float('inf') if reverse else float('inf')
         best_key = None
         count = 0
-        for key in self.completed(min_epochs, cond):
+        for key in self.completed(min_epoch, cond):
             val = self.previews[key][p_key]
             if reverse:
                 if val>best_val:
@@ -331,13 +320,13 @@ class BaseJob:
                     best_key = key
             count += 1
         if verbose>0:
-            if min_epochs==1:
+            if min_epoch==1:
                 print(f"{count} completed works found.")
             else:
-                print(f"{count} works trained with at least {min_epochs} epochs found.")
+                print(f"{count} works trained with at least {min_epoch} epochs found.")
         return best_key
 
-    def pop(self, key):
+    def pop(self, key: str) -> tuple[Config, dict, dict, dict]:
         r"""Pops out a work by key."""
         config = self.configs.pop(key)
         stat = self.stats.pop(key)

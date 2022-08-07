@@ -1,9 +1,11 @@
+from typing import Optional
+
 from .hashable import HashableDict
 
 class Config(HashableDict):
 
-    def __init__(self, config: dict):
-        super(Config, self).__init__(config)
+    def __init__(self, config: Optional[dict] = None):
+        super(Config, self).__init__(config or {})
         for key, val in self.items():
             if isinstance(val, HashableDict):
                 self[key] = Config(val)
