@@ -24,7 +24,7 @@ class Config(HashableDict):
         """
         flat_config = {}
         for key, val in self.items():
-            if isinstance(val, Config):
+            if isinstance(val, Config) and len(val)>0:
                 for subkey, subval in val.flatten().items():
                     flat_config[(subkey, '@', key)] = subval
             else:
@@ -55,9 +55,9 @@ class Config(HashableDict):
         for key, val in nested_config.items():
             if isinstance(val, dict):
                 nested_config[key] = Config(val).nest()
-        return nested_config
+        return Config(nested_config)
 
-    def update(self, config: dict, ignore_unknown: bool = True):
+    def update(self, config: dict, ignore_unknown: bool = False):
         r"""Returns an updated configuration.
 
         Args
@@ -65,11 +65,18 @@ class Config(HashableDict):
         config:
             The new configuration, can be partially defined.
         ignore_unknown:
-            Whether unknown fields should be kept.
+            Whether unknown fields should be ignored.
 
         """
         f_config = self.flatten()
         for key, val in Config(config).flatten().items():
             if key in f_config or not ignore_unknown:
+                f_config[key] = val
+        super(Config, self).update(f_config.nest())
+
+    def fill(self, config: dict):
+        f_config = self.flatten()
+        for key, val in Config(config).flatten().items():
+            if key not in f_config:
                 f_config[key] = val
         return f_config.nest()

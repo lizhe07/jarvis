@@ -1,10 +1,11 @@
 import random, time
 import numpy as np
-from collections.abc import Iterable
 from typing import Optional
-from .utils import time_str, flatten, nest
-from .archive import Archive
+from collections.abc import Iterable
+
 from .config import Config
+from .archive import Archive
+from .utils import time_str
 
 
 class BaseJob:
@@ -79,6 +80,7 @@ class BaseJob:
             Full configuration for `main` method.
 
         """
+        raise NotImplementedError
 
     def main(self,
         config: Config,
