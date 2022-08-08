@@ -51,7 +51,13 @@ class Config(HashableDict):
                     nested_config[parkey] = {}
                 nested_config[parkey][subkey] = val
             else:
-                nested_config[key] = val
+                if key in nested_config:
+                    if isinstance(val, dict):
+                        nested_config[key].update(val)
+                    else:
+                        raise ValueError(f"Conflicting values found for {key}.")
+                else:
+                    nested_config[key] = val
         for key, val in nested_config.items():
             if isinstance(val, dict):
                 nested_config[key] = Config(val).nest()
@@ -74,9 +80,9 @@ class Config(HashableDict):
                 f_config[key] = val
         super(Config, self).update(f_config.nest())
 
-    def fill(self, config: dict):
+    def fill(self, defaults: dict):
         f_config = self.flatten()
-        for key, val in Config(config).flatten().items():
+        for key, val in Config(defaults).flatten().items():
             if key not in f_config:
                 f_config[key] = val
         return f_config.nest()
