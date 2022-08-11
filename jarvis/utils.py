@@ -3,6 +3,7 @@ import numpy as np
 import yaml
 
 from .config import Config
+from .alias import Module, Optimizer, Scheduler
 
 
 def time_str(t_elapse, progress=1.):
@@ -192,26 +193,30 @@ def job_parser():
     return parser
 
 
-def sgd_optimizer(model, lr, momentum=0.9, weight_decay=0.):
+def sgd_optimizer(
+    model: Module, lr: float,
+    momentum: float = 0.9,
+    weight_decay: float = 0.,
+) -> Optimizer:
     r"""Returns a SGD optimizer.
 
-    Only parameters whose name ends with ``'weight'`` will be trained with
-    weight decay.
+    Only parameters whose name ends with 'weight' will be trained with weight
+    decay.
 
     Args
     ----
-    model: nn.Module
+    model:
         The pytorch model.
-    lr: float
+    lr:
         Learning rate for all parameters.
-    momentum: float
+    momentum:
         The momentum parameter for SGD.
-    weight_decay: float
+    weight_decay:
         The weight decay parameter for layer weights but not biases.
 
     Returns
     -------
-    optimizer: optimizer
+    optimizer:
         The SGD optimizer.
 
     """
@@ -219,15 +224,20 @@ def sgd_optimizer(model, lr, momentum=0.9, weight_decay=0.):
     params.append({
         'params': [param for name, param in model.named_parameters() if name.endswith('weight')],
         'weight_decay': weight_decay,
-        })
+    })
     params.append({
         'params': [param for name, param in model.named_parameters() if not name.endswith('weight')],
-        })
+    })
     optimizer = torch.optim.SGD(params, lr=lr, momentum=momentum)
     return optimizer
 
 
-def cyclic_scheduler(optimizer, phase_len=4, num_phases=3, gamma=0.3):
+def cyclic_scheduler(
+    optimizer: Optimizer,
+    phase_len: int = 4,
+    num_phases: int = 3,
+    gamma: float = 0.3,
+):
     r"""Returns a simple cyclic scheduler.
 
     Learning rate is scheduled to follow cycles, each of which contains a fixed
@@ -236,19 +246,19 @@ def cyclic_scheduler(optimizer, phase_len=4, num_phases=3, gamma=0.3):
 
     Args
     ----
-    optimizer: optimizer
+    optimizer:
         The pytorch optimizer.
     phase_len:
         The length of each phase, during which the learning rate is fixed.
-    num_phases: int
+    num_phases:
         The number of phasese within each cycle. Learning rate decays by a
         fixed factor between phases.
-    gamma: float
+    gamma:
         The decay factor between phases, must be in `(0, 1]`.
 
     Returns
     -------
-    scheduler: scheduler
+    scheduler:
         The cyclic scheculer.
 
     """

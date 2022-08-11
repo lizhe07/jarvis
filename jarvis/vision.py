@@ -132,12 +132,12 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
     Args
     ----
     task: str
-        The name of the datasets, e.g. ``'CIFAR10'``.
+        The name of the datasets, e.g. 'CIFAR10'.
     datasets_dir: str
         The directory of the datasets. Automatic download is disabled.
     split_ratio: float
-        The ratio of training set, usually `0.9` or `0.8`. When `split_ratio`
-        is ``None``, only testing set will be returned.
+        The ratio of training set, usually '0.9' or '0.8'. When `split_ratio`
+        is 'None', only testing set will be returned.
     augment: bool
         Whether to apply data augmentation on training set.
     grayscale: bool
@@ -152,11 +152,11 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
 
     Examples
     --------
-    >>> dataset_test = prepare_datasets(task, datasets_dir)
+    >>> det_test = prepare_datasets(task, datasets_dir)
 
-    >>> dataset_train, dataset_valid, dataset_test = prepare_datasets(
+    >>> dset_train, dset_valid, dset_test = prepare_datasets(
             task, datasets_dir, split_ratio
-            )
+        )
 
     """
     if task.endswith('-Gray'):
@@ -171,23 +171,23 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
             t_test = transforms.ToTensor()
         if to_grayscale:
             t_test = transforms.Compose([t_test, transforms.Grayscale()])
-    dataset, augs, *_, sample_num = DATASETS_META[task]
+    dset, augs, *_, sample_num = DATASETS_META[task]
 
-    dataset_test = dataset(datasets_dir, train=False, transform=t_test)
+    dset_test = dset(datasets_dir, train=False, transform=t_test)
     if task=='ImageNet':
         # load a random fixed shuffle of testing images
         idxs = pickle.loads(resources.read_binary('jarvis.resources', 'imagenet_test_idxs'))
-        dataset_test.samples = [dataset_test.samples[idx] for idx in idxs]
-        dataset_test.targets = [t for _, t in dataset_test.samples]
-        dataset_test.imgs = dataset_test.samples
+        dset_test.samples = [dset_test.samples[idx] for idx in idxs]
+        dset_test.targets = [t for _, t in dset_test.samples]
+        dset_test.imgs = dset_test.samples
         # load class names from https://github.com/anishathalye/imagenet-simple-labels
-        dataset_test.class_names = pickle.loads(
+        dset_test.class_names = pickle.loads(
             resources.read_binary('jarvis.resources', 'imagenet_class_names')
         )
     elif task!='TinyImageNet':
-        dataset_test.class_names = dataset_test.classes
+        dset_test.class_names = dset_test.classes
     if split_ratio is None:
-        return dataset_test
+        return dset_test
 
     assert split_ratio>0 and split_ratio<=1
     if t_train is None:
@@ -199,13 +199,13 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
             t_train = transforms.Compose([t_train, transforms.Grayscale()])
     idxs_train = np.array(random.sample(range(sample_num), int(sample_num*split_ratio)))
     idxs_valid = np.setdiff1d(np.arange(sample_num), idxs_train, assume_unique=True)
-    dataset_train = Subset(dataset(datasets_dir, train=True, transform=t_train), idxs_train)
-    dataset_train.targets = list(np.array(dataset_train.dataset.targets)[idxs_train])
-    dataset_train.class_names = dataset_test.class_names
-    dataset_valid = Subset(dataset(datasets_dir, train=True, transform=t_test), idxs_valid)
-    dataset_valid.targets = list(np.array(dataset_valid.dataset.targets)[idxs_valid])
-    dataset_valid.class_names = dataset_test.class_names
-    return dataset_train, dataset_valid, dataset_test
+    dset_train = Subset(dset(datasets_dir, train=True, transform=t_train), idxs_train)
+    dset_train.targets = list(np.array(dset_train.dataset.targets)[idxs_train])
+    dset_train.class_names = dset_test.class_names
+    dset_valid = Subset(dset(datasets_dir, train=True, transform=t_test), idxs_valid)
+    dset_valid.targets = list(np.array(dset_valid.dataset.targets)[idxs_valid])
+    dset_valid.class_names = dset_test.class_names
+    return dset_train, dset_valid, dset_test
 
 
 def prepare_model(task, arch, in_channels=None, **kwargs):
