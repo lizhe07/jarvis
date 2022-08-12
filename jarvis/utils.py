@@ -173,10 +173,13 @@ def job_parser():
         help="Maximum seconds of random wait before computation, to avoid file I/O conficts."
     )
     parser.add_argument('--num-works', default=0, type=int,
-        help="Number of agents to be trained before exit. '0' means to train all agents."
+        help="Number of works to be trained before exit. '0' means to train all works."
     )
     parser.add_argument('--patience', default=168, type=float,
         help="Number of hours from last modification of a training to be considered as running."
+    )
+    parser.add_argument('--max-errors', default=0, type=int,
+        help="Maximum number of runtime errors."
     )
     return parser
 

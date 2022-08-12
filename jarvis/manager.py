@@ -5,23 +5,25 @@ from collections.abc import Iterable
 
 from .config import Config
 from .archive import Archive
-from .utils import time_str
+from .utils import time_str, progress_str
 
 
-class BaseJob:
-    r"""Base class for batch processing.
+class Manager:
+    r"""Base class for managing model training.
 
     The job is associated with different directories storing configurations,
-    status, ckpts and previews of all works. Method `main` need to be
-    implemented by child class.
+    status, checkpoints and previews of all works.
 
     """
 
     def __init__(self,
         store_dir: Optional[str] = None,
+        *,
         read_only: bool = False,
         s_path_len: int = 2, s_pause: float = 1.,
         l_path_len: int = 3, l_pause: float = 5.,
+        eval_interval: int = 1, save_interval: int = 1,
+        verbose: int = 1,
     ):
         r"""
         Args
@@ -36,6 +38,8 @@ class BaseJob:
             and `previews`.
         l_path_len, l_pause:
             Long path length and pause time for `ckpts`.
+        verbose:
+            Information display level, with '0' referring to quiet mode.
 
         """
         self.store_dir = store_dir
@@ -61,13 +65,16 @@ class BaseJob:
         if self.store_dir is not None and self.read_only:
             for axv in [self.configs, self.stats, self.previews]:
                 axv.to_internal()
+        self.eval_interval = eval_interval
+        self.save_interval = save_interval
+        self.verbose = verbose
+        self.defaults = Config()
 
     def get_config(self, config: Optional[Config] = None) -> Config:
         r"""Returns work configuration.
 
         This method fills in default values of necessary keys, and check the
-        consistency of values if necessary. Needs to be implemented by child
-        class.
+        consistency of values if necessary.
 
         Args
         ----
@@ -77,69 +84,82 @@ class BaseJob:
         Returns
         -------
         config:
-            Full configuration for `main` method.
+            Full configuration for `process` method.
 
         """
-        raise NotImplementedError
-
-    def main(self,
-        config: Config,
-        num_epochs: int = 1,
-        resume: bool = True,
-        verbose: int = 1,
-    ):
-        r"""Main function that needs implementation by subclasses.
-
-        Args
-        ----
-        config:
-            A configuration dict for the work.
-        num_epochs:
-            Number of epochs of the work. If not explicit epochs can be defined,
-            use `num_epochs=1` for a single pass.
-        resume:
-            Whether to resume from existing checkpoint. If ``False``, compute
-            from scratch.
-        verbose:
-            Level of information display. No message will be printed when
-            'verbose' is no greater than 0.
-
-        Returns
-        -------
-        ckpt, preview:
-            Archive records that will be saved in `self.ckpts` and
-            `self.previews` respectively.
-
-        """
-        raise NotImplementedError
+        return Config(config).fill(self.defaults)
 
     def process(self,
         config: Config,
         num_epochs: int = 1,
         resume: bool = True,
-        verbose: int = 1,
     ):
-        key = self.configs.add(config)
-        if verbose>0:
-            print(f"Processing {key}...")
-        try:
+        r"""Processes a training work.
+
+        Args
+        ----
+        config:
+            A configuration dictionary of the work.
+        num_epochs:
+            Number of training epochs for each work. If explicit epochs can not
+            be defined, use `num_epochs=1` for a single pass.
+        resume:
+            Whether to resume from existing checkpoints. If 'False', process
+            each work from scratch.
+
+        """
+        self.setup(config)
+
+        try: # load existing checkpoint
             assert resume
-            epoch, ckpt, preview = self.load_ckpt(config)
-            assert epoch>=num_epochs
-            if verbose>0:
+            self.load_ckpt()
+            if self.verbose>0:
                 print("Checkpoint{} loaded.".format(
-                    '' if epoch==1 else f' (epoch {epoch})',
+                    '' if self.epoch==1 else f' (epoch {self.epoch})',
                 ))
         except:
-            tic = time.time()
-            ckpt, preview = self.main(config, num_epochs, resume, verbose)
-            self.save_ckpt(config, num_epochs, ckpt, preview)
-            toc = time.time()
-            if verbose>0:
-                print("Checkpoint{} saved. ({})".format(
-                    '' if num_epochs==1 else f' (epoch {num_epochs})', time_str(toc-tic),
-                ))
-        return ckpt, preview
+            self.init_ckpt()
+            if self.verbose>0:
+                print("No checkpoint loaded.")
+
+        while self.epoch<num_epochs:
+            if self.verbose>0:
+                print(f"Epoch: {progress_str(self.epoch, num_epochs)}")
+            self.train()
+            self.epoch += 1
+            if self.epoch%self.eval_interval==0 or self.epoch==num_epochs:
+                self.eval()
+            if self.epoch%self.save_interval==0 or self.epoch==num_epochs:
+                self.save_ckpt()
+
+    def setup(self, config: Config):
+        r"""Sets up manager."""
+        self.config = config
+
+    def init_ckpt(self):
+        r"""Initializes checkpoint."""
+        self.epoch = 0
+        self.ckpt = {'eval_records': {}}
+
+    def load_ckpt(self):
+        r"""Loads checkpoint."""
+        key = self.configs.get_key(self.config)
+        self.epoch = self.stats[key]['epoch']
+        self.ckpt = self.ckpts[key]
+        self.preview = self.previews[key]
+
+    def save_ckpt(self):
+        r"""Saves checkpoint."""
+        key = self.configs.add(self.config)
+        self.stats[key] = {'epoch': self.epoch, 'toc': time.time()}
+        self.ckpts[key] = self.ckpt
+        self.previews[key] = self.preview
+
+    def train(self):
+        pass
+
+    def eval(self):
+        pass
 
     def batch(self,
         configs: Iterable[Config],
@@ -148,7 +168,6 @@ class BaseJob:
         num_works: int = 0,
         patience: float = 168,
         max_errors: int = 0,
-        verbose: int = 1,
     ):
         r"""Batch processing.
 
@@ -157,12 +176,17 @@ class BaseJob:
         configs:
             An iterable object containing work configurations. Some are
             potentially processed already.
+        num_epochs, resume:
+            See `process` for more details.
         num_works:
-            The number of works to process. If it is 0, the processing stops
+            The number of works to process. If it is '0', the processing stops
             when no work is left in `configs`.
         patience:
             Patience time for processing an incomplete work, in hours. The last
             modified time of a work is recorded in `self.stats`.
+        max_errors:
+            Maximum number of allowed errors. If it is '0', the runtime error
+            is immediately raised.
 
         """
         w_count, e_count, interrupted = 0, 0, False
@@ -175,21 +199,22 @@ class BaseJob:
                     stat = {'epoch': 0, 'toc': -float('inf')}
                 if stat['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience:
                     continue
-                stat['toc'] = time.time()
+                stat['toc'] = time.time() # update modified time
                 self.stats[key] = stat
 
-                if verbose>0:
+                if self.verbose>0:
                     print("------------")
-                self.process(config, num_epochs, resume, verbose)
+                    print(f"Processing {key}...")
+                self.process(config, num_epochs, resume)
                 w_count += 1
-                if verbose>0:
+                if self.verbose>0:
                     print("------------")
             except KeyboardInterrupt:
                 interrupted = True
                 break
-            except Exception as e:
+            except Exception:
                 if max_errors==0:
-                    raise e
+                    raise
                 e_count += 1
                 if e_count==max_errors:
                     interrupted = True
@@ -199,7 +224,7 @@ class BaseJob:
             else:
                 if num_works>0 and w_count==num_works:
                     break
-        if verbose>0:
+        if self.verbose>0:
             print("\n{} works processed.".format(w_count))
             if not interrupted and (num_works==0 or w_count<num_works):
                 print("All works are processed or being processed.")
@@ -215,9 +240,8 @@ class BaseJob:
         ----
         search_spec:
             The work configuration search specification, can be nested. It has
-            the same key structure and a valid `config` for `main` method, and
-            values at the leaf level are lists containing possible values of a
-            `config`.
+            the same key structure as a valid `config` for `process` method, and
+            values at the leaf level are lists containing possible values.
 
         """
         f_spec = Config(search_spec).flatten()
@@ -238,21 +262,6 @@ class BaseJob:
                 config = self.get_config(f_config.nest())
                 yield config
         self.batch(config_gen(), **kwargs)
-
-    def load_ckpt(self, config: Config) -> tuple[int, dict, dict]:
-        r"""Loads checkpoint."""
-        key = self.configs.get_key(config)
-        epoch = self.stats[key]['epoch']
-        ckpt = self.ckpts[key]
-        preview = self.previews[key]
-        return epoch, ckpt, preview
-
-    def save_ckpt(self, config: Config, epoch: int, ckpt: dict, preview: dict):
-        r"""Saves checkpoint."""
-        key = self.configs.add(config)
-        self.stats[key] = {'epoch': epoch, 'toc': time.time()}
-        self.ckpts[key] = ckpt
-        self.previews[key] = preview
 
     @staticmethod
     def _is_matched(config: Config, cond: Config) -> bool:
@@ -279,24 +288,21 @@ class BaseJob:
         cond: Optional[dict] = None,
         p_key: str = 'loss_test',
         reverse: Optional[bool] = None,
-        verbose: int = 1,
     ) -> str:
         r"""Returns the best work given conditions.
 
         Args
         ----
         min_epoch:
-            Minimum number of epochs.
+            Minimum number of trained epochs.
         cond:
             Conditioned value of work configurations. Only completed work with
             matching values will be considered.
         p_key:
             The key of `preview` for comparing works.
         reverse:
-            Returns work with the largest value of ``'p_key'`` when `reverse` is
-            ``True``, otherwise the smallest.
-        verbose:
-            Level of information display.
+            Returns work with the largest `p_key` value if `reverse` is 'True',
+            otherwise the smallest.
 
         Returns
         -------
@@ -321,7 +327,7 @@ class BaseJob:
                     best_val = val
                     best_key = key
             count += 1
-        if verbose>0:
+        if self.verbose>0:
             if min_epoch==1:
                 print(f"{count} completed works found.")
             else:
