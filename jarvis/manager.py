@@ -124,7 +124,7 @@ class Manager:
 
         while self.epoch<num_epochs:
             if self.verbose>0:
-                print(f"Epoch: {progress_str(self.epoch, num_epochs)}")
+                print(f"\nEpoch: {progress_str(self.epoch+1, num_epochs)}")
             self.train()
             self.epoch += 1
             if self.epoch%self.eval_interval==0 or self.epoch==num_epochs:
