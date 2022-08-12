@@ -1,6 +1,7 @@
 from typing import Optional
 
 from .hashable import HashableDict
+from .utils import flatten, nest
 
 class Config(HashableDict):
 
@@ -11,57 +12,12 @@ class Config(HashableDict):
                 self[key] = Config(val)
 
     def flatten(self):
-        r"""Returns a flat configuration.
-
-        A nested configuration like `{'A': {'B', val}}` will be converted to
-        `{('B', '@', 'A'), val}`.
-
-        Returns
-        -------
-        flat_config:
-            A flat configuration with tuple keys for hierarchy.
-
-        """
-        flat_config = {}
-        for key, val in self.items():
-            if isinstance(val, Config) and len(val)>0:
-                for subkey, subval in val.flatten().items():
-                    flat_config[(subkey, '@', key)] = subval
-            else:
-                flat_config[key] = val
-        return Config(flat_config)
+        r"""Returns a flat configuration."""
+        return Config(flatten(self))
 
     def nest(self):
-        r"""Returns a nested configuration.
-
-        A flat configuration like `{('B', '@', 'A'), val}` will be converted to
-        `{'A': {'B', val}}`.
-
-        Returns
-        -------
-        nested_config:
-            A nested configuration possibly contains dictionaries as values.
-
-        """
-        nested_config = {}
-        for key, val in self.items():
-            if isinstance(key, tuple) and len(key)==3 and key[1]=='@':
-                subkey, _, parkey = key
-                if parkey not in nested_config:
-                    nested_config[parkey] = {}
-                nested_config[parkey][subkey] = val
-            else:
-                if key in nested_config:
-                    if isinstance(val, dict):
-                        nested_config[key].update(val)
-                    else:
-                        raise ValueError(f"Conflicting values found for {key}.")
-                else:
-                    nested_config[key] = val
-        for key, val in nested_config.items():
-            if isinstance(val, dict):
-                nested_config[key] = Config(val).nest()
-        return Config(nested_config)
+        r"""Returns a nested configuration."""
+        return Config(nest(self))
 
     def update(self, config: dict, ignore_unknown: bool = False):
         r"""Returns an updated configuration.
@@ -81,6 +37,7 @@ class Config(HashableDict):
         super(Config, self).update(f_config.nest())
 
     def fill(self, defaults: dict):
+        r"""Fills default values."""
         f_config = self.flatten()
         for key, val in Config(defaults).flatten().items():
             if key not in f_config:
