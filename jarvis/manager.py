@@ -14,6 +14,11 @@ class Manager:
     The job is associated with different directories storing configurations,
     status, checkpoints and previews of all works.
 
+    Methods `get_config`, `setup`, `init_ckpt`, `load_ckpt` and `save_ckpt`
+    usually need to be overridden to function properly, see the documents of
+    each for more detailed examples. Methods `train` and `eval` need to be
+    implemented by child class.
+
     """
 
     def __init__(self,
@@ -73,51 +78,85 @@ class Manager:
     def get_config(self, config: Optional[Config] = None) -> Config:
         r"""Returns work configuration.
 
-        This method fills in default values of necessary keys, and check the
-        consistency of values if necessary.
-
-        Args
-        ----
-        config:
-            Potentially partial configuration for a work.
-
-        Returns
-        -------
-        config:
-            Full configuration for `process` method.
+        Overriding
+        ----------
+        def get_config(self, config=None):
+            config = super(ChildManager, self).get_config(config)
+            # update `config`
+            return config
 
         """
         return Config(config).fill(self.defaults)
 
     def setup(self, config: Config):
-        r"""Sets up manager."""
+        r"""Sets up manager.
+
+        Overriding
+        ----------
+        def setup(self, config):
+            super(ChildManager, self).setup(config)
+            # set up `self` properties
+
+        """
         self.config = config
 
     def init_ckpt(self):
-        r"""Initializes checkpoint."""
+        r"""Initializes checkpoint.
+
+        Overriding
+        ----------
+        def init_ckpt(self):
+            super(ChildManager, self).init_ckpt()
+            # update `self.ckpt`, for example:
+            # self.ckpt.update({'max_acc': 0.})
+
+        """
         self.epoch = 0
         self.ckpt = {'eval_records': {}}
         self.preview = {}
 
     def load_ckpt(self):
-        r"""Loads checkpoint."""
+        r"""Loads checkpoint.
+
+        Overriding
+        ----------
+        def load_ckpt(self):
+            super(ChildManager, self).load_ckpt()
+            # update `self` properties with `self.ckpt`, for example:
+            # self.model.load_state_dict(self.ckpt['model_state'])
+
+        """
         key = self.configs.get_key(self.config)
         self.epoch = self.stats[key]['epoch']
         self.ckpt = self.ckpts[key]
         self.preview = self.previews[key]
 
     def save_ckpt(self):
-        r"""Saves checkpoint."""
+        r"""Saves checkpoint.
+
+        Overriding
+        ----------
+        def save_ckpt(self):
+            # update `self.ckpt` and `self.preview`
+            super(ChildManager, self).save_ckpt()
+
+        """
         key = self.configs.add(self.config)
         self.stats[key] = {'epoch': self.epoch, 'toc': time.time()}
         self.ckpts[key] = self.ckpt
         self.previews[key] = self.preview
 
     def train(self):
-        pass
+        r"""Trains the model for one epoch.
+
+        Learning rate scheduler should be called at the end if it exists.
+
+        """
+        raise NotImplementedError
 
     def eval(self):
-        pass
+        r"""Evaluates the model."""
+        raise NotImplementedError
 
     def process(self,
         config: Config,
