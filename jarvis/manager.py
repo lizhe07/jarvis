@@ -89,6 +89,36 @@ class Manager:
         """
         return Config(config).fill(self.defaults)
 
+    def setup(self, config: Config):
+        r"""Sets up manager."""
+        self.config = config
+
+    def init_ckpt(self):
+        r"""Initializes checkpoint."""
+        self.epoch = 0
+        self.ckpt = {'eval_records': {}}
+        self.preview = {}
+
+    def load_ckpt(self):
+        r"""Loads checkpoint."""
+        key = self.configs.get_key(self.config)
+        self.epoch = self.stats[key]['epoch']
+        self.ckpt = self.ckpts[key]
+        self.preview = self.previews[key]
+
+    def save_ckpt(self):
+        r"""Saves checkpoint."""
+        key = self.configs.add(self.config)
+        self.stats[key] = {'epoch': self.epoch, 'toc': time.time()}
+        self.ckpts[key] = self.ckpt
+        self.previews[key] = self.preview
+
+    def train(self):
+        pass
+
+    def eval(self):
+        pass
+
     def process(self,
         config: Config,
         num_epochs: int = 1,
@@ -132,41 +162,12 @@ class Manager:
             if self.epoch%self.save_interval==0 or self.epoch==num_epochs:
                 self.save_ckpt()
 
-    def setup(self, config: Config):
-        r"""Sets up manager."""
-        self.config = config
-
-    def init_ckpt(self):
-        r"""Initializes checkpoint."""
-        self.epoch = 0
-        self.ckpt = {'eval_records': {}}
-
-    def load_ckpt(self):
-        r"""Loads checkpoint."""
-        key = self.configs.get_key(self.config)
-        self.epoch = self.stats[key]['epoch']
-        self.ckpt = self.ckpts[key]
-        self.preview = self.previews[key]
-
-    def save_ckpt(self):
-        r"""Saves checkpoint."""
-        key = self.configs.add(self.config)
-        self.stats[key] = {'epoch': self.epoch, 'toc': time.time()}
-        self.ckpts[key] = self.ckpt
-        self.previews[key] = self.preview
-
-    def train(self):
-        pass
-
-    def eval(self):
-        pass
-
     def batch(self,
         configs: Iterable[Config],
         num_epochs: int = 1,
         resume: bool = True,
         num_works: int = 0,
-        patience: float = 168,
+        patience: float = 168.,
         max_errors: int = 0,
     ):
         r"""Batch processing.

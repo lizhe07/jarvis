@@ -65,11 +65,11 @@ def imagenet_dataset(datasets_dir, train=False, transform=None):
     if train:
         dataset = torchvision.datasets.ImageFolder(
             os.path.join(datasets_dir, 'ILSVRC2012', 'train'), transform,
-            )
+        )
     else:
         dataset = torchvision.datasets.ImageFolder(
             os.path.join(datasets_dir, 'ILSVRC2012', 'val'), transform,
-            )
+        )
     return dataset
 
 def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
@@ -80,12 +80,12 @@ def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
         key, val = line.split('\t')
         class_name_dict[key] = val[:-1]
 
-    dataset_train = torchvision.datasets.ImageFolder(
+    dset_train = torchvision.datasets.ImageFolder(
         os.path.join(datasets_dir, 'tiny-imagenet-200', 'train'), transform,
-        )
-    dataset_train.class_names = [class_name_dict[c] for c in dataset_train.classes]
+    )
+    dset_train.class_names = [class_name_dict[c] for c in dset_train.classes]
     if train:
-        return dataset_train
+        return dset_train
     else:
         with open(os.path.join(datasets_dir, 'tiny-imagenet-200', 'val', 'val_annotations.txt'), 'r') as f:
             lines = f.readlines()
@@ -97,25 +97,23 @@ def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
 
         _dataset = torchvision.datasets.ImageFolder(
             os.path.join(datasets_dir, 'tiny-imagenet-200', 'val'), transform,
-            )
+        )
         images, labels = [], []
         for i in range(len(_dataset)):
             img_pth = _dataset.imgs[i][0].split(os.sep)[-1]
             if img_pth not in img_pths:
                 continue
             images.append(_dataset[i][0])
-            labels.append(dataset_train.classes.index(
-                img_classes[img_pths.index(img_pth)]
-                ))
-        dataset_test = torch.utils.data.TensorDataset(
-            torch.stack(images).to(torch.float), torch.tensor(labels, dtype=torch.long)
-            )
-        dataset_test.targets = labels
-        dataset_test.class_names = dataset_train.class_names
-        return dataset_test
+            labels.append(dset_train.classes.index(img_classes[img_pths.index(img_pth)]))
+        dset_test = torch.utils.data.TensorDataset(
+            torch.stack(images).to(torch.float), torch.tensor(labels, dtype=torch.long),
+        )
+        dset_test.targets = labels
+        dset_test.class_names = dset_train.class_names
+        return dset_test
 
 
-# (dataset, t_aug, in_channels, class_num, sample_num) for different datasets
+# (dataset, t_aug, in_channels, num_classes, num_samples) for different datasets
 DATASETS_META = {
     'MNIST': (torchvision.datasets.MNIST, DEFAULT_DIGIT_AUG(28), 1, 10, 60000),
     'FashionMNIST': (torchvision.datasets.FashionMNIST, DEFAULT_IMAGE_AUG(28), 1, 10, 60000),
@@ -155,7 +153,7 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
     >>> det_test = prepare_datasets(task, datasets_dir)
 
     >>> dset_train, dset_valid, dset_test = prepare_datasets(
-            task, datasets_dir, split_ratio
+            task, datasets_dir, split_ratio,
         )
 
     """
@@ -237,7 +235,7 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
     return model
 
 
-def evaluate(model, dataset, batch_size=100, device='cuda', verbose=1):
+def evaluate(model, dataset, batch_size=100, num_workers=4, device='cuda', verbose=1):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -262,7 +260,7 @@ def evaluate(model, dataset, batch_size=100, device='cuda', verbose=1):
     model.eval().to(device)
     criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
 
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     loss, count = 0., 0.
     tic = time.time()
     for images, labels in loader:
@@ -275,5 +273,5 @@ def evaluate(model, dataset, batch_size=100, device='cuda', verbose=1):
     acc = count/len(dataset)
     toc = time.time()
     if verbose>0:
-        print('loss: {:5.3f}, acc:{:7.2%} ({})'.format(loss, acc, time_str(toc-tic)))
+        print('[loss: {:5.3f}], [acc:{:7.2%}] ({})'.format(loss, acc, time_str(toc-tic)))
     return loss, acc

@@ -2,7 +2,6 @@ import os, pickle, random, time
 from typing import Optional
 
 from .config import Config
-from .hashable import to_hashable
 from .utils import progress_str, time_str
 
 

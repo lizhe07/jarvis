@@ -1,5 +1,5 @@
 import numpy as np
-Array = np.ndarray
+from .alias import Array
 
 
 def to_hashable(x):

@@ -185,7 +185,8 @@ def job_parser():
 
 
 def sgd_optimizer(
-    model: Module, lr: float,
+    model: Module,
+    lr: float,
     momentum: float = 0.9,
     weight_decay: float = 0.,
 ) -> Optimizer:
