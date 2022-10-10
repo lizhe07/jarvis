@@ -67,6 +67,7 @@ class Archive:
                 return self.__store__[key]
             else:
                 store_path = self._store_path(key)
+                assert os.path.exists(store_path)
                 records = self._safe_read(store_path)
                 return records[key]
         except:

@@ -16,10 +16,13 @@ class Config(HashableDict):
         try:
             return self[key]
         except:
-            raise
+            return super(Config, self).__getattr__(key)
 
     def __setattr__(self, key, val):
-        self[key] = val
+        try:
+            super(Config, self).__setattr__(key, val)
+        except:
+            self[key] = val
 
     def flatten(self):
         r"""Returns a flat configuration."""
