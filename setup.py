@@ -7,5 +7,5 @@ setup(
     author='Zhe Li',
     python_requires='>=3.9',
     packages=find_packages(),
-    install_requires=['numpy', 'torch'],
+    install_requires=['numpy', 'torch', 'pyyaml'],
 )

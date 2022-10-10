@@ -1,3 +1,4 @@
+import sys, yaml
 from typing import Optional
 
 from .hashable import HashableDict
@@ -10,6 +11,15 @@ class Config(HashableDict):
         for key, val in self.items():
             if isinstance(val, HashableDict):
                 self[key] = Config(val)
+
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except:
+            raise
+
+    def __setattr__(self, key, val):
+        self[key] = val
 
     def flatten(self):
         r"""Returns a flat configuration."""
@@ -43,3 +53,22 @@ class Config(HashableDict):
             if key not in f_config:
                 f_config[key] = val
         return f_config.nest()
+
+def from_cli(argv: Optional[list[str]] = None):
+    if argv is None:
+        argv = sys.argv[1:]
+    config = Config()
+
+    def create(keys: list[str], val):
+        if len(keys)==1:
+            return {keys[0]: val}
+        else:
+            return {keys[0]: create(keys[1:], val)}
+
+    for _argv in argv:
+        assert _argv.count('=')==1, f"Expects one '=' in '{_argv}'."
+        keys, val = _argv.split('=')
+        keys = keys.split('.')
+        val = yaml.safe_load(val)
+        config.update(create(keys, val), ignore_unknown=False)
+    return config
