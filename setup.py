@@ -1,9 +1,8 @@
-from jarvis import __version__
 from setuptools import setup, find_packages
 
 setup(
     name="jarvis",
-    version=__version__,
+    version="0.5.1",
     author='Zhe Li',
     python_requires='>=3.9',
     packages=find_packages(),
