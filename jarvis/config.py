@@ -1,4 +1,5 @@
 import sys, yaml
+from importlib import import_module
 from typing import Optional
 
 from .hashable import HashableDict
@@ -57,6 +58,15 @@ class Config(HashableDict):
                 f_config[key] = val
         return f_config.nest()
 
+    def instantiate(self, **kwargs):
+        try:
+            _target_ = _locate(self._target_)
+            assert callable(_target_)
+        except:
+            raise RuntimeError("A callable '_target_' needs to be specified.")
+        return _target_(**self, **kwargs)
+
+
 def from_cli(argv: Optional[list[str]] = None):
     if argv is None:
         argv = sys.argv[1:]
@@ -75,3 +85,27 @@ def from_cli(argv: Optional[list[str]] = None):
         val = yaml.safe_load(val)
         config.update(create(keys, val), ignore_unknown=False)
     return config
+
+def _locate(path: str):
+    r"""Returns a callable object from string.
+
+    This is a simplied version of hydra._internal.utils._locate.
+
+    """
+    parts = path.split('.')
+
+    part = parts[0]
+    try:
+        obj = import_module(part)
+    except:
+        raise
+    for m in range(1, len(parts)):
+        part = parts[m]
+        try:
+            obj = getattr(obj, part)
+        except:
+            try:
+                obj = import_module('.'.join(parts[:m]))
+            except:
+                raise
+    return obj
