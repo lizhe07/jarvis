@@ -21,9 +21,9 @@ class Config(HashableDict):
 
     def __setattr__(self, key, val):
         try:
-            super(Config, self).__setattr__(key, val)
-        except:
             self[key] = val
+        except:
+            super(Config, self).__setattr__(key, val)
 
     def flatten(self):
         r"""Returns a flat configuration."""
@@ -60,11 +60,13 @@ class Config(HashableDict):
 
     def instantiate(self, **kwargs):
         try:
-            _target_ = _locate(self._target_)
-            assert callable(_target_)
+            _target = _locate(self._target_)
+            assert callable(_target)
         except:
             raise RuntimeError("A callable '_target_' needs to be specified.")
-        return _target_(**self, **kwargs)
+        _kwargs = {k: v for k, v in self.items() if k!='_target_'}
+        _kwargs.update(kwargs)
+        return _target(**_kwargs)
 
 
 def from_cli(argv: Optional[list[str]] = None):
