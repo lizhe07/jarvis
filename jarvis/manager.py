@@ -205,7 +205,7 @@ class Manager:
         configs: Iterable[Config],
         num_epochs: int = 1,
         resume: bool = True,
-        num_works: int = 0,
+        count: int = 0,
         patience: float = 168.,
         max_errors: int = 0,
     ):
@@ -218,7 +218,7 @@ class Manager:
             potentially processed already.
         num_epochs, resume:
             See `process` for more details.
-        num_works:
+        count:
             The number of works to process. If it is '0', the processing stops
             when no work is left in `configs`.
         patience:
@@ -262,12 +262,38 @@ class Manager:
                 else:
                     continue
             else:
-                if num_works>0 and w_count==num_works:
+                if count>0 and w_count==count:
                     break
         if self.verbose>0:
             print("\n{} works processed.".format(w_count))
-            if not interrupted and (num_works==0 or w_count<num_works):
+            if not interrupted and (count==0 or w_count<count):
                 print("All works are processed or being processed.")
+
+    def sweep(self, sweep_spec: dict, **kwargs):
+        r"""Alias for grid_search."""
+        method = sweep_spec.get('method', 'random')
+        assert method in ['random', 'smart']
+        if method=='smart':
+            raise NotImplementedError
+
+        choices = Config(sweep_spec['choices']).flatten()
+        keys = list(choices.keys())
+        vals, dims = [], []
+        for key in keys:
+            assert isinstance(choices[key], list)
+            vals.append(choices[key])
+            dims.append(len(choices[key]))
+        total_num = np.prod(dims)
+
+        def config_gen():
+            for idx in random.sample(range(total_num), total_num):
+                sub_idxs = np.unravel_index(idx, dims)
+                config = Config()
+                for i, key in enumerate(keys):
+                    config[key] = vals[i][sub_idxs[i]]
+                config = self.get_config(config.nest())
+                yield config
+        self.batch(config_gen(), **kwargs)
 
     def grid_search(self, search_spec: dict, **kwargs):
         r"""Grid hyper-parameter search.
