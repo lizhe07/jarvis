@@ -67,7 +67,7 @@ class Config(HashableDict):
         _kwargs = {}
         for k, v in self.items():
             if k!='_target_':
-                if isinstance(v, Config) and '_target' in v:
+                if isinstance(v, Config) and '_target_' in v:
                     _kwargs[k] = v.instantiate()
                 else:
                     _kwargs[k] = v

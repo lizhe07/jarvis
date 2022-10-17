@@ -5,7 +5,7 @@ from collections.abc import Iterable
 
 from .config import Config
 from .archive import Archive
-from .utils import time_str, progress_str
+from .utils import progress_str
 
 
 class Manager:
