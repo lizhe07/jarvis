@@ -66,7 +66,7 @@ class Config(HashableDict):
             raise RuntimeError("A callable '_target_' needs to be specified.")
         _kwargs = {}
         for k, v in self.items():
-            if k!='_target':
+            if k!='_target_':
                 if isinstance(v, Config) and '_target' in v:
                     _kwargs[k] = v.instantiate()
                 else:
