@@ -75,18 +75,18 @@ class Manager:
         self.verbose = verbose
         self.defaults = Config()
 
-    def get_config(self, config: Optional[Config] = None) -> Config:
+    def get_config(self, **kwargs) -> Config:
         r"""Returns work configuration.
 
         Overriding
         ----------
-        def get_config(self, config=None):
-            config = super(ChildManager, self).get_config(config)
+        def get_config(self, **kwargs):
+            config = super(ChildManager, self).get_config(**kwargs)
             # update `config`
             return config
 
         """
-        return Config(config).fill(self.defaults)
+        return Config(kwargs).fill(self.defaults)
 
     def setup(self, config: Config):
         r"""Sets up manager.
