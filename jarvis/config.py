@@ -58,21 +58,21 @@ class Config(HashableDict):
                 f_config[key] = val
         return f_config.nest()
 
-    def instantiate(self, **kwargs):
+    def instantiate(self, *args, **kwargs):
         try:
             _target = _locate(self._target_)
             assert callable(_target)
         except:
-            raise RuntimeError("A callable '_target_' needs to be specified.")
+            raise RuntimeError(f"The '_target_' ({self._target_}) is not callable.")
         _kwargs = {}
         for k, v in self.items():
             if k!='_target_':
-                if isinstance(v, Config) and '_target_' in v:
+                try:
                     _kwargs[k] = v.instantiate()
-                else:
+                except:
                     _kwargs[k] = v
         _kwargs.update(kwargs)
-        return _target(**_kwargs)
+        return _target(*args, **_kwargs)
 
 
 def from_cli(argv: Optional[list[str]] = None):
@@ -113,7 +113,7 @@ def _locate(path: str):
             obj = getattr(obj, part)
         except:
             try:
-                obj = import_module('.'.join(parts[:m]))
+                obj = import_module('.'.join(parts[:(m+1)]))
             except:
                 raise
     return obj
