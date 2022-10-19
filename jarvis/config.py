@@ -1,17 +1,26 @@
 import sys, yaml
 from importlib import import_module
-from typing import Optional
+from typing import Optional, Callable
 
-from .hashable import HashableDict
+from .hashable import HashableList, HashableSet, HashableDict, HashableArray
 from .utils import flatten, nest
+
+def _convert(spec):
+    if isinstance(spec, (list, tuple)) and not isinstance(spec, HashableArray):
+        return HashableList([_convert(v) for v in spec])
+    if isinstance(spec, set):
+        return HashableSet([_convert(v) for v in spec])
+    if isinstance(spec, dict):
+        return Config(spec)
+    return spec
+
 
 class Config(HashableDict):
 
     def __init__(self, config: Optional[dict] = None):
         super(Config, self).__init__(config or {})
         for key, val in self.items():
-            if isinstance(val, HashableDict):
-                self[key] = Config(val)
+            self[key] = _convert(val)
 
     def __getattr__(self, key):
         try:
@@ -58,22 +67,6 @@ class Config(HashableDict):
                 f_config[key] = val
         return f_config.nest()
 
-    def instantiate(self, *args, **kwargs):
-        try:
-            _target = _locate(self._target_)
-            assert callable(_target)
-        except:
-            raise RuntimeError(f"The '_target_' ({self._target_}) is not callable.")
-        _kwargs = {}
-        for k, v in self.items():
-            if k!='_target_':
-                try:
-                    _kwargs[k] = v.instantiate()
-                except:
-                    _kwargs[k] = v
-        _kwargs.update(kwargs)
-        return _target(*args, **_kwargs)
-
 
 def from_cli(argv: Optional[list[str]] = None):
     if argv is None:
@@ -94,7 +87,8 @@ def from_cli(argv: Optional[list[str]] = None):
         config.update(create(keys, val), ignore_unknown=False)
     return config
 
-def _locate(path: str):
+
+def _locate(path: str) -> Callable:
     r"""Returns a callable object from string.
 
     This is a simplied version of hydra._internal.utils._locate.
@@ -117,3 +111,24 @@ def _locate(path: str):
             except:
                 raise
     return obj
+
+
+def instantiate(spec, *args, **kwargs):
+    if isinstance(spec, HashableList) and not isinstance(spec, HashableArray):
+        return [instantiate(v) for v in spec]
+    if isinstance(spec, HashableSet):
+        return set([instantiate(v) for v in spec])
+    if isinstance(spec, Config) and  '_target_' in spec:
+        try:
+            _target = _locate(spec['_target_'])
+            assert callable(_target)
+        except:
+            raise RuntimeError(f"The '_target_' ({spec['_target_']}) is not callable.")
+        _kwargs = {}
+        for k, v in spec.items():
+            if k=='_target_':
+                continue
+            _kwargs[k] = instantiate(v)
+        _kwargs.update(kwargs)
+        return _target(*args, **_kwargs)
+    return spec

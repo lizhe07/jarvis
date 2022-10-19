@@ -1,9 +1,22 @@
 import numpy as np
-from .alias import Array
+from .alias import Iterable, Array
 
 
-def to_hashable(x):
+def _is_custom_hashable(val):
+    r"""Returns whether the input is a custom hashable type."""
+    return (
+        isinstance(val, HashableList)
+        or isinstance(val, HashableTuple)
+        or isinstance(val, HashableSet)
+        or isinstance(val, HashableDict)
+        or isinstance(val, HashableArray)
+    )
+
+
+def _to_hashable(x):
     r"""Converts to hashable data type."""
+    if _is_custom_hashable(x):
+        return x
     if isinstance(x, list):
         return HashableList(x)
     if isinstance(x, tuple):
@@ -23,22 +36,11 @@ def to_hashable(x):
         return x
 
 
-def _is_custom_hashable(val):
-    r"""Returns whether the input is a custom hashable type."""
-    return (
-        isinstance(val, HashableList)
-        or isinstance(val, HashableTuple)
-        or isinstance(val, HashableSet)
-        or isinstance(val, HashableDict)
-        or isinstance(val, HashableArray)
-    )
-
-
 class HashableList(list):
     r"""Hashable list class."""
 
-    def __init__(self, native_list: list):
-        super(HashableList, self).__init__([to_hashable(val) for val in native_list])
+    def __init__(self, native_list: Iterable):
+        super(HashableList, self).__init__([_to_hashable(val) for val in native_list])
 
     def __hash__(self):
         return hash(tuple(self))
@@ -53,8 +55,8 @@ class HashableList(list):
 class HashableTuple(tuple):
     r"""Hashable tuple class."""
 
-    def __new__(cls, native_tuple: tuple):
-        return super(HashableTuple, cls).__new__(cls, tuple(to_hashable(val) for val in native_tuple))
+    def __new__(cls, native_tuple: Iterable):
+        return super(HashableTuple, cls).__new__(cls, tuple(_to_hashable(val) for val in native_tuple))
 
     def native(self) -> tuple:
         converted = []
@@ -66,8 +68,8 @@ class HashableTuple(tuple):
 class HashableSet(set):
     r"""Hashable set class."""
 
-    def __init__(self, native_set: set):
-        super(HashableSet, self).__init__([to_hashable(val) for val in native_set])
+    def __init__(self, native_set: Iterable):
+        super(HashableSet, self).__init__([_to_hashable(val) for val in native_set])
 
     def __hash__(self):
         return hash(frozenset(self))
@@ -83,7 +85,7 @@ class HashableDict(dict):
     r"""Hashable dictionary class."""
 
     def __init__(self, native_dict: dict):
-        super(HashableDict, self).__init__({key: to_hashable(val) for key, val in native_dict.items()})
+        super(HashableDict, self).__init__({key: _to_hashable(val) for key, val in native_dict.items()})
 
     def __hash__(self):
         return hash(frozenset(self.items()))

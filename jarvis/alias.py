@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from numpy import ndarray as Array
 from torch.nn import Module
 from torch.optim import Optimizer
