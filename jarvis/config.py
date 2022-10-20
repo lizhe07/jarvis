@@ -1,4 +1,5 @@
 import sys, yaml
+from copy import deepcopy
 from importlib import import_module
 from typing import Optional, Callable
 
@@ -30,9 +31,12 @@ class Config(HashableDict):
 
     def __setattr__(self, key, val):
         try:
-            self[key] = val
+            self[key] = _convert(val)
         except:
             super(Config, self).__setattr__(key, val)
+
+    def clone(self):
+        return deepcopy(self)
 
     def flatten(self):
         r"""Returns a flat configuration."""
@@ -66,6 +70,17 @@ class Config(HashableDict):
             if key not in f_config:
                 f_config[key] = val
         return f_config.nest()
+
+    def instantiate(self, *args, **kwargs): # one-level instantiation
+        assert '_target_' in self, "A callable needs to be specified as '_target_'."
+        try:
+            _target = _locate(self._target_)
+            assert callable(_target)
+        except:
+            raise RuntimeError(f"The '_target_' ({_target}) is not callable.")
+        _kwargs = {k: v for k, v in self.items() if k!='_target_'}
+        _kwargs.update(kwargs)
+        return _target(*args, **_kwargs)
 
 
 def from_cli(argv: Optional[list[str]] = None):
