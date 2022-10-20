@@ -58,7 +58,7 @@ class Config(HashableDict):
 
         """
         f_config = self.flatten()
-        for key, val in Config(config).flatten().items():
+        for key, val in Config(config).clone().flatten().items():
             if key in f_config or not ignore_unknown:
                 f_config[key] = val
         super(Config, self).update(f_config.nest())
@@ -66,7 +66,7 @@ class Config(HashableDict):
     def fill(self, defaults: dict):
         r"""Fills default values."""
         f_config = self.flatten()
-        for key, val in Config(defaults).flatten().items():
+        for key, val in Config(defaults).clone().flatten().items():
             if key not in f_config:
                 f_config[key] = val
         return f_config.nest()
