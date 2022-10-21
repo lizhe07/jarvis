@@ -47,6 +47,10 @@ class Config(HashableDict):
         except:
             setattr(super(Config, self), key, val)
 
+    def get(self, key):
+        # TODO implement for nested key as dot string
+        return super(Config, self).get(key)
+
     def clone(self):
         return deepcopy(self)
 
