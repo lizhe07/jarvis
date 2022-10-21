@@ -23,6 +23,18 @@ class Config(HashableDict):
         for key, val in self.items():
             self[key] = _convert(val)
 
+        keys = list(self.keys())
+        for key in keys:
+            if isinstance(key, str) and '.' in key:
+                self.update(Config._create(key.split('.'), self.pop(key)))
+
+    @classmethod
+    def _create(cls, keys: list[str], val) -> dict:
+        if len(keys)==1:
+            return {keys[0]: val}
+        else:
+            return {keys[0]: Config._create(keys[1:], val)}
+
     def __getattr__(self, key):
         try:
             return self[key]
@@ -87,19 +99,12 @@ def from_cli(argv: Optional[list[str]] = None):
     if argv is None:
         argv = sys.argv[1:]
     config = Config()
-
-    def create(keys: list[str], val):
-        if len(keys)==1:
-            return {keys[0]: val}
-        else:
-            return {keys[0]: create(keys[1:], val)}
-
     for _argv in argv:
         assert _argv.count('=')==1, f"Expects one '=' in '{_argv}'."
         keys, val = _argv.split('=')
         keys = keys.split('.')
         val = yaml.safe_load(val)
-        config.update(create(keys, val), ignore_unknown=False)
+        config.update(Config._create(keys, val), ignore_unknown=False)
     return config
 
 
