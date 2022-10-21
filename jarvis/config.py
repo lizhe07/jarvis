@@ -39,13 +39,13 @@ class Config(HashableDict):
         try:
             return self[key]
         except:
-            return super(Config, self).__getattr__(key)
+            return getattr(super(Config, self), key)
 
     def __setattr__(self, key, val):
         try:
             self[key] = _convert(val)
         except:
-            super(Config, self).__setattr__(key, val)
+            setattr(super(Config, self), key, val)
 
     def clone(self):
         return deepcopy(self)
