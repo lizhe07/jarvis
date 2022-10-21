@@ -301,7 +301,7 @@ class Manager:
                 config = Config()
                 for i, key in enumerate(keys):
                     config[key] = vals[i][sub_idxs[i]]
-                config = self.get_config(config.nest())
+                config = self.get_config(**config.nest())
                 yield config
         self.batch(config_gen(), **kwargs)
 
