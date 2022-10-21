@@ -107,13 +107,28 @@ class Manager:
         ----------
         def init_ckpt(self):
             super(ChildManager, self).init_ckpt()
-            # update `self.ckpt`, for example:
+            # update `self.ckpt` with tracked metrics as needed
             # self.ckpt.update({'max_acc': 0.})
 
         """
         self.epoch = 0
         self.ckpt = {'eval_records': {}}
         self.preview = {}
+
+    def save_ckpt(self):
+        r"""Saves checkpoint.
+
+        Overriding
+        ----------
+        def save_ckpt(self):
+            # update `self.ckpt` and `self.preview`
+            super(ChildManager, self).save_ckpt()
+
+        """
+        key = self.configs.add(self.config)
+        self.stats[key] = {'epoch': self.epoch, 'toc': time.time()}
+        self.ckpts[key] = self.ckpt
+        self.previews[key] = self.preview
 
     def load_ckpt(self):
         r"""Loads checkpoint.
@@ -131,21 +146,6 @@ class Manager:
         self.ckpt = self.ckpts[key]
         self.preview = self.previews[key]
 
-    def save_ckpt(self):
-        r"""Saves checkpoint.
-
-        Overriding
-        ----------
-        def save_ckpt(self):
-            # update `self.ckpt` and `self.preview`
-            super(ChildManager, self).save_ckpt()
-
-        """
-        key = self.configs.add(self.config)
-        self.stats[key] = {'epoch': self.epoch, 'toc': time.time()}
-        self.ckpts[key] = self.ckpt
-        self.previews[key] = self.preview
-
     def train(self):
         r"""Trains the model for one epoch.
 
@@ -155,7 +155,15 @@ class Manager:
         raise NotImplementedError
 
     def eval(self):
-        r"""Evaluates the model."""
+        r"""Evaluates the model.
+
+        Typically creates a dictionary of evaluation results and adds it to
+        `self.ckpt['eval_records']`.
+
+        >>> eval_record = {}
+        >>> self.ckpt['eval_records'][self.epoch] = eval_record
+
+        """
         raise NotImplementedError
 
     def process(self,
@@ -187,9 +195,11 @@ class Manager:
                     '' if self.epoch==1 else f' (epoch {self.epoch})',
                 ))
         except:
-            self.init_ckpt()
             if self.verbose>0:
                 print("No checkpoint loaded.")
+            self.init_ckpt()
+            self.eval()
+            self.save_ckpt()
 
         while self.epoch<num_epochs:
             if self.verbose>0:
