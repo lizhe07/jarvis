@@ -8,6 +8,7 @@ from .utils import flatten, nest
 
 def _convert(spec):
     if isinstance(spec, (list, tuple)) and not isinstance(spec, HashableArray):
+        # replace tuple with list since Config usually deals with yaml file
         return HashableList([_convert(v) for v in spec])
     if isinstance(spec, set):
         return HashableSet([_convert(v) for v in spec])
