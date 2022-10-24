@@ -75,18 +75,18 @@ class Manager:
         self.verbose = verbose
         self.defaults = Config()
 
-    def get_config(self, **kwargs) -> Config:
+    def get_config(self, config) -> Config:
         r"""Returns work configuration.
 
         Overriding
         ----------
-        def get_config(self, **kwargs):
-            config = super(ChildManager, self).get_config(**kwargs)
+        def get_config(self, config):
+            config = super(ChildManager, self).get_config(config)
             # update `config`
             return config
 
         """
-        return Config(kwargs).fill(self.defaults)
+        return Config(config).fill(self.defaults)
 
     def setup(self, config: Config):
         r"""Sets up manager.
@@ -301,7 +301,7 @@ class Manager:
                 config = Config()
                 for i, key in enumerate(keys):
                     config[key] = vals[i][sub_idxs[i]]
-                config = self.get_config(**config.nest())
+                config = self.get_config(config.nest())
                 yield config
         self.batch(config_gen(), **kwargs)
 
