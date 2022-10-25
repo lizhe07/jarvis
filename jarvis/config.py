@@ -1,4 +1,4 @@
-import sys, yaml
+import sys, yaml, time, random
 from copy import deepcopy
 from importlib import import_module
 from typing import Optional, Callable
@@ -110,6 +110,11 @@ def from_cli(argv: Optional[list[str]] = None):
         keys = keys.split('.')
         val = yaml.safe_load(val)
         config.update(Config._create(keys, val), ignore_unknown=False)
+    if 'max_wait' in config:
+        wait = config.pop('max_wait')*random.random()
+        if wait>0:
+            print("Wait for {:.1f} secs before execution.")
+            time.sleep(wait)
     return config
 
 
