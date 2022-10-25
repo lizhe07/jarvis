@@ -86,7 +86,7 @@ class Manager:
             return config
 
         """
-        return Config(config).fill(self.defaults)
+        return Config(config).clone().fill(self.defaults)
 
     def setup(self, config: Config):
         r"""Sets up manager.
