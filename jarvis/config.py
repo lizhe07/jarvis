@@ -113,7 +113,7 @@ def from_cli(argv: Optional[list[str]] = None):
     if 'max_wait' in config:
         wait = config.pop('max_wait')*random.random()
         if wait>0:
-            print("Wait for {:.1f} secs before execution.")
+            print("Wait for {:.1f} secs before execution.".format(wait))
             time.sleep(wait)
     return config
 
