@@ -11,8 +11,12 @@ from .utils import progress_str
 class Manager:
     r"""Base class for managing model training.
 
-    The job is associated with different directories storing configurations,
-    status, checkpoints and previews of all works.
+    A manager is associated with different directories storing configurations,
+    status, checkpoints and previews of all works. Each individual work is
+    specified by a configuration, and assigned with a unique ID. While
+    processing, the manager first sets up itself and then iteratively calls the
+    training epoch. Model evaluation and checkpoint saving are done periodically
+    during the training.
 
     Methods `get_config`, `setup`, `init_ckpt`, `load_ckpt` and `save_ckpt`
     usually need to be overridden to function properly, see the documents of
@@ -42,7 +46,9 @@ class Manager:
             Short path length and pause time for `configs`, as well as `stats`
             and `previews`.
         l_path_len, l_pause:
-            Long path length and pause time for `ckpts`.
+            Long path length and pause time for `ckpts`. Checkpoints usually
+            takes larger storage space, therefore they are separated into more
+            files and have higher tolerance on I/O failure.
         verbose:
             Information display level, with '0' referring to quiet mode.
 
@@ -78,6 +84,9 @@ class Manager:
     def get_config(self, config) -> Config:
         r"""Returns work configuration.
 
+        The method first fills in default values, then performs additional
+        changes if necessary. For example, checking compatibility between keys.
+
         Overriding
         ----------
         def get_config(self, config):
@@ -90,6 +99,9 @@ class Manager:
 
     def setup(self, config: Config):
         r"""Sets up manager.
+
+        The method sets `self` properties for future training, for example
+        preparing datasets and initializing models.
 
         Overriding
         ----------
@@ -160,7 +172,7 @@ class Manager:
         Typically creates a dictionary of evaluation results and adds it to
         `self.ckpt['eval_records']`.
 
-        >>> eval_record = {}
+        >>> eval_record = {'loss': loss, 'acc': acc}
         >>> self.ckpt['eval_records'][self.epoch] = eval_record
 
         """
@@ -216,7 +228,7 @@ class Manager:
         num_epochs: int = 1,
         resume: bool = True,
         count: int = 0,
-        patience: float = 168.,
+        patience: float = 1.,
         max_errors: int = 0,
     ):
         r"""Batch processing.
@@ -280,7 +292,20 @@ class Manager:
                 print("All works are processed or being processed.")
 
     def sweep(self, sweep_spec: dict, **kwargs):
-        r"""Alias for grid_search."""
+        r"""Sweep on a hyper-parameter grid.
+
+        Work configurations are constructed randomly from `sweep_spec`, using
+        the method `get_config`. The configuration generator is passed to the
+        method `batch`.
+
+        Args
+        ----
+        sweep_spec:
+            The work configuration search specification, can be nested. It has
+            the same key structure as a valid `config` for `get_config` method,
+            and values at the leaf level are lists containing possible values.
+
+        """
         method = sweep_spec.get('method', 'random')
         assert method in ['random', 'smart']
         if method=='smart':
@@ -302,40 +327,6 @@ class Manager:
                 for i, key in enumerate(keys):
                     config[key] = vals[i][sub_idxs[i]]
                 config = self.get_config(config.nest())
-                yield config
-        self.batch(config_gen(), **kwargs)
-
-    def grid_search(self, search_spec: dict, **kwargs):
-        r"""Grid hyper-parameter search.
-
-        Work configurations are constructed randomly from `search_spec`, using
-        the method `get_config`. The configuration generator is passed to the
-        method `batch`.
-
-        Args
-        ----
-        search_spec:
-            The work configuration search specification, can be nested. It has
-            the same key structure as a valid `config` for `process` method, and
-            values at the leaf level are lists containing possible values.
-
-        """
-        f_spec = Config(search_spec).flatten()
-        f_keys = list(f_spec.keys())
-        vals, dims = [], []
-        for key in f_keys:
-            assert isinstance(f_spec[key], list)
-            vals.append(f_spec[key])
-            dims.append(len(f_spec[key]))
-        total_num = np.prod(dims)
-
-        def config_gen():
-            for idx in random.sample(range(total_num), total_num):
-                sub_idxs = np.unravel_index(idx, dims)
-                f_config = Config()
-                for i, f_key in enumerate(f_keys):
-                    f_config[f_key] = vals[i][sub_idxs[i]]
-                config = self.get_config(f_config.nest())
                 yield config
         self.batch(config_gen(), **kwargs)
 
