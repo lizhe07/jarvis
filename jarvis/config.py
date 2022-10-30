@@ -7,6 +7,11 @@ from .hashable import HashableList, HashableSet, HashableDict, HashableArray
 from .utils import flatten, nest
 
 def _convert(spec):
+    r"""Converts an object to Config value.
+
+    If `spec` is a container, use the hashable container class for nesting.
+
+    """
     if isinstance(spec, (list, tuple)) and not isinstance(spec, HashableArray):
         # replace tuple with list since Config usually deals with yaml file
         return HashableList([_convert(v) for v in spec])
@@ -18,12 +23,20 @@ def _convert(spec):
 
 
 class Config(HashableDict):
+    r"""Configuration class.
+
+    Compared to `HashableDict`, a few new features are implemented. Items can be
+    accessed via dot expression. An object can be instantiated if a callable
+    `_target_` field exists.
+
+    """
 
     def __init__(self, config: Optional[dict] = None):
         super(Config, self).__init__(config or {})
         for key, val in self.items():
             self[key] = _convert(val)
 
+        # deal with existing nested keys
         keys = list(self.keys())
         for key in keys:
             if isinstance(key, str) and '.' in key:
@@ -31,18 +44,30 @@ class Config(HashableDict):
 
     @classmethod
     def _create(cls, keys: list[str], val) -> dict:
+        r"""Creates nested dictionary.
+
+        Args
+        ----
+        keys:
+            A list of strings specifying the nested key.
+        val:
+            Dictionary value.
+
+        """
         if len(keys)==1:
             return {keys[0]: val}
         else:
-            return {keys[0]: Config._create(keys[1:], val)}
+            return {keys[0]: cls._create(keys[1:], val)}
 
     def __getattr__(self, key):
+        r"""Returns configuration value."""
         try:
             return self[key]
         except:
             return getattr(super(Config, self), key)
 
     def __setattr__(self, key, val):
+        r"""Sets configuration value."""
         try:
             self[key] = _convert(val)
         except:
@@ -53,6 +78,7 @@ class Config(HashableDict):
         return super(Config, self).get(key)
 
     def clone(self):
+        r"""Returns a clone of the configuration."""
         return deepcopy(self)
 
     def flatten(self):
@@ -64,7 +90,7 @@ class Config(HashableDict):
         return Config(nest(self))
 
     def update(self, config: dict, ignore_unknown: bool = False):
-        r"""Returns an updated configuration.
+        r"""Updates the configuration.
 
         Args
         ----
@@ -81,7 +107,7 @@ class Config(HashableDict):
         super(Config, self).update(f_config.nest())
 
     def fill(self, defaults: dict):
-        r"""Fills default values."""
+        r"""Returns a configuration with filled default values."""
         f_config = self.flatten()
         for key, val in Config(defaults).clone().flatten().items():
             if key not in f_config:
@@ -89,6 +115,14 @@ class Config(HashableDict):
         return f_config.nest()
 
     def instantiate(self, *args, **kwargs): # one-level instantiation
+        r"""Instantiates an object using the configuration.
+
+        When a callable object is specified by a string in '_target_', this
+        method will use other key-values as arguments to instantiate a new
+        object. '_target_' should be a string that can be imported from the
+        working directory, it can be a class or a function.
+
+        """
         assert '_target_' in self, "A callable needs to be specified as '_target_'."
         try:
             _target = _locate(self._target_)
@@ -101,6 +135,7 @@ class Config(HashableDict):
 
 
 def from_cli(argv: Optional[list[str]] = None):
+    r"""Constructs a configuration from command line."""
     if argv is None:
         argv = sys.argv[1:]
     config = Config()
@@ -110,6 +145,8 @@ def from_cli(argv: Optional[list[str]] = None):
         keys = keys.split('.')
         val = yaml.safe_load(val)
         config.update(Config._create(keys, val), ignore_unknown=False)
+
+    # implement random wait to avoid file reading conflicts in cluster usage
     if 'max_wait' in config:
         wait = config.pop('max_wait')*random.random()
         if wait>0:
@@ -141,24 +178,3 @@ def _locate(path: str) -> Callable:
             except:
                 raise
     return obj
-
-
-def instantiate(spec, *args, **kwargs):
-    if isinstance(spec, HashableList) and not isinstance(spec, HashableArray):
-        return [instantiate(v) for v in spec]
-    if isinstance(spec, HashableSet):
-        return set([instantiate(v) for v in spec])
-    if isinstance(spec, Config) and  '_target_' in spec:
-        try:
-            _target = _locate(spec['_target_'])
-            assert callable(_target)
-        except:
-            raise RuntimeError(f"The '_target_' ({spec['_target_']}) is not callable.")
-        _kwargs = {}
-        for k, v in spec.items():
-            if k=='_target_':
-                continue
-            _kwargs[k] = instantiate(v)
-        _kwargs.update(kwargs)
-        return _target(*args, **_kwargs)
-    return spec
