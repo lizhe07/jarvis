@@ -66,10 +66,13 @@ class Config(HashableDict):
         except:
             return getattr(super(Config, self), key)
 
+    def __setitem__(self, key, val):
+        super(Config, self).__setitem__(key, _convert(val))
+
     def __setattr__(self, key, val):
         r"""Sets configuration value."""
         try:
-            self[key] = _convert(val)
+            self[key] = val
         except:
             setattr(super(Config, self), key, val)
 

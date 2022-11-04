@@ -86,6 +86,7 @@ class Manager:
 
         The method first fills in default values, then performs additional
         changes if necessary. For example, checking compatibility between keys.
+        It is possible that the key structure gets changed.
 
         Overriding
         ----------
