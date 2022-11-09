@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Aug 28 09:16:03 2019
+from pathlib import Path
+with open(Path(__file__).parent/'VERSION.txt', 'r') as f:
+    __version__ = f.readline().split('"')[1]
 
-@author: zhe
-"""
-
-__version__ = '0.3.1'
-
+from .config import Config
 from .archive import Archive
-from .job import BaseJob
+from .manager import Manager

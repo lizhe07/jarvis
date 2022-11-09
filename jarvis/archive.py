@@ -1,84 +1,85 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Nov 23 23:03:10 2019
-
-@author: Zhe
-"""
-
 import os, pickle, random, time
-from .utils import to_hashable, progress_str, time_str
+from typing import Optional
+
+from .config import Config
+from .utils import progress_str, time_str
 
 
 class Archive:
-    r"""Dictionary-like class that stores data externally.
-
-    Args
-    ----
-    store_dir: str
-        The directory for storing data. If `store_dir` is ``None``, an internal
-        dictionary `__store__` is used.
-    key_len: int
-        The length of keys.
-    pth_len: int
-        The length of external file names, should be no greater than `key_len`.
-    max_try: int
-        The maximum number of trying to read/write external files.
-    pause: float
-        The time (seconds) between two consecutive read/write attempts.
-    hashable: bool
-        Whether the record is hashable.
-
-    """
+    r"""Dictionary-like class that stores data externally."""
     _alphabet = ['{:X}'.format(i) for i in range(16)]
 
-    def __init__(self, store_dir=None, key_len=8, pth_len=2, max_try=30, pause=0.5, hashable=False):
+    def __init__(self,
+        store_dir: Optional[str] = None,
+        key_len: int = 8,
+        path_len: int = 2,
+        max_try: int = 30,
+        pause: float = 0.5,
+        is_config: bool = False,
+    ):
+        r"""
+        Args
+        ----
+        store_dir:
+            The directory for storing data. If `store_dir` is ``None``, an
+            internal dictionary `__store__` is used.
+        key_len:
+            The length of keys.
+        path_len:
+            The length of external file names, should be no greater than
+            `key_len`.
+        max_try:
+            The maximum number of trying to read/write external files.
+        pause:
+            The time (seconds) between two consecutive read/write attempts.
+        is_config:
+            Whether the records are configurations.
+
+        """
         self.store_dir, self.key_len = store_dir, key_len
         if self.store_dir is None:
             self.__store__ = {}
         else:
+            assert key_len>=path_len, "File name length should be no greater than key length."
             os.makedirs(self.store_dir, exist_ok=True)
-            self.pth_len, self.max_try, self.pause = pth_len, max_try, pause
-            assert key_len>=pth_len, "file name length should be no greater than key length"
-        self.hashable = hashable
+            self.path_len, self.max_try, self.pause = path_len, max_try, pause
+        self.is_config = is_config
 
     def __repr__(self):
         if self.store_dir is None:
-            return 'Archive object with no external storage'
+            return "Archive object with no external storage."
         else:
-            return 'Archive object stored in {}'.format(self.store_dir)
+            return f"Archive object stored in {self.store_dir}."
 
     def __setitem__(self, key, val):
+        val = Config(val) if self.is_config else val
         if self.store_dir is None:
-            self.__store__[key] = to_hashable(val) if self.hashable else val
+            self.__store__[key] = val
         else:
-            store_pth = self._store_pth(key)
-            records = self._safe_read(store_pth) if os.path.exists(store_pth) else {}
-            records[key] = to_hashable(val) if self.hashable else val
-            self._safe_write(records, store_pth)
+            store_path = self._store_path(key)
+            records = self._safe_read(store_path) if os.path.exists(store_path) else {}
+            records[key] = val
+            self._safe_write(records, store_path)
 
     def __getitem__(self, key):
-        if self.store_dir is None:
-            assert key in self.__store__, f"{key} does not exist"
-            return self.__store__[key]
-        else:
-            store_pth = self._store_pth(key)
-            assert os.path.exists(store_pth), f"{key} does not exist"
-            records = self._safe_read(store_pth)
-            assert key in records, f"{key} does not exist"
-            return records[key]
+        try:
+            if self.store_dir is None:
+                return self.__store__[key]
+            else:
+                store_path = self._store_path(key)
+                assert os.path.exists(store_path)
+                records = self._safe_read(store_path)
+                return records[key]
+        except:
+            raise KeyError(key)
 
     def __contains__(self, key):
-        if self.store_dir is None:
-            return key in self.__store__
+        try:
+            self[key]
+        except:
+            return False
         else:
-            try:
-                store_pth = self._store_pth(key)
-            except:
-                return False # invalid key
-            if not os.path.exists(store_pth):
-                return False
-            records = self._safe_read(store_pth)
-            return key in records
+            return True
 
     def __iter__(self):
         return iter(self.keys())
@@ -87,31 +88,30 @@ class Archive:
         return len(list(self.keys()))
 
     def _is_valid_key(self, key):
-        r"""Returns if a key is valid.
-
-        """
-        if len(key)!=self.key_len:
+        r"""Returns if a key is valid."""
+        if not (isinstance(key, str) and len(key)==self.key_len):
             return False
         for c in key:
             if c not in Archive._alphabet:
                 return False
         return True
 
-    def _store_pth(self, key):
-        r"""Returns the path of external file associated with a key.
+    def _store_path(self, key):
+        r"""Returns the path of external file associated with a key."""
+        assert self._is_valid_key(key), f"Invalid key '{key}' encountered."
+        return f'{self.store_dir}/{key[:self.path_len]}.axv'
 
-        """
-        assert self._is_valid_key(key), f"invalid key '{key}' encountered"
-        return os.path.join(self.store_dir, key[:self.pth_len]+'.axv')
+    def _store_paths(self):
+        r"""Returns all valid external files in the directory."""
+        return [
+            f'{self.store_dir}/{f}' for f in os.listdir(self.store_dir)
+            if f.endswith('.axv') and len(f)==(self.path_len+4)
+        ]
 
-    def _store_pths(self):
-        r"""Returns all valid external files in the directory.
+    def _sleep(self):
+        time.sleep(self.pause*(0.8+random.random()*0.4))
 
-        """
-        return [os.path.join(self.store_dir, f) for f in os.listdir(self.store_dir)
-                if f.endswith('.axv') and len(f)==(self.pth_len+4)]
-
-    def _safe_read(self, store_pth):
+    def _safe_read(self, store_path):
         r"""Safely reads a file.
 
         This is designed for cluster use. An error is raised when too many
@@ -121,44 +121,38 @@ class Archive:
         count = 0
         while count<self.max_try:
             try:
-                with open(store_pth, 'rb') as f:
+                with open(store_path, 'rb') as f:
                     records = pickle.load(f)
             except:
                 count += 1
-                time.sleep(self.pause*(0.8+random.random()*0.4))
+                self._sleep()
             else:
                 break
         if count==self.max_try:
-            raise RuntimeError('max number ({}) of reading tried and failed'.format(count))
+            raise RuntimeError(f"Max number ({count}) of reading tried and failed.")
         return records
 
-    def _safe_write(self, records, store_pth):
-        r"""Safely writes a file.
-
-        """
+    def _safe_write(self, records, store_path):
+        r"""Safely writes a file."""
         count = 0
         while count<self.max_try:
             try:
-                with open(store_pth, 'wb') as f:
+                with open(store_path, 'wb') as f:
                     pickle.dump(records, f)
             except:
                 count += 1
-                time.sleep(self.pause*(0.8+random.random()*0.4))
+                self._sleep()
             else:
                 break
         if count==self.max_try:
-            raise RuntimeError('max number ({}) of writing tried and failed'.format(count))
+            raise RuntimeError(f"Max number ({count}) of writing tried and failed.")
 
     def _random_key(self):
-        r"""Returns a random key.
-
-        """
+        r"""Returns a random key."""
         return ''.join(random.choices(Archive._alphabet, k=self.key_len))
 
     def _new_key(self):
-        r"""Returns a new key.
-
-        """
+        r"""Returns a new key."""
         while True:
             key = self._random_key()
             if key not in self:
@@ -166,68 +160,70 @@ class Archive:
         return key
 
     def keys(self):
-        r"""Returns a generator for keys.
-
-        """
+        r"""A generator for keys."""
         if self.store_dir is None:
             for key in self.__store__.keys():
                 yield key
         else:
-            store_pths = self._store_pths()
-            random.shuffle(store_pths)
-            for store_pth in store_pths:
-                records = self._safe_read(store_pth)
+            store_paths = self._store_paths()
+            random.shuffle(store_paths) # randomization to avoid cluster conflict
+            for store_path in store_paths:
+                records = self._safe_read(store_path)
                 for key in records.keys():
                     yield key
 
     def values(self):
-        r"""Returns a generator for values.
-
-        """
+        r"""A generator for values."""
         if self.store_dir is None:
             for val in self.__store__.values():
                 yield val
         else:
-            store_pths = self._store_pths()
-            random.shuffle(store_pths)
-            for store_pth in store_pths:
-                records = self._safe_read(store_pth)
+            store_paths = self._store_paths()
+            random.shuffle(store_paths)
+            for store_path in store_paths:
+                records = self._safe_read(store_path)
                 for val in records.values():
                     yield val
 
     def items(self):
-        r"""Returns a generator for items.
-
-        """
+        r"""A generator for items."""
         if self.store_dir is None:
             for key, val in self.__store__.items():
                 yield key, val
         else:
-            store_pths = self._store_pths()
-            random.shuffle(store_pths)
-            for store_pth in store_pths:
-                records = self._safe_read(store_pth)
+            store_paths = self._store_paths()
+            random.shuffle(store_paths)
+            for store_path in store_paths:
+                records = self._safe_read(store_path)
                 for key, val in records.items():
                     yield key, val
 
-    def get_key(self, val):
+    def get_key(self, val) -> Optional[str]:
         r"""Returns the key of a record.
 
-        Implemented for hashable records only. ``None`` is returned if the item
-        is not found.
+        Returns
+        -------
+        key:
+            The key of record being searched for. ``None`` if not found.
 
         """
-        assert self.hashable, "key search is implemented for hashable records only"
-        h_val = to_hashable(val)
+        assert self.is_config, "Key search is implemented for config records only."
+        h_val = Config(val)
         for key, val in self.items():
             if val==h_val:
                 return key
         return None
 
-    def add(self, val):
+    def add(self, val) -> str:
         r"""Adds a new item if it has not already existed.
 
+        Returns
+        -------
+        key:
+            The key of added record.
+
         """
+        assert self.is_config, "Value addition is implemented for config records only."
         key = self.get_key(val)
         if key is None:
             key = self._new_key()
@@ -235,72 +231,71 @@ class Archive:
         return key
 
     def pop(self, key):
-        r"""Pops out an item by key.
-
-        """
-        assert key in self, f"{key} does not exist"
+        r"""Pops out an item by key."""
         if self.store_dir is None:
-            return self.__store__.pop(key)
+            return self.__store__.pop(key, None)
         else:
-            store_pth = self._store_pth(key)
-            records = self._safe_read(store_pth)
-            val = records.pop(key)
+            store_path = self._store_path(key)
+            if not os.path.exists(store_path):
+                return None
+            records = self._safe_read(store_path)
+            val = records.pop(key, None)
             if records:
-                self._safe_write(records, store_pth)
+                self._safe_write(records, store_path)
             else:
-                os.remove(store_pth) # remove empty external file
+                os.remove(store_path) # remove empty external file
             return val
 
-    def prune(self):
+    def prune(self) -> list[str]:
         r"""Removes corrupted files.
 
         Returns
         -------
-        removed: list
+        removed:
             The name of removed files.
 
         """
         removed = []
         if self.store_dir is None:
-            print('no external store detected')
+            print("No external store detected.")
         else:
-            store_pths = self._store_pths()
+            store_paths = self._store_paths()
             verbose, tic = None, time.time()
-            for i, store_pth in enumerate(store_pths, 1):
+            for i, store_path in enumerate(store_paths, 1):
                 try:
-                    self._safe_read(store_pth)
+                    self._safe_read(store_path)
                 except:
-                    print("{} corrupted, will be removed".format(store_pth))
-                    os.remove(store_pth)
-                    removed.append(store_pth[(-4-self.pth_len):-4])
-                if i%(-(-len(store_pths)//10))==0 or i==len(store_pths):
+                    print("{} corrupted, will be removed".format(store_path))
+                    os.remove(store_path)
+                    removed.append(store_path[(-4-self.path_len):-4])
+                if i%(-(-len(store_paths)//10))==0 or i==len(store_paths):
                     toc = time.time()
                     if verbose is None:
                         # display progress if estimated time is longer than 20 mins
-                        verbose = (toc-tic)/i*len(store_pths)>1200
+                        verbose = (toc-tic)/i*len(store_paths)>1200
                     if verbose:
                         print("{} ({})".format(
-                            progress_str(i, len(store_pths)),
-                            time_str(toc-tic, progress=i/len(store_pths))
-                            ))
+                            progress_str(i, len(store_paths)),
+                            time_str(toc-tic, progress=i/len(store_paths)),
+                        ))
             if removed:
-                print("{} corrupted files removed".format(len(removed)))
+                print(f"{len(removed)} corrupted files removed.")
             else:
-                print("no corrupted files detected")
+                print("No corrupted files detected.")
         return removed
 
-    def get_duplicates(self):
+    def get_duplicates(self) -> dict[Config, list[str]]:
         r"""Returns all duplicate records.
 
         Returns
         -------
-        duplicates: dict
-            A dictionary of which the key is the archive record, while the
-            value is the list of archive keys associated with it.
+        duplicates:
+            A dictionary of which the key is the duplicate record value, while
+            the value is the list of keys associated with it.
 
         """
-        assert self.hashable, "duplicate search is implemented for hashable records only"
-        inv_dict = {}
+        assert self.is_config, "Duplicate detection is implemented for config records only."
+        inv_dict = {} # dictionary for inverse archive
         for key, val in self.items():
             if val in inv_dict:
                 inv_dict[val].append(key)
@@ -310,9 +305,7 @@ class Archive:
         return duplicates
 
     def to_internal(self):
-        r"""Moves external storage to internal.
-
-        """
+        r"""Moves external storage to internal."""
         if self.store_dir is not None:
             self.__store__ =  dict((key, val) for key, val in self.items())
             self.store_dir = None

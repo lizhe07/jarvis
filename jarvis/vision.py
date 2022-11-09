@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Jul 31 21:59:48 2020
-
-@author: Zhe
-"""
-
 import os, time, random, pickle, torch, torchvision
 from importlib import resources
 import numpy as np
@@ -21,7 +14,7 @@ MODELS = {
     'ResNet50': resnet.resnet50,
     'ResNet101': resnet.resnet101,
     'ResNet152': resnet.resnet152,
-    }
+}
 
 DEFAULT_IMAGE_AUG = lambda size: [
     transforms.Pad(4, padding_mode='reflect'),
@@ -29,26 +22,26 @@ DEFAULT_IMAGE_AUG = lambda size: [
     transforms.RandomCrop(size),
     transforms.RandomHorizontalFlip(),
     transforms.ColorJitter(.25, .25, .25),
-    ]
+]
 DEFAULT_DIGIT_AUG = lambda size: [
     transforms.Pad(4, padding_mode='reflect'),
     transforms.RandomRotation(2),
     transforms.RandomCrop(size),
-    ]
+]
 
 IMAGENET_TRAIN = transforms.Compose([
     transforms.RandomResizedCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.ColorJitter(
         brightness=0.1, contrast=0.1, saturation=0.1,
-        ),
+    ),
     transforms.ToTensor(),
-    ])
+])
 IMAGENET_TEST = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
-    ])
+])
 
 
 def imagenet_dataset(datasets_dir, train=False, transform=None):
@@ -72,11 +65,11 @@ def imagenet_dataset(datasets_dir, train=False, transform=None):
     if train:
         dataset = torchvision.datasets.ImageFolder(
             os.path.join(datasets_dir, 'ILSVRC2012', 'train'), transform,
-            )
+        )
     else:
         dataset = torchvision.datasets.ImageFolder(
             os.path.join(datasets_dir, 'ILSVRC2012', 'val'), transform,
-            )
+        )
     return dataset
 
 def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
@@ -87,12 +80,12 @@ def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
         key, val = line.split('\t')
         class_name_dict[key] = val[:-1]
 
-    dataset_train = torchvision.datasets.ImageFolder(
+    dset_train = torchvision.datasets.ImageFolder(
         os.path.join(datasets_dir, 'tiny-imagenet-200', 'train'), transform,
-        )
-    dataset_train.class_names = [class_name_dict[c] for c in dataset_train.classes]
+    )
+    dset_train.class_names = [class_name_dict[c] for c in dset_train.classes]
     if train:
-        return dataset_train
+        return dset_train
     else:
         with open(os.path.join(datasets_dir, 'tiny-imagenet-200', 'val', 'val_annotations.txt'), 'r') as f:
             lines = f.readlines()
@@ -104,25 +97,23 @@ def tinyimagenet_dataset(datasets_dir, train=False, transform=None):
 
         _dataset = torchvision.datasets.ImageFolder(
             os.path.join(datasets_dir, 'tiny-imagenet-200', 'val'), transform,
-            )
+        )
         images, labels = [], []
         for i in range(len(_dataset)):
             img_pth = _dataset.imgs[i][0].split(os.sep)[-1]
             if img_pth not in img_pths:
                 continue
             images.append(_dataset[i][0])
-            labels.append(dataset_train.classes.index(
-                img_classes[img_pths.index(img_pth)]
-                ))
-        dataset_test = torch.utils.data.TensorDataset(
-            torch.stack(images).to(torch.float), torch.tensor(labels, dtype=torch.long)
-            )
-        dataset_test.targets = labels
-        dataset_test.class_names = dataset_train.class_names
-        return dataset_test
+            labels.append(dset_train.classes.index(img_classes[img_pths.index(img_pth)]))
+        dset_test = torch.utils.data.TensorDataset(
+            torch.stack(images).to(torch.float), torch.tensor(labels, dtype=torch.long),
+        )
+        dset_test.targets = labels
+        dset_test.class_names = dset_train.class_names
+        return dset_test
 
 
-# (dataset, t_aug, in_channels, class_num, sample_num) for different datasets
+# (dataset, t_aug, in_channels, num_classes, num_samples) for different datasets
 DATASETS_META = {
     'MNIST': (torchvision.datasets.MNIST, DEFAULT_DIGIT_AUG(28), 1, 10, 60000),
     'FashionMNIST': (torchvision.datasets.FashionMNIST, DEFAULT_IMAGE_AUG(28), 1, 10, 60000),
@@ -130,7 +121,7 @@ DATASETS_META = {
     'CIFAR100': (torchvision.datasets.CIFAR100, DEFAULT_IMAGE_AUG(32), 3, 100, 50000),
     'ImageNet': (imagenet_dataset, None, 3, 1000, 1281167),
     'TinyImageNet': (tinyimagenet_dataset, DEFAULT_IMAGE_AUG(64), 3, 200, 100000),
-    }
+}
 
 
 def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_test=None):
@@ -139,12 +130,12 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
     Args
     ----
     task: str
-        The name of the datasets, e.g. ``'CIFAR10'``.
+        The name of the datasets, e.g. 'CIFAR10'.
     datasets_dir: str
         The directory of the datasets. Automatic download is disabled.
     split_ratio: float
-        The ratio of training set, usually `0.9` or `0.8`. When `split_ratio`
-        is ``None``, only testing set will be returned.
+        The ratio of training set, usually '0.9' or '0.8'. When `split_ratio`
+        is 'None', only testing set will be returned.
     augment: bool
         Whether to apply data augmentation on training set.
     grayscale: bool
@@ -159,11 +150,11 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
 
     Examples
     --------
-    >>> dataset_test = prepare_datasets(task, datasets_dir)
+    >>> det_test = prepare_datasets(task, datasets_dir)
 
-    >>> dataset_train, dataset_valid, dataset_test = prepare_datasets(
-            task, datasets_dir, split_ratio
-            )
+    >>> dset_train, dset_valid, dset_test = prepare_datasets(
+            task, datasets_dir, split_ratio,
+        )
 
     """
     if task.endswith('-Gray'):
@@ -178,23 +169,23 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
             t_test = transforms.ToTensor()
         if to_grayscale:
             t_test = transforms.Compose([t_test, transforms.Grayscale()])
-    dataset, augs, *_, sample_num = DATASETS_META[task]
+    dset, augs, *_, sample_num = DATASETS_META[task]
 
-    dataset_test = dataset(datasets_dir, train=False, transform=t_test)
+    dset_test = dset(datasets_dir, train=False, transform=t_test)
     if task=='ImageNet':
         # load a random fixed shuffle of testing images
         idxs = pickle.loads(resources.read_binary('jarvis.resources', 'imagenet_test_idxs'))
-        dataset_test.samples = [dataset_test.samples[idx] for idx in idxs]
-        dataset_test.targets = [t for _, t in dataset_test.samples]
-        dataset_test.imgs = dataset_test.samples
+        dset_test.samples = [dset_test.samples[idx] for idx in idxs]
+        dset_test.targets = [t for _, t in dset_test.samples]
+        dset_test.imgs = dset_test.samples
         # load class names from https://github.com/anishathalye/imagenet-simple-labels
-        dataset_test.class_names = pickle.loads(
+        dset_test.class_names = pickle.loads(
             resources.read_binary('jarvis.resources', 'imagenet_class_names')
-            )
+        )
     elif task!='TinyImageNet':
-        dataset_test.class_names = dataset_test.classes
+        dset_test.class_names = dset_test.classes
     if split_ratio is None:
-        return dataset_test
+        return dset_test
 
     assert split_ratio>0 and split_ratio<=1
     if t_train is None:
@@ -206,13 +197,13 @@ def prepare_datasets(task, datasets_dir, split_ratio=None, *, t_train=None, t_te
             t_train = transforms.Compose([t_train, transforms.Grayscale()])
     idxs_train = np.array(random.sample(range(sample_num), int(sample_num*split_ratio)))
     idxs_valid = np.setdiff1d(np.arange(sample_num), idxs_train, assume_unique=True)
-    dataset_train = Subset(dataset(datasets_dir, train=True, transform=t_train), idxs_train)
-    dataset_train.targets = list(np.array(dataset_train.dataset.targets)[idxs_train])
-    dataset_train.class_names = dataset_test.class_names
-    dataset_valid = Subset(dataset(datasets_dir, train=True, transform=t_test), idxs_valid)
-    dataset_valid.targets = list(np.array(dataset_valid.dataset.targets)[idxs_valid])
-    dataset_valid.class_names = dataset_test.class_names
-    return dataset_train, dataset_valid, dataset_test
+    dset_train = Subset(dset(datasets_dir, train=True, transform=t_train), idxs_train)
+    dset_train.targets = list(np.array(dset_train.dataset.targets)[idxs_train])
+    dset_train.class_names = dset_test.class_names
+    dset_valid = Subset(dset(datasets_dir, train=True, transform=t_test), idxs_valid)
+    dset_valid.targets = list(np.array(dset_valid.dataset.targets)[idxs_valid])
+    dset_valid.class_names = dset_test.class_names
+    return dset_train, dset_valid, dset_test
 
 
 def prepare_model(task, arch, in_channels=None, **kwargs):
@@ -235,16 +226,16 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
         A pytorch model that can be called by `logits = model(images)`.
 
     """
-    _, _, _in_channels, class_num, _ = DATASETS_META[task]
+    _, _, _in_channels, num_classes, _ = DATASETS_META[task]
     if in_channels is None:
         in_channels = _in_channels
     if isinstance(arch, str):
         arch = MODELS[arch]
-    model = arch(class_num=class_num, in_channels=in_channels, **kwargs)
+    model = arch(num_classes=num_classes, in_channels=in_channels, **kwargs)
     return model
 
 
-def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbose=False):
+def evaluate(model, dataset, batch_size=100, num_workers=4, device='cuda', verbose=1):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -257,8 +248,6 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbos
         The batch size of the data loader.
     device: str
         The device used for evaluation.
-    worker_num: int
-        The number of workers of the data loader.
 
     Returns
     -------
@@ -268,15 +257,12 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbos
         The classification accuracy averaged over the dataset.
 
     """
-    if device=='cuda' and not torch.cuda.is_available():
-        device = 'cpu'
     model.eval().to(device)
     criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
 
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=worker_num)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     loss, count = 0., 0.
-    if verbose:
-        tic = time.time()
+    tic = time.time()
     for images, labels in loader:
         with torch.no_grad():
             logits = model(images.to(device))
@@ -285,7 +271,7 @@ def evaluate(model, dataset, batch_size=100, device='cuda', worker_num=2, verbos
             count += (predicts.cpu()==labels).to(torch.float).sum().item()
     loss = loss/len(dataset)
     acc = count/len(dataset)
-    if verbose:
-        toc = time.time()
-        print('loss: {:5.3f}, acc:{:7.2%} ({})'.format(loss, acc, time_str(toc-tic)))
+    toc = time.time()
+    if verbose>0:
+        print('[loss: {:5.3f}], [acc:{:7.2%}] ({})'.format(loss, acc, time_str(toc-tic)))
     return loss, acc
