@@ -107,8 +107,8 @@ class Manager:
         Overriding
         ----------
         def setup(self, config):
-            super(ChildManager, self).setup(config)
             # set up `self` properties
+            super(ChildManager, self).setup(config)
 
         """
         self.config = config
