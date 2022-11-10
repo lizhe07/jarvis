@@ -229,7 +229,7 @@ class Manager:
         num_epochs: int = 1,
         resume: bool = True,
         count: int = 0,
-        patience: float = 1.,
+        patience: float = 4.,
         max_errors: int = 0,
     ):
         r"""Batch processing.
@@ -292,27 +292,22 @@ class Manager:
             if not interrupted and (count==0 or w_count<count):
                 print("All works are processed or being processed.")
 
-    def sweep(self, sweep_spec: dict, **kwargs):
-        r"""Sweep on a hyper-parameter grid.
+    def _config_gen(self, choices: dict):
+        r"""Generator of configurations.
 
         Work configurations are constructed randomly from `sweep_spec`, using
-        the method `get_config`. The configuration generator is passed to the
-        method `batch`.
+        the method `get_config`.
 
         Args
         ----
-        sweep_spec:
+        choices:
             The work configuration search specification, can be nested. It has
             the same key structure as a valid `config` for `get_config` method,
             and values at the leaf level are lists containing possible values.
 
-        """
-        method = sweep_spec.get('method', 'random')
-        assert method in ['random', 'smart']
-        if method=='smart':
-            raise NotImplementedError
 
-        choices = Config(sweep_spec['choices']).flatten()
+        """
+        choices = Config(choices).flatten()
         keys = list(choices.keys())
         vals, dims = [], []
         for key in keys:
@@ -321,15 +316,41 @@ class Manager:
             dims.append(len(choices[key]))
         total_num = np.prod(dims)
 
-        def config_gen():
-            for idx in random.sample(range(total_num), total_num):
-                sub_idxs = np.unravel_index(idx, dims)
-                config = Config()
-                for i, key in enumerate(keys):
-                    config[key] = vals[i][sub_idxs[i]]
-                config = self.get_config(config.nest())
-                yield config
-        self.batch(config_gen(), **kwargs)
+        for idx in random.sample(range(total_num), total_num):
+            sub_idxs = np.unravel_index(idx, dims)
+            config = Config()
+            for i, key in enumerate(keys):
+                config[key] = vals[i][sub_idxs[i]]
+            config = self.get_config(config.nest())
+            yield config
+
+    def sweep(self, choices: dict, order: str = 'random', **kwargs):
+        r"""Sweep on a grid of configurations.
+
+        Args
+        ----
+        choices:
+            The configuration value grid, see `_config_gen` for more details.
+        order:
+            Process order, either 'random' or more advanced 'smart'.
+
+        """
+        assert order in ['random', 'smart']
+        if order=='smart':
+            raise NotImplementedError
+        self.batch(self._config_gen(choices), **kwargs)
+
+    def overview(self, choices: dict):
+        configs = list(set(self._config_gen(choices)))
+        trained_epochs = []
+        for config in configs:
+            try:
+                key = self.configs.get_key(config)
+                epoch = self.stats[key]['epoch']
+            except:
+                epoch = 0
+            trained_epochs.append(epoch)
+        return trained_epochs
 
     @staticmethod
     def _is_matched(config: Config, cond: Config) -> bool:
