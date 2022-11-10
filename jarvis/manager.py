@@ -450,8 +450,17 @@ class Manager:
         tmp_manager = Manager(store_dir=tmp_path)
         for old_key, config in tmp_manager.configs.items():
             new_key = self.configs.add(config)
-            self.stats[new_key] = tmp_manager.stats[old_key]
-            self.ckpts[new_key] = tmp_manager.ckpts[old_key]
-            self.previews[new_key] = tmp_manager.previews[old_key]
+            try:
+                self.stats[new_key] = tmp_manager.stats[old_key]
+            except:
+                pass
+            try:
+                self.ckpts[new_key] = tmp_manager.ckpts[old_key]
+            except:
+                pass
+            try:
+                self.previews[new_key] = tmp_manager.previews[old_key]
+            except:
+                pass
         shutil.rmtree(tmp_path)
         print(f"Data from {tar_path} loaded.")
