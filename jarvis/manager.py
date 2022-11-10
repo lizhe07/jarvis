@@ -1,4 +1,4 @@
-import random, time
+import random, time, tarfile, shutil
 import numpy as np
 from typing import Optional
 from collections.abc import Iterable
@@ -409,3 +409,28 @@ class Manager:
         ckpt = self.ckpts.pop(key)
         preview = self.previews.pop(key)
         return config, stat, ckpt, preview
+
+    def export_tar(self, tar_path: str = 'store.tar.gz'):
+        r"""Exports manager data to a tar file."""
+        assert self.store_dir is not None
+        with tarfile.open(tar_path, 'w:gz') as f:
+            for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
+                f.add(f'{self.store_dir}/{axv_name}', arcname=axv_name)
+        print(f"Data exported to {tar_path}.")
+
+    def load_tar(self, tar_path: str):
+        r"""Loads manager data from a tar file."""
+        tmp_path = '{}/tmp_{}'.format(
+            self.store_dir if self.store_dir is not None else 'store',
+            self.configs._random_key(),
+        )
+        with tarfile.open(tar_path, 'r:gz') as f:
+            f.extractall(tmp_path)
+        tmp_manager = Manager(store_dir=tmp_path)
+        for old_key, config in tmp_manager.configs.items():
+            new_key = self.configs.add(config)
+            self.stats[new_key] = tmp_manager.stats[old_key]
+            self.ckpts[new_key] = tmp_manager.ckpts[old_key]
+            self.previews[new_key] = tmp_manager.previews[old_key]
+        shutil.rmtree(tmp_path)
+        print(f"Data from {tar_path} loaded.")
