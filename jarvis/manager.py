@@ -81,7 +81,7 @@ class Manager:
         self.verbose = verbose
         self.defaults = Config()
 
-    def get_config(self, config) -> Config:
+    def get_config(self, config: Optional[dict] = None) -> Config:
         r"""Returns work configuration.
 
         The method first fills in default values, then performs additional
@@ -112,6 +112,7 @@ class Manager:
 
         """
         self.config = config
+        self._t_train = self._t_eval = None
 
     def init_ckpt(self):
         r"""Initializes checkpoint.
@@ -139,7 +140,10 @@ class Manager:
 
         """
         key = self.configs.add(self.config)
-        self.stats[key] = {'epoch': self.epoch, 'toc': time.time()}
+        self.stats[key] = {
+            'epoch': self.epoch, 'toc': time.time(),
+            't_train': self._t_train, 't_eval': self._t_eval,
+        }
         self.ckpts[key] = self.ckpt
         self.previews[key] = self.preview
 
@@ -211,16 +215,27 @@ class Manager:
             if self.verbose>0:
                 print("No checkpoint loaded.")
             self.init_ckpt()
+            tic = time.time()
             self.eval()
+            toc = time.time()
+            self._t_eval = toc-tic
             self.save_ckpt()
 
         while self.epoch<num_epochs:
             if self.verbose>0:
                 print(f"\nEpoch: {progress_str(self.epoch+1, num_epochs)}")
+
+            tic = time.time()
             self.train()
+            toc = time.time()
+            self._t_train = toc-tic
+
             self.epoch += 1
             if self.epoch%self.eval_interval==0 or self.epoch==num_epochs:
+                tic = time.time()
                 self.eval()
+                toc = time.time()
+                self._t_eval = toc-tic
             if self.epoch%self.save_interval==0 or self.epoch==num_epochs:
                 self.save_ckpt()
 
