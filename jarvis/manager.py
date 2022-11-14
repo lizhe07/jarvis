@@ -112,7 +112,6 @@ class Manager:
 
         """
         self.config = config
-        self._t_train = self._t_eval = None
 
     def init_ckpt(self):
         r"""Initializes checkpoint.
@@ -126,6 +125,7 @@ class Manager:
 
         """
         self.epoch = 0
+        self._t_train = self._t_eval = None
         self.ckpt = {'eval_records': {}}
         self.preview = {}
 
@@ -160,6 +160,8 @@ class Manager:
         """
         key = self.configs.get_key(self.config)
         self.epoch = self.stats[key]['epoch']
+        self._t_train = self.stats[key].get('t_train', None)
+        self._t_eval = self.stats[key].get('t_eval', None)
         self.ckpt = self.ckpts[key]
         self.preview = self.previews[key]
 
@@ -228,14 +230,20 @@ class Manager:
             tic = time.time()
             self.train()
             toc = time.time()
-            self._t_train = toc-tic
+            if self._t_train is None:
+                self._t_train = toc-tic
+            else:
+                self._t_train = 0.8*self._t_train+0.2*(toc-tic)
 
             self.epoch += 1
             if self.epoch%self.eval_interval==0 or self.epoch==num_epochs:
                 tic = time.time()
                 self.eval()
                 toc = time.time()
-                self._t_eval = toc-tic
+                if self._t_eval is None:
+                    self._t_eval = toc-tic
+                else:
+                    self._t_eval = 0.8*self._t_eval+0.2*(toc-tic)
             if self.epoch%self.save_interval==0 or self.epoch==num_epochs:
                 self.save_ckpt()
 
