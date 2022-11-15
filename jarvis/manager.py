@@ -5,7 +5,7 @@ from collections.abc import Iterable
 
 from .config import Config
 from .archive import Archive
-from .utils import progress_str
+from .utils import progress_str, time_str
 
 
 class Manager:
@@ -363,17 +363,42 @@ class Manager:
             raise NotImplementedError
         self.batch(self._config_gen(choices), **kwargs)
 
-    def overview(self, choices: dict):
+    def overview(self, choices: dict, min_epoch: Optional[int] = None):
         configs = list(set(self._config_gen(choices)))
-        trained_epochs = []
+        report = {
+            'epochs': [],
+            't_trains': [], 't_evals': [],
+        }
         for config in configs:
             try:
-                key = self.configs.get_key(config)
-                epoch = self.stats[key]['epoch']
+                stat = self.stats[self.configs.get_key(config)]
+                epoch = stat['epoch']
+                t_train = stat.get('t_train') or np.nan
+                t_eval = stat.get('t_eval') or np.nan
             except:
                 epoch = 0
-            trained_epochs.append(epoch)
-        return trained_epochs
+                t_train = t_eval = np.nan
+            report['epochs'].append(epoch)
+            report['t_trains'].append(t_train)
+            report['t_evals'].append(t_eval)
+        for key in report:
+            report[key] = np.array(report[key])
+        if self.verbose>0:
+            if min_epoch is None:
+                print("Average number of trained epochs: {:.1f}".format(np.mean(report['epochs'])))
+            else:
+                p = report['epochs']/min_epoch
+                p[p>1] = 1
+                print("Average progress of training {:.1%} ({} epochs as complete).".format(
+                    np.mean(p), min_epoch,
+                ))
+            t_train = np.nanmean(report['t_trains'])
+            if not np.isnan(t_train):
+                print("Approximate training time {} per epoch.".format(time_str(t_train)))
+            t_eval = np.nanmean(report['t_evals'])
+            if not np.isnan(t_eval):
+                print("Approximate evaluation time {}.".format(time_str(t_eval)))
+        return report
 
     @staticmethod
     def _is_matched(config: Config, cond: Config) -> bool:
