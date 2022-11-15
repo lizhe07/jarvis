@@ -363,12 +363,18 @@ class Manager:
             raise NotImplementedError
         self.batch(self._config_gen(choices), **kwargs)
 
-    def overview(self, choices: dict, min_epoch: Optional[int] = None):
+    def overview(self,
+        choices: dict,
+        min_epoch: Optional[int] = None,
+        p_keys: Optional[list[str]] = None,
+    ):
         configs = list(set(self._config_gen(choices)))
         report = {
-            'epochs': [],
-            't_trains': [], 't_evals': [],
+            'epoch': [],
+            't_train': [], 't_eval': [],
         }
+        for key in p_keys:
+            report[key] = []
         for config in configs:
             try:
                 stat = self.stats[self.configs.get_key(config)]
@@ -378,24 +384,32 @@ class Manager:
             except:
                 epoch = 0
                 t_train = t_eval = np.nan
-            report['epochs'].append(epoch)
-            report['t_trains'].append(t_train)
-            report['t_evals'].append(t_eval)
+            report['epoch'].append(epoch)
+            report['t_train'].append(t_train)
+            report['t_eval'].append(t_eval)
+            if p_keys:
+                try:
+                    preview = self.previews[self.configs.get_key(config)]
+                    for key in p_keys:
+                        report[key].append(preview.get(key) or np.nan)
+                except:
+                    for key in p_keys:
+                        report[key].append(np.nan)
         for key in report:
             report[key] = np.array(report[key])
         if self.verbose>0:
             if min_epoch is None:
-                print("Average number of trained epochs: {:.1f}".format(np.mean(report['epochs'])))
+                print("Average number of trained epochs: {:.1f}".format(np.mean(report['epoch'])))
             else:
-                p = report['epochs']/min_epoch
+                p = report['epoch']/min_epoch
                 p[p>1] = 1
                 print("Average progress of training {:.1%} ({} epochs as complete).".format(
                     np.mean(p), min_epoch,
                 ))
-            t_train = np.nanmean(report['t_trains'])
+            t_train = np.nanmean(report['t_train'])
             if not np.isnan(t_train):
                 print("Approximate training time {} per epoch.".format(time_str(t_train)))
-            t_eval = np.nanmean(report['t_evals'])
+            t_eval = np.nanmean(report['t_eval'])
             if not np.isnan(t_eval):
                 print("Approximate evaluation time {}.".format(time_str(t_eval)))
         return report
