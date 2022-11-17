@@ -282,7 +282,7 @@ class Manager:
                 try:
                     stat = self.stats[key]
                 except:
-                    stat = {'epoch': 0, 'toc': -float('inf')}
+                    stat = {'epoch': -1, 'toc': -float('inf')}
                 if stat['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience:
                     continue
                 stat['toc'] = time.time() # update modified time
@@ -390,11 +390,10 @@ class Manager:
             if p_keys:
                 try:
                     preview = self.previews[self.configs.get_key(config)]
-                    for key in p_keys:
-                        report[key].append(preview.get(key) or np.nan)
                 except:
-                    for key in p_keys:
-                        report[key].append(np.nan)
+                    preview = {}
+                for key in p_keys:
+                    report[key].append(preview.get(key) or np.nan)
         for key in report:
             report[key] = np.array(report[key])
         if self.verbose>0:
