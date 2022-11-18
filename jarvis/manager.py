@@ -495,6 +495,7 @@ class Manager:
     def export_tar(self, tar_path: str = 'store.tar.gz', cond: Optional[dict] = None):
         r"""Exports manager data to a tar file."""
         assert self.store_dir is not None
+        tic = time.time()
         if cond is not None:
             store_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
             tmp_manager = Manager(store_dir=store_dir)
@@ -510,10 +511,12 @@ class Manager:
                 f.add(f'{store_dir}/{axv_name}', arcname=axv_name)
         if cond is not None:
             shutil.rmtree(store_dir)
-        print(f"Data exported to {tar_path}.")
+        toc = time.time()
+        print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
     def load_tar(self, tar_path: str):
         r"""Loads manager data from a tar file."""
+        tic = time.time()
         tmp_path = '{}/tmp_{}'.format(
             self.store_dir if self.store_dir is not None else 'store',
             self.configs._random_key(),
@@ -536,4 +539,5 @@ class Manager:
             except:
                 pass
         shutil.rmtree(tmp_path)
-        print(f"Data from {tar_path} loaded.")
+        toc = time.time()
+        print(f"Data from {tar_path} loaded ({time_str(toc-tic)}).")
