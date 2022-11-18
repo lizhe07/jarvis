@@ -422,7 +422,7 @@ class Manager:
                 return False
         return True
 
-    def completed(self, min_epoch: int = 1, cond: Optional[dict] = None) -> str:
+    def completed(self, min_epoch: int = 0, cond: Optional[dict] = None) -> str:
         r"""A generator for completed works."""
         for key, stat in self.stats.items():
             if stat['epoch']>=min_epoch:
@@ -492,12 +492,24 @@ class Manager:
         preview = self.previews.pop(key)
         return config, stat, ckpt, preview
 
-    def export_tar(self, tar_path: str = 'store.tar.gz'):
+    def export_tar(self, tar_path: str = 'store.tar.gz', cond: Optional[dict] = None):
         r"""Exports manager data to a tar file."""
         assert self.store_dir is not None
+        if cond is not None:
+            store_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
+            tmp_manager = Manager(store_dir=store_dir)
+            for key in self.completed(cond=cond):
+                tmp_manager.configs[key] = self.configs[key]
+                tmp_manager.stats[key] = self.stats[key]
+                tmp_manager.ckpts[key] = self.ckpts[key]
+                tmp_manager.previews[key] = self.previews[key]
+        else:
+            store_dir = self.store_dir
         with tarfile.open(tar_path, 'w:gz') as f:
             for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
-                f.add(f'{self.store_dir}/{axv_name}', arcname=axv_name)
+                f.add(f'{store_dir}/{axv_name}', arcname=axv_name)
+        if cond is not None:
+            shutil.rmtree(store_dir)
         print(f"Data exported to {tar_path}.")
 
     def load_tar(self, tar_path: str):
