@@ -400,8 +400,7 @@ class Manager:
             if min_epoch is None:
                 print("Average number of trained epochs: {:.1f}".format(np.mean(report['epoch'])))
             else:
-                p = report['epoch']/min_epoch
-                p[p>1] = 1
+                p = np.clip(report['epoch']/min_epoch, 0, 1)
                 print("Average progress of training {:.1%} ({} epochs as complete).".format(
                     np.mean(p), min_epoch,
                 ))
