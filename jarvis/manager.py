@@ -107,11 +107,11 @@ class Manager:
         Overriding
         ----------
         def setup(self, config):
-            # set up `self` properties
             super(ChildManager, self).setup(config)
+            # set up `self` properties
 
         """
-        self.config = config
+        self.config = config.clone()
 
     def init_ckpt(self):
         r"""Initializes checkpoint.
