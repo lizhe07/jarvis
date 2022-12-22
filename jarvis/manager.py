@@ -187,7 +187,7 @@ class Manager:
 
     def process(self,
         config: Config,
-        num_epochs: int = 1,
+        num_epochs: int = 0,
         resume: bool = True,
     ):
         r"""Processes a training work.
@@ -249,7 +249,7 @@ class Manager:
 
     def batch(self,
         configs: Iterable[Config],
-        num_epochs: int = 1,
+        num_epochs: int = 0,
         resume: bool = True,
         count: int = 0,
         patience: float = 4.,
