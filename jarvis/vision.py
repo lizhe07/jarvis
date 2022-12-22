@@ -235,7 +235,7 @@ def prepare_model(task, arch, in_channels=None, **kwargs):
     return model
 
 
-def evaluate(model, dataset, batch_size=100, num_workers=4, device='cuda', verbose=1):
+def evaluate(model, dataset, batch_size=100, *, num_workers=4, device='cuda', verbose=1):
     r"""Evaluates the task performance of the model.
 
     Args
@@ -246,6 +246,8 @@ def evaluate(model, dataset, batch_size=100, num_workers=4, device='cuda', verbo
         The dataset to evaluate the model on.
     batch_size: int
         The batch size of the data loader.
+    num_workers: int
+        Number of workers for data loader.
     device: str
         The device used for evaluation.
 
@@ -257,6 +259,8 @@ def evaluate(model, dataset, batch_size=100, num_workers=4, device='cuda', verbo
         The classification accuracy averaged over the dataset.
 
     """
+    if not torch.cuda.is_available():
+        device = 'cpu'
     model.eval().to(device)
     criterion = torch.nn.CrossEntropyLoss(reduction='sum').to(device)
 
