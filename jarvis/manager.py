@@ -290,7 +290,7 @@ class Manager:
 
                 if self.verbose>0:
                     print("------------")
-                    print("Processing {} (work {})...".format(
+                    print("Processing {} ({})...".format(
                         key, progress_str(w_count+1, count) if count>0 else w_count+1,
                     ))
                 self.process(config, num_epochs, resume)
