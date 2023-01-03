@@ -62,7 +62,11 @@ class Config(HashableDict):
     def __getattr__(self, key):
         r"""Returns configuration value."""
         try:
-            return self[key]
+            dot_pos = key.find('.')
+            if dot_pos==-1:
+                return self[key]
+            else:
+                return getattr(self[key[:dot_pos]], key[dot_pos+1:])
         except:
             return getattr(super(Config, self), key)
 
@@ -72,7 +76,11 @@ class Config(HashableDict):
     def __setattr__(self, key, val):
         r"""Sets configuration value."""
         try:
-            self[key] = val
+            dot_pos = key.find('.')
+            if dot_pos==-1:
+                self[key] = val
+            else:
+                setattr(self[key[:dot_pos]], key[dot_pos+1:], val)
         except:
             setattr(super(Config, self), key, val)
 
