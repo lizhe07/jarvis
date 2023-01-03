@@ -254,6 +254,7 @@ class Manager:
         count: int = 0,
         patience: float = 4.,
         max_errors: int = 0,
+        disp_interval: int = 1,
     ):
         r"""Batch processing.
 
@@ -273,9 +274,13 @@ class Manager:
         max_errors:
             Maximum number of allowed errors. If it is '0', the runtime error
             is immediately raised.
+        disp_interval:
+            Information display interval, `verbose` will be set to be non-zero
+            every `disp_interval` works.
 
         """
         w_count, e_count, interrupted = 0, 0, False
+        _verbose = self.verbose
         for config in configs:
             try:
                 key = self.configs.add(config)
@@ -288,15 +293,19 @@ class Manager:
                 stat['toc'] = time.time() # update modified time
                 self.stats[key] = stat
 
+                if w_count%disp_interval==0 or (count>0 and w_count+1==count):
+                    self.verbose = _verbose
+                else:
+                    self.verbose = 0
                 if self.verbose>0:
                     print("------------")
                     print("Processing {} ({})...".format(
                         key, progress_str(w_count+1, count) if count>0 else w_count+1,
                     ))
                 self.process(config, num_epochs, resume)
-                w_count += 1
                 if self.verbose>0:
                     print("------------")
+                w_count += 1
             except KeyboardInterrupt:
                 interrupted = True
                 break
@@ -312,6 +321,7 @@ class Manager:
             else:
                 if count>0 and w_count==count:
                     break
+        self.verbose = _verbose
         if self.verbose>0:
             print("\n{} works processed.".format(w_count))
             if not interrupted and (count==0 or w_count<count):
