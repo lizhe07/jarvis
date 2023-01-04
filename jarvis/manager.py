@@ -280,6 +280,7 @@ class Manager:
 
         """
         w_count, e_count, interrupted = 0, 0, False
+        tic = t_last = time.time()
         _verbose = self.verbose
         for config in configs:
             try:
@@ -289,6 +290,11 @@ class Manager:
                 except:
                     stat = {'epoch': -1, 'toc': -float('inf')}
                 if stat['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience:
+                    if _verbose>0 and time.time()-t_last>60:
+                        t_last = time.time()
+                        print("Searching for the next work... ({:.0f} mins elapsed)".format(
+                            (t_last-tic)/60,
+                        ))
                     continue
                 stat['toc'] = time.time() # update modified time
                 self.stats[key] = stat
@@ -304,6 +310,7 @@ class Manager:
                     ))
                 self.process(config, num_epochs, resume)
                 w_count += 1
+                tic = t_last = time.time()
             except KeyboardInterrupt:
                 interrupted = True
                 break
