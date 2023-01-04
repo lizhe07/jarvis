@@ -385,16 +385,20 @@ class Manager:
         min_epoch: Optional[int] = None,
         p_keys: Optional[list[str]] = None,
     ):
+        _keys = dict((v, k) for k, v in self.configs.items())
+        _stats = dict((k, v) for k, v in self.stats.items())
+        _previews = dict((k, v) for k, v in self.previews.items())
         configs = list(set(self._config_gen(choices)))
         report = {
             'epoch': [],
             't_train': [], 't_eval': [],
         }
-        for key in p_keys:
-            report[key] = []
+        for p_key in p_keys:
+            report[p_key] = []
         for config in configs:
             try:
-                stat = self.stats[self.configs.get_key(config)]
+                key = _keys[config]
+                stat = _stats[key]
                 epoch = stat['epoch']
                 t_train = stat.get('t_train') or np.nan
                 t_eval = stat.get('t_eval') or np.nan
@@ -406,13 +410,13 @@ class Manager:
             report['t_eval'].append(t_eval)
             if p_keys:
                 try:
-                    preview = self.previews[self.configs.get_key(config)]
+                    preview = _previews[key]
                 except:
                     preview = {}
-                for key in p_keys:
-                    report[key].append(preview.get(key) or np.nan)
-        for key in report:
-            report[key] = np.array(report[key])
+                for p_key in p_keys:
+                    report[p_key].append(preview.get(p_key) or np.nan)
+        for p_key in report:
+            report[p_key] = np.array(report[p_key])
         if self.verbose>0:
             if min_epoch is None:
                 print("Average number of trained epochs: {:.1f}".format(np.mean(report['epoch'])))
