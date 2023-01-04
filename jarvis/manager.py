@@ -279,23 +279,21 @@ class Manager:
             every `disp_interval` works.
 
         """
+        def to_process(stat, num_epochs, patience):
+            return stat['epoch']<num_epochs and (time.time()-stat['toc'])/3600>=patience
         w_count, e_count, interrupted = 0, 0, False
-        tic = t_last = time.time()
+        _keys = dict((v, k) for k, v in self.configs.items())
+        _stats = dict((k, v) for k, v in self.stats.items())
         _verbose = self.verbose
         for config in configs:
+            if config in _keys and not to_process(_stats[_keys[config]], num_epochs, patience):
+                continue
             try:
                 key = self.configs.add(config)
                 try:
                     stat = self.stats[key]
                 except:
                     stat = {'epoch': -1, 'toc': -float('inf')}
-                if stat['epoch']>=num_epochs or (time.time()-stat['toc'])/3600<patience:
-                    if _verbose>0 and time.time()-t_last>60:
-                        t_last = time.time()
-                        print("Searching for the next work... ({:.0f} mins elapsed)".format(
-                            (t_last-tic)/60,
-                        ))
-                    continue
                 stat['toc'] = time.time() # update modified time
                 self.stats[key] = stat
 
@@ -310,7 +308,8 @@ class Manager:
                     ))
                 self.process(config, num_epochs, resume)
                 w_count += 1
-                tic = t_last = time.time()
+                _keys = dict((v, k) for k, v in self.configs.items())
+                _stats = dict((k, v) for k, v in self.stats.items())
             except KeyboardInterrupt:
                 interrupted = True
                 break
@@ -323,9 +322,8 @@ class Manager:
                     break
                 else:
                     continue
-            else:
-                if count>0 and w_count==count:
-                    break
+            if count>0 and w_count==count:
+                break
         self.verbose = _verbose
         if self.verbose>0:
             print("\n{} works processed.".format(w_count))
