@@ -326,7 +326,7 @@ class Manager:
                 break
         self.verbose = _verbose
         if self.verbose>0:
-            print("\n{} works processed.".format(w_count))
+            print("{} works processed.".format(w_count))
             if not interrupted and (count==0 or w_count<count):
                 print("All works are processed or being processed.")
 
@@ -391,6 +391,8 @@ class Manager:
             'epoch': [],
             't_train': [], 't_eval': [],
         }
+        if p_keys is None:
+            p_keys = []
         for p_key in p_keys:
             report[p_key] = []
         for config in configs:
