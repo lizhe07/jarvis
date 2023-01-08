@@ -211,7 +211,7 @@ class Manager:
             self.load_ckpt()
             if self.verbose>0:
                 print("Checkpoint{} loaded.".format(
-                    '' if self.epoch==1 else f' (epoch {self.epoch})',
+                    '' if self.epoch==0 else f' (epoch {self.epoch})',
                 ))
         except:
             if self.verbose>0:
@@ -294,6 +294,8 @@ class Manager:
                     stat = self.stats[key]
                 except:
                     stat = {'epoch': -1, 'toc': -float('inf')}
+                if not to_process(stat, num_epochs, patience):
+                    continue
                 stat['toc'] = time.time() # update modified time
                 self.stats[key] = stat
 
