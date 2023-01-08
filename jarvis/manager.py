@@ -209,6 +209,7 @@ class Manager:
         try: # load existing checkpoint
             assert resume
             self.load_ckpt()
+            assert self.epoch>=0
             if self.verbose>0:
                 print("Checkpoint{} loaded.".format(
                     '' if self.epoch==0 else f' (epoch {self.epoch})',
