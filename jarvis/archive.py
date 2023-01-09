@@ -223,7 +223,7 @@ class Archive:
             The key of added record.
 
         """
-        assert self.is_config, "Value addition is implemented for config records only."
+        assert self.is_config, "Item adding is implemented for config records only."
         key = self.get_key(val)
         if key is None:
             key = self._new_key()

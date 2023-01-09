@@ -515,6 +515,29 @@ class Manager:
         preview = self.previews.pop(key)
         return config, stat, ckpt, preview
 
+    def prune(self):
+        r"""Removes duplicate works.
+
+        Duplicated works may exist due to accident, remove all records except
+        for the most trained one.
+
+        """
+        dups = self.configs.get_duplicates()
+        if self.verbose>0 and len(dups)>0:
+            print(f"{len(dups)} duplicate works found.")
+        for keys in dups.values():
+            best_key, max_epoch = None, None
+            for key in keys:
+                if key not in self.stats:
+                    continue
+                epoch = self.stats[key]['epoch']
+                if best_key is None or epoch>max_epoch:
+                    best_key = key
+                    max_epoch = epoch
+            for key in keys:
+                if key!=best_key:
+                    self.pop(key)
+
     def export_tar(self, tar_path: str = 'store.tar.gz', cond: Optional[dict] = None):
         r"""Exports manager data to a tar file."""
         assert self.store_dir is not None
