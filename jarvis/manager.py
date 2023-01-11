@@ -287,8 +287,8 @@ class Manager:
         _stats = dict((k, v) for k, v in self.stats.items())
         _verbose = self.verbose
         for config in configs:
-            if config in _keys and not to_process(_stats[_keys[config]], num_epochs, patience):
-                continue
+            # if config in _keys and not to_process(_stats[_keys[config]], num_epochs, patience):
+            #     continue
             try:
                 key = self.configs.add(config)
                 try:
