@@ -1,7 +1,8 @@
 import sys, yaml, time, random
 from copy import deepcopy
 from importlib import import_module
-from typing import Optional, Callable
+from typing import Optional
+from collections.abc import Callable
 
 from .hashable import HashableList, HashableSet, HashableDict, HashableArray
 from .utils import flatten, nest
