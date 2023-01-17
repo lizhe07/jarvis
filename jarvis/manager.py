@@ -283,14 +283,27 @@ class Manager:
         def to_process(stat, num_epochs, patience):
             return stat['epoch']<num_epochs and (time.time()-stat['toc'])/3600>=patience
         w_count, e_count, interrupted = 0, 0, False
-        _keys = dict((v, k) for k, v in self.configs.items())
+        _configs = dict((k, v) for k, v in self.configs.items())
         _stats = dict((k, v) for k, v in self.stats.items())
         _verbose = self.verbose
         for config in configs:
-            # if config in _keys and not to_process(_stats[_keys[config]], num_epochs, patience):
-            #     continue
+            _keys = []
+            for _key, _config in _configs.items():
+                if config==_config:
+                    _keys.append(_key)
+            if len(_keys)>1:
+                raise RuntimeError(
+                    f"Duplicate configs detected for\n{config}\n"
+                    f"Existing keys:\n{_keys}"
+                )
+            if len(_keys)==1 and not to_process(_stats[_keys[0]], num_epochs, patience):
+                continue
             try:
                 key = self.configs.add(config)
+                if len(_keys)==1 and key!=_keys[0]:
+                    raise RuntimeError(
+                        f"New key {key} conflicts with old key {_keys[0]}."
+                    )
                 try:
                     stat = self.stats[key]
                 except:
@@ -311,8 +324,8 @@ class Manager:
                     ))
                 self.process(config, num_epochs, resume)
                 w_count += 1
-                _keys = dict((v, k) for k, v in self.configs.items())
-                _stats = dict((k, v) for k, v in self.stats.items())
+                # _keys = dict((v, k) for k, v in self.configs.items())
+                # _stats = dict((k, v) for k, v in self.stats.items())
             except KeyboardInterrupt:
                 interrupted = True
                 break
