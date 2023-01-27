@@ -1,8 +1,20 @@
 import os, pickle, random, time
-from typing import Optional
+from typing import Any, Optional
 
 from .config import Config
 from .utils import progress_str, time_str
+
+
+class MaxTryIOError(RuntimeError):
+    r"""Raised when too many attempts to open an file fail."""
+
+    def __init__(self,
+        store_path: str, count: int,
+    ):
+        self.file_path = store_path
+        self.count = count
+        msg = f"Max number ({count}) of reading tried and failed on {store_path}."
+        super().__init__(msg)
 
 
 class Archive:
@@ -45,13 +57,13 @@ class Archive:
             self.path_len, self.max_try, self.pause = path_len, max_try, pause
         self.is_config = is_config
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.store_dir is None:
             return "Archive object with no external storage."
         else:
             return f"Archive object stored in {self.store_dir}."
 
-    def __setitem__(self, key, val):
+    def __setitem__(self, key: str, val: Any):
         val = Config(val) if self.is_config else val
         if self.store_dir is None:
             self.__store__[key] = val
@@ -61,7 +73,7 @@ class Archive:
             records[key] = val
             self._safe_write(records, store_path)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         try:
             if self.store_dir is None:
                 return self.__store__[key]
@@ -73,7 +85,7 @@ class Archive:
         except:
             raise KeyError(key)
 
-    def __contains__(self, key):
+    def __contains__(self, key: str) -> bool:
         try:
             self[key]
         except:
@@ -87,21 +99,21 @@ class Archive:
     def __len__(self):
         return len(list(self.keys()))
 
-    def _is_valid_key(self, key):
+    def _is_valid_key(self, key: str) -> bool:
         r"""Returns if a key is valid."""
         if not (isinstance(key, str) and len(key)==self.key_len):
             return False
         for c in key:
-            if c not in Archive._alphabet:
+            if c not in self._alphabet:
                 return False
         return True
 
-    def _store_path(self, key):
+    def _store_path(self, key: str) -> str:
         r"""Returns the path of external file associated with a key."""
         assert self._is_valid_key(key), f"Invalid key '{key}' encountered."
         return f'{self.store_dir}/{key[:self.path_len]}.axv'
 
-    def _store_paths(self):
+    def _store_paths(self) -> list[str]:
         r"""Returns all valid external files in the directory."""
         return [
             f'{self.store_dir}/{f}' for f in os.listdir(self.store_dir)
@@ -111,7 +123,7 @@ class Archive:
     def _sleep(self):
         time.sleep(self.pause*(0.8+random.random()*0.4))
 
-    def _safe_read(self, store_path):
+    def _safe_read(self, store_path: str) -> dict:
         r"""Safely reads a file.
 
         This is designed for cluster use. An error is raised when too many
@@ -129,10 +141,10 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            raise RuntimeError(f"Max number ({count}) of reading tried and failed.")
+            raise MaxTryIOError(store_path, count)
         return records
 
-    def _safe_write(self, records, store_path):
+    def _safe_write(self, records: dict, store_path: str):
         r"""Safely writes a file."""
         count = 0
         while count<self.max_try:
@@ -145,13 +157,13 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            raise RuntimeError(f"Max number ({count}) of writing tried and failed.")
+            raise MaxTryIOError(store_path, count)
 
-    def _random_key(self):
+    def _random_key(self) -> str:
         r"""Returns a random key."""
-        return ''.join(random.choices(Archive._alphabet, k=self.key_len))
+        return ''.join(random.choices(self._alphabet, k=self.key_len))
 
-    def _new_key(self):
+    def _new_key(self) -> str:
         r"""Returns a new key."""
         while True:
             key = self._random_key()
@@ -159,7 +171,7 @@ class Archive:
                 break
         return key
 
-    def keys(self):
+    def keys(self) -> str:
         r"""A generator for keys."""
         if self.store_dir is None:
             for key in self.__store__.keys():
@@ -172,7 +184,7 @@ class Archive:
                 for key in records.keys():
                     yield key
 
-    def values(self):
+    def values(self) -> Any:
         r"""A generator for values."""
         if self.store_dir is None:
             for val in self.__store__.values():
@@ -185,7 +197,7 @@ class Archive:
                 for val in records.values():
                     yield val
 
-    def items(self):
+    def items(self) -> tuple[str, Any]:
         r"""A generator for items."""
         if self.store_dir is None:
             for key, val in self.__store__.items():
@@ -198,7 +210,7 @@ class Archive:
                 for key, val in records.items():
                     yield key, val
 
-    def get_key(self, val) -> Optional[str]:
+    def get_key(self, val: dict) -> Optional[str]:
         r"""Returns the key of a record.
 
         Returns
@@ -214,7 +226,7 @@ class Archive:
                 return key
         return None
 
-    def add(self, val) -> str:
+    def add(self, val: dict) -> str:
         r"""Adds a new item if it has not already existed.
 
         Returns
@@ -230,7 +242,7 @@ class Archive:
             self[key] = val
         return key
 
-    def pop(self, key):
+    def pop(self, key: str) -> Any:
         r"""Pops out an item by key."""
         if self.store_dir is None:
             return self.__store__.pop(key, None)

@@ -13,14 +13,14 @@ class Manager:
 
     A manager is associated with different directories storing configurations,
     status, checkpoints and previews of all works. Each individual work is
-    specified by a configuration, and assigned with a unique ID. While
+    specified by a configuration, and assigned with a unique string ID. While
     processing, the manager first sets up itself and then iteratively calls the
     training epoch. Model evaluation and checkpoint saving are done periodically
     during the training.
 
     Methods `get_config`, `setup`, `init_ckpt`, `load_ckpt` and `save_ckpt`
-    usually need to be overridden to function properly, see the documents of
-    each for more detailed examples. Methods `train` and `eval` need to be
+    usually need to be overridden to function properly, see the doc strings of
+    each for more detailed examples. Methods `train` and `eval` must be
     implemented by child class.
 
     """
@@ -49,6 +49,10 @@ class Manager:
             Long path length and pause time for `ckpts`. Checkpoints usually
             takes larger storage space, therefore they are separated into more
             files and have higher tolerance on I/O failure.
+        eval_interval:
+            Work is evaluated every `eval_interval` epochs.
+        save_interval:
+            Checkpoint is saved every `save_interval` epochs.
         verbose:
             Information display level, with '0' referring to quiet mode.
 
@@ -79,20 +83,20 @@ class Manager:
         self.eval_interval = eval_interval
         self.save_interval = save_interval
         self.verbose = verbose
-        self.defaults = Config()
+        self.defaults = Config() # can be updated by child class `__init__`
 
     def get_config(self, config: Optional[dict] = None) -> Config:
         r"""Returns work configuration.
 
         The method first fills in default values, then performs additional
-        changes if necessary. For example, checking compatibility between keys.
+        steps if necessary. For example, checking compatibility between keys.
         It is possible that the key structure gets changed.
 
         Overriding
         ----------
         def get_config(self, config):
-            config = super(ChildManager, self).get_config(config)
-            # update `config`
+            config = super().get_config(config)
+            # verify and adjust `config` if necessary
             return config
 
         """
@@ -102,12 +106,13 @@ class Manager:
         r"""Sets up manager.
 
         The method sets `self` properties for future training, for example
-        preparing datasets and initializing models.
+        preparing datasets and initializing models. By default, the method
+        sets `self.config` for the current work.
 
         Overriding
         ----------
         def setup(self, config):
-            super(ChildManager, self).setup(config)
+            super().setup(config)
             # set up `self` properties
 
         """
@@ -119,7 +124,7 @@ class Manager:
         Overriding
         ----------
         def init_ckpt(self):
-            super(ChildManager, self).init_ckpt()
+            super().init_ckpt()
             # update `self.ckpt` with tracked metrics as needed
             # self.ckpt.update({'max_acc': 0.})
 
@@ -136,7 +141,7 @@ class Manager:
         ----------
         def save_ckpt(self):
             # update `self.ckpt` and `self.preview`
-            super(ChildManager, self).save_ckpt()
+            super().save_ckpt()
 
         """
         key = self.configs.add(self.config)
@@ -153,7 +158,7 @@ class Manager:
         Overriding
         ----------
         def load_ckpt(self):
-            super(ChildManager, self).load_ckpt()
+            super().load_ckpt()
             # update `self` properties with `self.ckpt`, for example:
             # self.model.load_state_dict(self.ckpt['model_state'])
 
@@ -190,7 +195,7 @@ class Manager:
         num_epochs: int = 0,
         resume: bool = True,
     ):
-        r"""Processes a training work.
+        r"""Processes a work.
 
         Args
         ----
@@ -198,7 +203,7 @@ class Manager:
             A configuration dictionary of the work.
         num_epochs:
             Number of training epochs for each work. If explicit epochs can not
-            be defined, use `num_epochs=1` for a single pass.
+            be defined, use `num_epochs=0` for an evaluation-only work.
         resume:
             Whether to resume from existing checkpoints. If 'False', process
             each work from scratch.
@@ -212,11 +217,11 @@ class Manager:
             assert self.epoch>=0
             if self.verbose>0:
                 print("Checkpoint{} loaded.".format(
-                    '' if self.epoch==0 else f' (epoch {self.epoch})',
+                    '' if num_epochs==0 else f' (epoch {self.epoch})',
                 ))
         except:
             if self.verbose>0:
-                print("No checkpoint loaded.")
+                print("No checkpoint loaded, initializing from scratch.")
             self.init_ckpt()
             tic = time.time()
             self.eval()
@@ -282,7 +287,9 @@ class Manager:
         """
         def to_process(stat, num_epochs, patience):
             return stat['epoch']<num_epochs and (time.time()-stat['toc'])/3600>=patience
-        w_count, e_count, interrupted = 0, 0, False
+        w_count = 0 # counter for processed works
+        e_count = 0 # counter for runtime errors
+        interrupted = False # flag for keyboard interruption
         _verbose = self.verbose
         for config in configs:
             try:
@@ -310,12 +317,14 @@ class Manager:
             except KeyboardInterrupt:
                 interrupted = True
                 break
-            except Exception:
+            except:
                 if max_errors==0:
                     raise
                 e_count += 1
                 if e_count==max_errors:
                     interrupted = True
+                    if _verbose>0:
+                        print(f"Max number of errors {max_errors} reached.")
                     break
                 else:
                     continue
@@ -327,10 +336,10 @@ class Manager:
             if not interrupted and (count==0 or w_count<count):
                 print("All works are processed or being processed.")
 
-    def _config_gen(self, choices: dict):
+    def _config_gen(self, choices: dict) -> Config:
         r"""Generator of configurations.
 
-        Work configurations are constructed randomly from `sweep_spec`, using
+        Work configurations are constructed randomly from `choices`, using
         the method `get_config`.
 
         Args
@@ -339,7 +348,6 @@ class Manager:
             The work configuration search specification, can be nested. It has
             the same key structure as a valid `config` for `get_config` method,
             and values at the leaf level are lists containing possible values.
-
 
         """
         choices = Config(choices).flatten()
@@ -379,7 +387,31 @@ class Manager:
         choices: dict,
         min_epoch: Optional[int] = None,
         p_keys: Optional[list[str]] = None,
-    ):
+    ) -> dict:
+        r"""Returns an overview report of the sweep.
+
+        Args
+        ----
+        choices:
+            The configuration value grid, see `_config_gen` for more details.
+        min_epoch:
+            Minimum number of epochs to be considered as complete, useful when
+            printing information about the progress of a sweep.
+        p_keys:
+            A list of keys in `preview` of each work. Expected to gather float
+            numbers at `preview[key]` of all processed works.
+
+        Returns
+        -------
+        report:
+            A dictionary containing different values from all works specified
+            by `choices`. Besides the custom keys in `p_keys`, there are default
+            keys:
+            - 'epoch': Number of epochs of each work.
+            - 't_train': Average time of training one epoch, in seconds.
+            - 't_eval': Average time of evaluation, in seconds.
+
+        """
         _keys = dict((v, k) for k, v in self.configs.items())
         _stats = dict((k, v) for k, v in self.stats.items())
         _previews = dict((k, v) for k, v in self.previews.items())
@@ -440,18 +472,28 @@ class Manager:
         return True
 
     def completed(self, min_epoch: int = 0, cond: Optional[dict] = None) -> str:
-        r"""A generator for completed works."""
-        for key, stat in self.stats.items():
+        r"""A generator for completed works.
+
+        Args
+        ----
+        min_epoch, cond:
+            See `best_work` for more details.
+
+        """
+        cond = Config(cond)
+        _configs = dict((k, v) for k, v in self.configs.items())
+        _stats = dict((k, v) for k, v in self.stats.items())
+        for key, stat in _stats.items():
             if stat['epoch']>=min_epoch:
                 try:
-                    config = self.configs[key]
+                    config = _configs[key]
                 except:
                     continue
-                if cond is None or self._is_matched(config, Config(cond)):
+                if self._is_matched(config, cond):
                     yield key
 
     def best_work(self,
-        min_epoch: int = 1,
+        min_epoch: int = 0,
         cond: Optional[dict] = None,
         p_key: str = 'loss_test',
         reverse: Optional[bool] = None,
@@ -477,7 +519,7 @@ class Manager:
             The key of best work.
 
         """
-        assert min_epoch>0
+        assert min_epoch>=0
         if reverse is None:
             reverse = p_key.startswith('acc') or p_key.startswith('return')
         best_val = -float('inf') if reverse else float('inf')
@@ -533,51 +575,68 @@ class Manager:
                     self.pop(key)
 
     def export_tar(self, tar_path: str = 'store.tar.gz', cond: Optional[dict] = None):
-        r"""Exports manager data to a tar file."""
+        r"""Exports manager data to a tar file.
+
+        Args
+        ----
+        tar_path:
+            Path of the file to export to.
+        cond:
+            Conditioned values for the works to export.
+
+        """
         assert self.store_dir is not None
         tic = time.time()
-        if cond is not None:
-            store_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
-            tmp_manager = Manager(store_dir=store_dir)
-            for key in self.completed(cond=cond):
-                tmp_manager.configs[key] = self.configs[key]
-                tmp_manager.stats[key] = self.stats[key]
-                tmp_manager.ckpts[key] = self.ckpts[key]
-                tmp_manager.previews[key] = self.previews[key]
-        else:
-            store_dir = self.store_dir
+        tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
+        tmp_manager = Manager(store_dir=tmp_dir)
+        cond = Config(cond)
+        for key, config in self.configs.items():
+            try:
+                assert self._is_matched(config, cond)
+                _stat = self.stats[key]
+                _ckpt = self.ckpts[key]
+                _preview = self.ckpts[key]
+            except:
+                continue
+            tmp_manager.configs[key] = config
+            tmp_manager.stats[key] = _stat
+            tmp_manager.ckpts[key] = _ckpt
+            tmp_manager.previews[key] = _preview
         with tarfile.open(tar_path, 'w:gz') as f:
             for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
-                f.add(f'{store_dir}/{axv_name}', arcname=axv_name)
-        if cond is not None:
-            shutil.rmtree(store_dir)
+                f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
+        shutil.rmtree(tmp_dir)
         toc = time.time()
         print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
     def load_tar(self, tar_path: str):
-        r"""Loads manager data from a tar file."""
+        r"""Loads manager data from a tar file.
+
+        Args
+        ----
+        tar_path:
+            Path of the file to load from.
+
+        """
         tic = time.time()
-        tmp_path = '{}/tmp_{}'.format(
+        tmp_dir = '{}/tmp_{}'.format(
             self.store_dir if self.store_dir is not None else 'store',
             self.configs._random_key(),
         )
         with tarfile.open(tar_path, 'r:gz') as f:
-            f.extractall(tmp_path)
-        tmp_manager = Manager(store_dir=tmp_path)
+            f.extractall(tmp_dir)
+        tmp_manager = Manager(store_dir=tmp_dir)
         for old_key, config in tmp_manager.configs.items():
-            new_key = self.configs.add(config)
             try:
-                self.stats[new_key] = tmp_manager.stats[old_key]
+                new_key = self.configs.add(config)
+                _stat = tmp_manager.stats[old_key]
+                _ckpt = tmp_manager.ckpts[old_key]
+                _preview = tmp_manager.previews[old_key]
             except:
-                pass
-            try:
-                self.ckpts[new_key] = tmp_manager.ckpts[old_key]
-            except:
-                pass
-            try:
-                self.previews[new_key] = tmp_manager.previews[old_key]
-            except:
-                pass
-        shutil.rmtree(tmp_path)
+                continue
+            self.stats[new_key] = _stat
+            self.ckpts[new_key] = _ckpt
+            self.previews[new_key] = _preview
+        shutil.rmtree(tmp_dir)
         toc = time.time()
         print(f"Data from {tar_path} loaded ({time_str(toc-tic)}).")
