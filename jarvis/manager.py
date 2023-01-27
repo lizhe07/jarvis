@@ -287,11 +287,22 @@ class Manager:
         """
         def to_process(stat, num_epochs, patience):
             return stat['epoch']<num_epochs and (time.time()-stat['toc'])/3600>=patience
+
+        # gather completed works to exclude
+        _configs = dict((k, v) for k, v in self.configs.items())
+        _stats = dict((k, v) for k, v in self.stats.items())
+        completed = set()
+        for _key, _stat in _stats.items():
+            if _key in _configs and _stat['epoch']>=num_epochs:
+                completed.add(_configs[_key])
+
         w_count = 0 # counter for processed works
         e_count = 0 # counter for runtime errors
         interrupted = False # flag for keyboard interruption
         _verbose = self.verbose
         for config in configs:
+            if config in completed:
+                continue
             try:
                 key = self.configs.add(config)
                 try:
