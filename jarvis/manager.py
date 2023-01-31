@@ -443,7 +443,7 @@ class Manager:
                 t_train = stat.get('t_train') or np.nan
                 t_eval = stat.get('t_eval') or np.nan
             except:
-                epoch = 0
+                epoch = -1
                 t_train = t_eval = np.nan
             report['epoch'].append(epoch)
             report['t_train'].append(t_train)
