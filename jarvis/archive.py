@@ -320,7 +320,7 @@ class Archive:
         duplicates = dict((val, keys) for val, keys in inv_dict.items() if len(keys)>1)
         return duplicates
 
-    def clone(self, target_dir: str, keys: Optional[set[str]] = None):
+    def copy_to(self, target_dir: str, keys: Optional[set[str]] = None):
         r"""Clones the archive to a new folder.
 
         Args

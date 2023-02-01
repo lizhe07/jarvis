@@ -610,16 +610,16 @@ class Manager:
         tmp_manager = Manager(store_dir=tmp_dir)
 
         keys = set(self.completed(min_epoch, cond))
-        self.configs.clone(tmp_manager.configs.store_dir, keys)
-        self.stats.clone(tmp_manager.stats.store_dir, keys)
-        self.ckpts.clone(tmp_manager.ckpts.store_dir, keys)
-        self.previews.clone(tmp_manager.previews.store_dir, keys)
+        self.configs.copy_to(tmp_manager.configs.store_dir, keys)
+        self.stats.copy_to(tmp_manager.stats.store_dir, keys)
+        self.ckpts.copy_to(tmp_manager.ckpts.store_dir, keys)
+        self.previews.copy_to(tmp_manager.previews.store_dir, keys)
 
         with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as f:
             for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
                 f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
-        shutil.rmtree(tmp_dir)
 
+        shutil.rmtree(tmp_dir)
         toc = time.time()
         print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
@@ -632,25 +632,44 @@ class Manager:
             Path of the file to load from.
 
         """
+        assert self.store_dir is not None
         tic = time.time()
-        tmp_dir = '{}/tmp_{}'.format(
-            self.store_dir if self.store_dir is not None else 'store',
-            self.configs._random_key(),
-        )
+
+        tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
         with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as f:
             f.extractall(tmp_dir)
         tmp_manager = Manager(store_dir=tmp_dir)
-        for old_key, config in tmp_manager.configs.items():
-            try:
-                new_key = self.configs.add(config)
-                _stat = tmp_manager.stats[old_key]
-                _ckpt = tmp_manager.ckpts[old_key]
-                _preview = tmp_manager.previews[old_key]
-            except:
-                continue
-            self.stats[new_key] = _stat
-            self.ckpts[new_key] = _ckpt
-            self.previews[new_key] = _preview
+
+        _old_configs = dict((k, v) for k, v in self.configs.items())
+        _old_keys = dict((v, k) for k, v in self.configs.items())
+        _new_configs = dict((k, v) for k, v in tmp_manager.configs.items())
+        clone_keys, add_keys = set(), set() # keys to process with either 'clone' or 'add' method
+        for new_key, config in _new_configs.items():
+            if config in _old_keys:
+                if new_key==_old_keys[config]:
+                    clone_keys.add(new_key)
+                else:
+                    add_keys.add(new_key)
+            else:
+                if new_key in _old_configs:
+                    add_keys.add(new_key)
+                else:
+                    clone_keys.add(new_key)
+
+        tmp_manager.configs.copy_to(self.configs.store_dir, clone_keys)
+        tmp_manager.stats.copy_to(self.stats.store_dir, clone_keys)
+        tmp_manager.ckpts.copy_to(self.ckpts.store_dir, clone_keys)
+        tmp_manager.previews.copy_to(self.previews.store_dir, clone_keys)
+
+        for src_key in add_keys:
+            dst_key = self.configs.add(_new_configs[src_key])
+            self.stats[dst_key] = tmp_manager.stats[src_key]
+            self.ckpts[dst_key] = tmp_manager.ckpts[src_key]
+            self.previews[dst_key] = tmp_manager.previews[src_key]
+
         shutil.rmtree(tmp_dir)
         toc = time.time()
-        print(f"Data from {tar_path} loaded ({time_str(toc-tic)}).")
+        print(
+            f"Data from {tar_path} loaded ({time_str(toc-tic)}, {len(clone_keys)} cloned and "
+            f"{len(add_keys)} added)."
+        )
