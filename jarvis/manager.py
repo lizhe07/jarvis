@@ -590,6 +590,7 @@ class Manager:
         tar_path: str = 'store.tar.gz',
         min_epoch: int = 0,
         cond: Optional[dict] = None,
+        compresslevel: int = 9,
     ):
         r"""Exports manager data to a tar file.
 
@@ -614,7 +615,7 @@ class Manager:
         self.ckpts.clone(tmp_manager.ckpts.store_dir, keys)
         self.previews.clone(tmp_manager.previews.store_dir, keys)
 
-        with tarfile.open(tar_path, 'w:gz') as f:
+        with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as f:
             for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
                 f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
         shutil.rmtree(tmp_dir)
@@ -622,7 +623,7 @@ class Manager:
         toc = time.time()
         print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
-    def load_tar(self, tar_path: str):
+    def load_tar(self, tar_path: str, compresslevel: int = 9):
         r"""Loads manager data from a tar file.
 
         Args
@@ -636,7 +637,7 @@ class Manager:
             self.store_dir if self.store_dir is not None else 'store',
             self.configs._random_key(),
         )
-        with tarfile.open(tar_path, 'r:gz') as f:
+        with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as f:
             f.extractall(tmp_dir)
         tmp_manager = Manager(store_dir=tmp_dir)
         for old_key, config in tmp_manager.configs.items():

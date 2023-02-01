@@ -336,6 +336,7 @@ class Archive:
         axv_paths = [
             f for f in os.listdir(self.store_dir) if f.endswith('.axv') and len(f)==(self.path_len+4)
         ]
+        random.shuffle(axv_paths)
         for axv_path in axv_paths:
             records = self._safe_read(f'{self.store_dir}/{axv_path}')
             records = dict((k, v) for k, v in records.items() if len(keys)==0 or k in keys)
