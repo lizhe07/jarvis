@@ -606,7 +606,7 @@ class Manager:
                 assert self._is_matched(config, cond)
                 _stat = self.stats[key]
                 _ckpt = self.ckpts[key]
-                _preview = self.ckpts[key]
+                _preview = self.previews[key]
             except:
                 continue
             tmp_manager.configs[key] = config
