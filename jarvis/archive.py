@@ -333,14 +333,44 @@ class Archive:
         """
         if keys is None:
             keys = set()
-        axv_paths = [
+        for file_name in os.listdir(target_dir):
+            _records = None
+            if file_name.endswith('.axv'):
+                assert len(file_name)==(self.path_len+4), (
+                    f"Data in the target directory {target_dir} have inconsistent file name length "
+                    f"than {self.path_len}."
+                )
+                if _records is None or len(_records)==0:
+                    _records = self._safe_read(f'{target_dir}/{file_name}')
+            if len(_records)>0:
+                _key = next(iter(_records.keys()))
+                assert len(_key)==self.key_len, (
+                    f"Data in the target directory {target_dir} have inconsistent key length than "
+                    f"{self.key_len}."
+                )
+
+        file_names = [
             f for f in os.listdir(self.store_dir) if f.endswith('.axv') and len(f)==(self.path_len+4)
         ]
-        random.shuffle(axv_paths)
-        for axv_path in axv_paths:
-            records = self._safe_read(f'{self.store_dir}/{axv_path}')
-            records = dict((k, v) for k, v in records.items() if len(keys)==0 or k in keys)
-            self._safe_write(records, f'{target_dir}/{axv_path}')
+        random.shuffle(file_names)
+        for file_name in file_names:
+            src_path = f'{self.store_dir}/{file_name}'
+            dst_path = f'{target_dir}/{file_name}'
+
+            src_records = self._safe_read(src_path)
+            src_records = dict((k, v) for k, v in src_records.items() if len(keys)==0 or k in keys)
+
+            if os.path.exists(dst_path):
+                dst_records = self._safe_read(dst_path)
+            else:
+                dst_records = {}
+            for key in src_records:
+                assert key not in dst_records, (
+                    f"Existing key '{key}' detected in the target directory {target_dir}, cloning "
+                    "operation aborted."
+                )
+            dst_records.update(src_records)
+            self._safe_write(dst_records, dst_path)
 
     def to_internal(self):
         r"""Moves external storage to internal."""
