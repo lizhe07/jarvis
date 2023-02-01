@@ -320,6 +320,27 @@ class Archive:
         duplicates = dict((val, keys) for val, keys in inv_dict.items() if len(keys)>1)
         return duplicates
 
+    def clone(self, target_dir: str, keys: Optional[set[str]] = None):
+        r"""Clones the archive to a new folder.
+
+        Args
+        ----
+        target_dir:
+            Path to the target directory.
+        keys:
+            Keys of the records to be cloned. Clone everything if is ``None``.
+
+        """
+        if keys is None:
+            keys = set()
+        axv_paths = [
+            f for f in os.listdir(self.store_dir) if f.endswith('.axv') and len(f)==(self.path_len+4)
+        ]
+        for axv_path in axv_paths:
+            records = self._safe_read(f'{self.store_dir}/{axv_path}')
+            records = dict((k, v) for k, v in records.items() if len(keys)==0 or k in keys)
+            self._safe_write(records, f'{target_dir}/{axv_path}')
+
     def to_internal(self):
         r"""Moves external storage to internal."""
         if self.store_dir is not None:

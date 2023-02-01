@@ -487,8 +487,10 @@ class Manager:
 
         Args
         ----
-        min_epoch, cond:
-            See `best_work` for more details.
+        min_epoch:
+            Minimum number of trained epochs.
+        cond:
+            Conditioned value of work configurations.
 
         """
         cond = Config(cond)
@@ -511,13 +513,12 @@ class Manager:
     ) -> str:
         r"""Returns the best work given conditions.
 
+        Only completed work with matching config values will be considered.
+
         Args
         ----
-        min_epoch:
-            Minimum number of trained epochs.
-        cond:
-            Conditioned value of work configurations. Only completed work with
-            matching values will be considered.
+        min_epoch, cond:
+            See `completed` for more details.
         p_key:
             The key of `preview` for comparing works.
         reverse:
@@ -585,38 +586,39 @@ class Manager:
                 if key!=best_key:
                     self.pop(key)
 
-    def export_tar(self, tar_path: str = 'store.tar.gz', cond: Optional[dict] = None):
+    def export_tar(self,
+        tar_path: str = 'store.tar.gz',
+        min_epoch: int = 0,
+        cond: Optional[dict] = None,
+    ):
         r"""Exports manager data to a tar file.
 
         Args
         ----
         tar_path:
             Path of the file to export to.
-        cond:
-            Conditioned values for the works to export.
+        min_epoch, cond:
+            Minimum number of trained epochs and conditioned values for the
+            works to export. See `completed` for more details.
 
         """
         assert self.store_dir is not None
         tic = time.time()
+
         tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
         tmp_manager = Manager(store_dir=tmp_dir)
-        cond = Config(cond)
-        for key, config in self.configs.items():
-            try:
-                assert self._is_matched(config, cond)
-                _stat = self.stats[key]
-                _ckpt = self.ckpts[key]
-                _preview = self.previews[key]
-            except:
-                continue
-            tmp_manager.configs[key] = config
-            tmp_manager.stats[key] = _stat
-            tmp_manager.ckpts[key] = _ckpt
-            tmp_manager.previews[key] = _preview
+
+        keys = set(self.completed(min_epoch, cond))
+        self.configs.clone(tmp_manager.configs.store_dir, keys)
+        self.stats.clone(tmp_manager.stats.store_dir, keys)
+        self.ckpts.clone(tmp_manager.ckpts.store_dir, keys)
+        self.previews.clone(tmp_manager.previews.store_dir, keys)
+
         with tarfile.open(tar_path, 'w:gz') as f:
             for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
                 f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
         shutil.rmtree(tmp_dir)
+
         toc = time.time()
         print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
