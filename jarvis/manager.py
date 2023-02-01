@@ -669,7 +669,4 @@ class Manager:
 
         shutil.rmtree(tmp_dir)
         toc = time.time()
-        print(
-            f"Data from {tar_path} loaded ({time_str(toc-tic)}, {len(clone_keys)} cloned and "
-            f"{len(add_keys)} added)."
-        )
+        print(f"Data from {tar_path} loaded ({time_str(toc-tic)}).")
