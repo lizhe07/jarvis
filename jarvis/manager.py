@@ -586,11 +586,23 @@ class Manager:
                 if key!=best_key:
                     self.pop(key)
 
+    def _export_dir(self,
+        dst_dir: str,
+        min_epoch: int = 0,
+        cond: Optional[dict] = None,
+    ):
+        dst_manager = Manager(store_dir=dst_dir)
+        keys = set(self.completed(min_epoch, cond))
+        self.configs.copy_to(dst_manager.configs.store_dir, keys)
+        self.stats.copy_to(dst_manager.stats.store_dir, keys)
+        self.ckpts.copy_to(dst_manager.ckpts.store_dir, keys)
+        self.previews.copy_to(dst_manager.previews.store_dir, keys)
+
     def export_tar(self,
         tar_path: str = 'store.tar.gz',
         min_epoch: int = 0,
         cond: Optional[dict] = None,
-        compresslevel: int = 9,
+        compresslevel: int = 1,
     ):
         r"""Exports manager data to a tar file.
 
@@ -601,49 +613,30 @@ class Manager:
         min_epoch, cond:
             Minimum number of trained epochs and conditioned values for the
             works to export. See `completed` for more details.
+        compressionlevel:
+            Compression level of gzip.
 
         """
         assert self.store_dir is not None
         tic = time.time()
 
         tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
-        tmp_manager = Manager(store_dir=tmp_dir)
-
-        keys = set(self.completed(min_epoch, cond))
-        self.configs.copy_to(tmp_manager.configs.store_dir, keys)
-        self.stats.copy_to(tmp_manager.stats.store_dir, keys)
-        self.ckpts.copy_to(tmp_manager.ckpts.store_dir, keys)
-        self.previews.copy_to(tmp_manager.previews.store_dir, keys)
-
+        self._export_dir(tmp_dir, min_epoch, cond)
         with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as f:
             for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
                 f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
-
         shutil.rmtree(tmp_dir)
+
         toc = time.time()
         print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
-    def load_tar(self, tar_path: str, compresslevel: int = 9):
-        r"""Loads manager data from a tar file.
-
-        Args
-        ----
-        tar_path:
-            Path of the file to load from.
-
-        """
-        assert self.store_dir is not None
-        tic = time.time()
-
-        tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
-        with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as f:
-            f.extractall(tmp_dir)
-        tmp_manager = Manager(store_dir=tmp_dir)
-
+    def _load_dir(self, src_dir: str):
+        src_manager = Manager(store_dir=src_dir)
+        # divide works into 'cloning' group and 'adding' group
         _old_configs = dict((k, v) for k, v in self.configs.items())
         _old_keys = dict((v, k) for k, v in self.configs.items())
-        _new_configs = dict((k, v) for k, v in tmp_manager.configs.items())
-        clone_keys, add_keys = set(), set() # keys to process with either 'clone' or 'add' method
+        _new_configs = dict((k, v) for k, v in src_manager.configs.items())
+        clone_keys, add_keys = set(), set()
         for new_key, config in _new_configs.items():
             if config in _old_keys:
                 if new_key==_old_keys[config]:
@@ -655,18 +648,37 @@ class Manager:
                     add_keys.add(new_key)
                 else:
                     clone_keys.add(new_key)
-
-        tmp_manager.configs.copy_to(self.configs.store_dir, clone_keys)
-        tmp_manager.stats.copy_to(self.stats.store_dir, clone_keys)
-        tmp_manager.ckpts.copy_to(self.ckpts.store_dir, clone_keys)
-        tmp_manager.previews.copy_to(self.previews.store_dir, clone_keys)
-
+        # use 'copy_to' to add 'cloning' group directly
+        src_manager.configs.copy_to(self.configs.store_dir, clone_keys)
+        src_manager.stats.copy_to(self.stats.store_dir, clone_keys)
+        src_manager.ckpts.copy_to(self.ckpts.store_dir, clone_keys)
+        src_manager.previews.copy_to(self.previews.store_dir, clone_keys)
+        # use 'add' to insert 'adding' group one by one
         for src_key in add_keys:
             dst_key = self.configs.add(_new_configs[src_key])
-            self.stats[dst_key] = tmp_manager.stats[src_key]
-            self.ckpts[dst_key] = tmp_manager.ckpts[src_key]
-            self.previews[dst_key] = tmp_manager.previews[src_key]
+            self.stats[dst_key] = src_manager.stats[src_key]
+            self.ckpts[dst_key] = src_manager.ckpts[src_key]
+            self.previews[dst_key] = src_manager.previews[src_key]
 
+    def load_tar(self, tar_path: str, compresslevel: int = 1):
+        r"""Loads manager data from a tar file.
+
+        Args
+        ----
+        tar_path:
+            Path of the file to load from.
+        compressionlevel:
+            Compression level of gzip.
+
+        """
+        assert self.store_dir is not None
+        tic = time.time()
+
+        tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
+        with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as f:
+            f.extractall(tmp_dir)
+        self._load_dir(tmp_dir)
         shutil.rmtree(tmp_dir)
+
         toc = time.time()
         print(f"Data from {tar_path} loaded ({time_str(toc-tic)}).")
