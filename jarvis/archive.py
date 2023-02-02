@@ -365,11 +365,11 @@ class Archive:
                 dst_records = self._safe_read(dst_path)
             else:
                 dst_records = {}
-            for key in src_records:
-                assert key not in dst_records, (
-                    f"Existing key '{key}' detected in the target directory {dst_dir}, cloning "
-                    "operation aborted."
-                )
+            # for key in src_records:
+            #     assert key not in dst_records, (
+            #         f"Existing key '{key}' detected in the target directory {dst_dir}, cloning "
+            #         "operation aborted."
+            #     )
             dst_records.update(src_records)
             self._safe_write(dst_records, dst_path)
 

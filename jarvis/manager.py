@@ -621,25 +621,34 @@ class Manager:
         tic = time.time()
 
         tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
-        self._export_dir(tmp_dir, min_epoch, cond)
-        with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as f:
-            for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
-                f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
-        shutil.rmtree(tmp_dir)
+        try:
+            self._export_dir(tmp_dir, min_epoch, cond)
+            with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as f:
+                for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
+                    f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
+        except:
+            raise
+        finally:
+            shutil.rmtree(tmp_dir)
 
         toc = time.time()
         print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
-    def _load_dir(self, src_dir: str):
+    def _load_dir(self, src_dir: str, newer_only: bool = True):
         src_manager = Manager(store_dir=src_dir)
         # divide works into 'cloning' group and 'adding' group
         _old_configs = dict((k, v) for k, v in self.configs.items())
         _old_keys = dict((v, k) for k, v in self.configs.items())
+        _old_stats = dict((k, v) for k, v in self.stats.items())
         _new_configs = dict((k, v) for k, v in src_manager.configs.items())
+        _new_stats = dict((k, v) for k, v in src_manager.stats.items())
         clone_keys, add_keys = set(), set()
         for new_key, config in _new_configs.items():
             if config in _old_keys:
-                if new_key==_old_keys[config]:
+                old_key = _old_keys[config]
+                if newer_only and _new_stats[new_key]['epoch']<=_old_stats[old_key]['epoch']:
+                    continue
+                if new_key==old_key:
                     clone_keys.add(new_key)
                 else:
                     add_keys.add(new_key)
@@ -675,10 +684,14 @@ class Manager:
         tic = time.time()
 
         tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
-        with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as f:
-            f.extractall(tmp_dir)
-        self._load_dir(tmp_dir)
-        shutil.rmtree(tmp_dir)
+        try:
+            with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as f:
+                f.extractall(tmp_dir)
+            self._load_dir(tmp_dir)
+        except:
+            raise
+        finally:
+            shutil.rmtree(tmp_dir)
 
         toc = time.time()
         print(f"Data from {tar_path} loaded ({time_str(toc-tic)}).")
