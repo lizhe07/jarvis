@@ -588,11 +588,14 @@ class Manager:
 
     def _export_dir(self,
         dst_dir: str,
+        *,
+        keys: Optional[set] = None,
         min_epoch: int = 0,
         cond: Optional[dict] = None,
     ):
         dst_manager = Manager(store_dir=dst_dir)
-        keys = set(self.completed(min_epoch, cond))
+        if keys is None:
+            keys = set(self.completed(min_epoch, cond))
         self.configs.copy_to(dst_manager.configs.store_dir, keys)
         self.stats.copy_to(dst_manager.stats.store_dir, keys)
         self.ckpts.copy_to(dst_manager.ckpts.store_dir, keys)
@@ -622,7 +625,7 @@ class Manager:
 
         tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
         try:
-            self._export_dir(tmp_dir, min_epoch, cond)
+            self._export_dir(tmp_dir, min_epoch=min_epoch, cond=cond)
             with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as f:
                 for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
                     f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
