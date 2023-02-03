@@ -1,7 +1,7 @@
 import argparse, random, torch
 import numpy as np
 
-from .alias import Module, Optimizer, Scheduler
+from .alias import Tensor, Module, Optimizer, Scheduler
 
 
 def time_str(t_elapse: float, progress: float = 1.) -> str:
@@ -141,7 +141,7 @@ def numpy_dict(state: dict) -> dict:
     """
     f_state = flatten(state)
     for key, val in f_state.items():
-        if isinstance(val, torch.Tensor):
+        if isinstance(val, Tensor):
             f_state[key] = (val.data.cpu().clone().numpy(), val.dtype)
     return nest(f_state)
 
@@ -164,24 +164,6 @@ def tensor_dict(state: dict, device='cpu') -> dict:
         if isinstance(val, tuple) and len(val)==2 and isinstance(val[0], np.ndarray) and isinstance(val[1], torch.dtype):
             f_state[key] = torch.tensor(val[0], dtype=val[1], device=device)
     return nest(f_state)
-
-
-def job_parser():
-    r"""Returns a base parser for job processing."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--max-wait', default=1, type=float,
-        help="Maximum seconds of random wait before computation, to avoid file I/O conficts."
-    )
-    parser.add_argument('--num-works', default=0, type=int,
-        help="Number of works to be trained before exit. '0' means to train all works."
-    )
-    parser.add_argument('--patience', default=168, type=float,
-        help="Number of hours from last modification of a training to be considered as running."
-    )
-    parser.add_argument('--max-errors', default=0, type=int,
-        help="Maximum number of runtime errors."
-    )
-    return parser
 
 
 def sgd_optimizer(
