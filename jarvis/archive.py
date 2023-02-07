@@ -1,8 +1,10 @@
 import os, pickle, random, time
+import numpy as np
 from typing import Any, Optional
 
 from .config import Config
 from .utils import progress_str, time_str
+from .alias import Array
 
 
 class MaxTryIOError(RuntimeError):
@@ -291,11 +293,37 @@ class HashableRecordArchive(Archive):
 
     def _to_hashable(self, n_val):
         r"""Converts an object to a hashable record."""
-        raise NotImplementedError
+        if isinstance(n_val, dict):
+            h_val = ('_D', frozenset((k, self._to_hashable(v)) for k, v in n_val.items()))
+        elif isinstance(n_val, list):
+            h_val = ('_L', tuple(self._to_hashable(v) for v in n_val))
+        elif isinstance(n_val, tuple):
+            h_val = ('_T', tuple(self._to_hashable(v) for v in n_val))
+        elif isinstance(n_val, set):
+            h_val = ('_S', frozenset(self._to_hashable(v) for v in n_val))
+        elif isinstance(n_val, Array):
+            h_val = ('_A', n_val.shape, n_val.dtype, tuple(n_val.reshape(-1)))
+        else:
+            h_val = n_val
+        hash(h_val)
+        return h_val
 
     def _to_native(self, h_val):
         r"""Converts a hashable record to a native object."""
-        raise NotImplementedError
+        if isinstance(h_val, tuple) and len(h_val)==2 and h_val[0] in ['_D', '_L', '_T', '_S']:
+            if h_val[0]=='_D':
+                n_val = {k: self._to_native(v) for k, v in h_val[1]}
+            if h_val[0]=='_L':
+                n_val = [self._to_native(v) for v in h_val[1]]
+            if h_val[0]=='_T':
+                n_val = tuple(self._to_native(v) for v in h_val[1])
+            if h_val[0]=='_S':
+                n_val = set(self._to_native(v) for v in h_val[1])
+            if h_val[0]=='_A':
+                n_val = np.array(h_val[3], dtype=h_val[2]).reshape(h_val[1])
+        else:
+            n_val = h_val
+        return n_val
 
     def __setitem__(self, key: str, n_val: Any):
         super().__setitem__(key, self._to_hashable(n_val))
@@ -343,7 +371,7 @@ class HashableRecordArchive(Archive):
                 inv_dict[val].append(key)
             else:
                 inv_dict[val] = [key]
-        duplicates = list((self._to_native(val), keys) for val, keys in inv_dict.items() if len(keys)>1)
+        duplicates = [(self._to_native(val), keys) for val, keys in inv_dict.items() if len(keys)>1]
         return duplicates
 
 
@@ -356,32 +384,10 @@ class ConfigArchive(HashableRecordArchive):
     ):
         super().__init__(store_dir, max_try=max_try, **kwargs)
 
-    def _to_hashable(self, n_val):
-        if isinstance(n_val, dict):
-            h_val = ('_D', frozenset((k, self._to_hashable(v)) for k, v in n_val.items()))
-        elif isinstance(n_val, list):
-            h_val = ('_L', tuple(self._to_hashable(v) for v in n_val))
-        elif isinstance(n_val, tuple):
-            h_val = ('_T', tuple(self._to_hashable(v) for v in n_val))
-        elif isinstance(n_val, set):
-            h_val = ('_S', frozenset(self._to_hashable(v) for v in n_val))
-        else:
-            h_val = n_val
-        hash(h_val)
-        return h_val
-
     def _to_native(self, h_val):
-        if isinstance(h_val, tuple) and len(h_val)==2 and h_val[0] in ['_D', '_L', '_T', '_S']:
-            if h_val[0]=='_D':
-                n_val = Config({k: self._to_native(v) for k, v in h_val[1]})
-            if h_val[0]=='_L':
-                n_val = [self._to_native(v) for v in h_val[1]]
-            if h_val[0]=='_T':
-                n_val = tuple(self._to_native(v) for v in h_val[1])
-            if h_val[0]=='_S':
-                n_val = set(self._to_native(v) for v in h_val[1])
-        else:
-            n_val = h_val
+        n_val = super()._to_native(h_val)
+        if isinstance(n_val, dict):
+            n_val = Config(n_val)
         return n_val
 
     def __setitem__(self, key: str, val: dict):
