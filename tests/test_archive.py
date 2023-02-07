@@ -1,9 +1,10 @@
 import unittest, yaml
 from pathlib import Path
 import random, shutil
+import numpy as np
 
 from jarvis.config import Config
-from jarvis.archive import Archive, ConfigArchive
+from jarvis.archive import Archive, HashableRecordArchive, ConfigArchive
 
 
 class ArchiveTestCase(unittest.TestCase):
@@ -43,6 +44,20 @@ class TestBasicArchive(ArchiveTestCase):
         # check deletion
         del self.axv[key]
         self.assertNotIn(key, self.axv)
+
+
+class TestHashableRecordArchive(ArchiveTestCase):
+
+    def _create_axv(self, store_dir):
+        return HashableRecordArchive(store_dir)
+
+    def test_array(self):
+        self.axv._clear()
+        x = np.random.uniform(size=(3, 4, 5))
+        key = self.axv.add(x)
+        y = self.axv[key]
+        self.assertEqual(y.shape, (3, 4, 5))
+        self.assertEqual(np.all(y==x), True)
 
 
 class TestConfigArchive(ArchiveTestCase):

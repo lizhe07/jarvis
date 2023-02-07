@@ -302,7 +302,7 @@ class HashableRecordArchive(Archive):
         elif isinstance(n_val, set):
             h_val = ('_S', frozenset(self._to_hashable(v) for v in n_val))
         elif isinstance(n_val, Array):
-            h_val = ('_A', n_val.shape, n_val.dtype, tuple(n_val.reshape(-1)))
+            h_val = ('_A', (tuple(n_val.reshape(-1)), n_val.dtype, n_val.shape))
         else:
             h_val = n_val
         hash(h_val)
@@ -310,7 +310,7 @@ class HashableRecordArchive(Archive):
 
     def _to_native(self, h_val):
         r"""Converts a hashable record to a native object."""
-        if isinstance(h_val, tuple) and len(h_val)==2 and h_val[0] in ['_D', '_L', '_T', '_S']:
+        if isinstance(h_val, tuple) and len(h_val)==2 and h_val[0] in ['_D', '_L', '_T', '_S', '_A']:
             if h_val[0]=='_D':
                 n_val = {k: self._to_native(v) for k, v in h_val[1]}
             if h_val[0]=='_L':
@@ -320,7 +320,7 @@ class HashableRecordArchive(Archive):
             if h_val[0]=='_S':
                 n_val = set(self._to_native(v) for v in h_val[1])
             if h_val[0]=='_A':
-                n_val = np.array(h_val[3], dtype=h_val[2]).reshape(h_val[1])
+                n_val = np.array(h_val[1][0], dtype=h_val[1][1]).reshape(h_val[1][2])
         else:
             n_val = h_val
         return n_val
