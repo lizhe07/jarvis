@@ -9,6 +9,7 @@ class TestConfig(unittest.TestCase):
 
     def setUp(self):
         self.config_path = Path(__file__).parent/'fixtures'/'resnet_config.yaml'
+        self.defaults_path = Path(__file__).parent/'fixtures'/'defaults.yaml'
 
     def test_nesting(self):
         config = Config({
@@ -30,6 +31,26 @@ class TestConfig(unittest.TestCase):
         config.update({'b.a': 'John'})
         self.assertEqual(set(config.keys()), set(['a', 'b']))
         self.assertEqual(config['b']['a'], 'John')
+
+    def test_fill(self):
+        config = Config({
+            'data': 'CIFAR100',
+        })
+        config.fill(self.config_path, self.defaults_path)
+        self.assertEqual(set(config.keys()), set(['data', 'model', 'train']))
+        self.assertEqual(config.data, 'CIFAR100')
+        self.assertEqual(
+            set(config.model.keys()),
+            set(['_target_', 'base_channels', 'conv0_channels']),
+        )
+        self.assertEqual(config.model.base_channels, 64)
+        self.assertEqual(config.model.conv0_channels, 32)
+        self.assertEqual(
+            set(config.train.keys()),
+            set(['pretrained', 'batch_size', 'optimizer'])
+        )
+        self.assertEqual(config.train.optimizer.lr, 1e-4)
+        self.assertEqual(config.train.optimizer.momentum, 0.99)
 
     def test_dot_notation(self):
         with open(self.config_path, 'r') as f:

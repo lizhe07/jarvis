@@ -1,6 +1,7 @@
 import sys, yaml, time, random
+from pathlib import Path
 from importlib import import_module
-from typing import Optional
+from typing import Optional, Union
 from collections.abc import Callable
 
 def _format(val):
@@ -77,6 +78,62 @@ class Config(dict):
     def update(self, config):
         for key, val in config.items():
             self[key] = val
+
+    def flatten(self) -> dict:
+        r"""Returns a flattened dictionary."""
+        f_dict = {}
+        for p_key, p_val in self.items(): # parent key and value
+            if isinstance(p_val, Config):
+                for c_key, c_val in p_val.flatten().items(): # child key and value
+                    f_dict[f'{p_key}.{c_key}'] = c_val
+            else:
+                f_dict[p_key] = p_val
+        return f_dict
+
+    def fill(self,
+        config: Union[dict, Path, str, None] = None,
+        defaults: Union[dict, Path, str, None] = None,
+    ):
+        r"""Fills in values from another configuration accompanied with default
+        values.
+
+        This method first copies new values from the provided config dictionary
+        to itself, then looks up in a dictionary for default values of relevant
+        '_target_' values recursively.
+
+        Args
+        ----
+        config:
+            The base configuration to take values from, can be a dictionary or a
+            path to a yaml file. Existing keys will NOT be overwritten.
+        defaults:
+            The default values for relevant classes/functions mentioned in the
+            current config object.
+
+        """
+        if isinstance(config, (Path, str)):
+            with open(config, 'r') as f:
+                config = yaml.safe_load(f)
+        config = Config(config)
+        for key, val in config.flatten().items():
+            try:
+                self[key]
+            except:
+                self[key] = val
+
+        if defaults is None:
+            return
+        elif isinstance(defaults, (Path, str)):
+            with open(defaults, 'r') as f:
+                defaults = yaml.safe_load(f)
+        assert isinstance(defaults, dict)
+        for key, val in self.items():
+            if isinstance(val, Config):
+                if '_target_' in val and val._target_ in defaults:
+                    _config = defaults[val._target_]
+                else:
+                    _config = {}
+                val.fill(_config, defaults)
 
     def instantiate(self, *args, **kwargs): # one-level instantiation
         r"""Instantiates an object using the configuration.
