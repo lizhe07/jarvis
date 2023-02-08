@@ -1,5 +1,6 @@
-import argparse, random, torch
+import random, torch
 import numpy as np
+from typing import Optional
 
 from .alias import Tensor, Module, Optimizer, Scheduler
 
@@ -241,3 +242,27 @@ def cyclic_scheduler(
         optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len),
     )
     return scheduler
+
+
+def create_mlp_layers(
+    in_features: int, out_features: int,
+    num_features: Optional[list[int]] = None,
+    nonlinearity: str = 'ReLU',
+    last_linear: bool = True,
+) -> torch.nn.ModuleList:
+    nonlinearity = getattr(torch.nn, nonlinearity)
+    layers = torch.nn.ModuleList()
+    for l_idx in range(len(num_features)+1):
+        if l_idx==0:
+            _in_features = in_features
+        else:
+            _in_features = num_features[l_idx-1]
+        if l_idx==len(num_features):
+            _out_features = out_features
+        else:
+            _out_features = num_features[l_idx]
+        layers.append(torch.nn.Sequential(
+            torch.nn.Linear(_in_features, _out_features),
+            nonlinearity() if l_idx<len(num_features) or not last_linear else torch.nn.Identity(),
+        ))
+    return layers
