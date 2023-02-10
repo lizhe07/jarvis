@@ -116,7 +116,7 @@ class Config(dict):
                 config = yaml.safe_load(f)
         config = Config(config)
         for key, val in config.flatten().items():
-            try:
+            try: # 'in' and 'setdefault' do not work
                 self[key]
             except:
                 self[key] = val

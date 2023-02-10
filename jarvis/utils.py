@@ -1,6 +1,9 @@
 import random, torch
 import numpy as np
 from typing import Optional
+from torch.utils.data import (
+    TensorDataset, DataLoader, WeightedRandomSampler,
+)
 
 from .alias import Tensor, Module, Optimizer, Scheduler
 
@@ -266,3 +269,26 @@ def create_mlp_layers(
             nonlinearity() if l_idx<len(num_features) or not last_linear else torch.nn.Identity(),
         ))
     return layers
+
+
+def train_one_epoch(
+    dset: TensorDataset, criterion, optimizer: Optimizer,
+    batch_size: int, weights = None, device: str = 'cuda',
+):
+    if weights is None:
+        loader = DataLoader(dset, batch_size=batch_size, shuffle=True, drop_last=True)
+    else:
+        sampler = WeightedRandomSampler(weights, len(dset))
+        loader = DataLoader(dset, batch_size=batch_size, sampler=sampler, drop_last=True)
+
+    gamma, loss_train = 0.5**(10/len(loader)), None
+    for xs in loader:
+        xs = (t.to(device) for t in xs)
+        loss: Tensor = criterion(*xs)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        loss_train = loss.item() if loss_train is None else gamma*loss_train+(1-gamma)*loss.item()
+    return loss_train
