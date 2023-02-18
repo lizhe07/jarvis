@@ -135,6 +135,12 @@ class Config(dict):
                     _config = {}
                 val.fill(_config, defaults)
 
+    def clone(self):
+        config = Config()
+        for key, val in self.flatten().items():
+            config[key] = val
+        return config
+
     def instantiate(self, *args, **kwargs): # one-level instantiation
         r"""Instantiates an object using the configuration.
 
