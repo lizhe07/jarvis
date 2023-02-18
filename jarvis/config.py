@@ -75,10 +75,6 @@ class Config(dict):
         else:
             return super().__getattr__(key)
 
-    def update(self, config):
-        for key, val in config.items():
-            self[key] = val
-
     def flatten(self) -> dict:
         r"""Returns a flattened dictionary."""
         f_dict = {}
@@ -89,6 +85,10 @@ class Config(dict):
             else:
                 f_dict[p_key] = p_val
         return f_dict
+
+    def update(self, config: dict):
+        for key, val in Config(config).flatten().items():
+            self[key] = val
 
     def fill(self,
         config: Union[dict, Path, str, None] = None,
