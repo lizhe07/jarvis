@@ -86,54 +86,36 @@ class Config(dict):
                 f_dict[p_key] = p_val
         return f_dict
 
-    def update(self, config: dict):
-        for key, val in Config(config).flatten().items():
-            self[key] = val
-
-    def fill(self,
-        config: Union[dict, Path, str, None] = None,
-        defaults: Union[dict, Path, str, None] = None,
-    ):
-        r"""Fills in values from another configuration accompanied with default
-        values.
-
-        This method first copies new values from the provided config dictionary
-        to itself, then looks up in a dictionary for default values of relevant
-        '_target_' values recursively.
-
-        Args
-        ----
-        config:
-            The base configuration to take values from, can be a dictionary or a
-            path to a yaml file. Existing keys will NOT be overwritten.
-        defaults:
-            The default values for relevant classes/functions mentioned in the
-            current config object.
-
-        """
+    @staticmethod
+    def _load_dict(config: Union[dict, Path, str]):
         if isinstance(config, (Path, str)):
             with open(config, 'r') as f:
                 config = yaml.safe_load(f)
-        config = Config(config)
+        return config
+
+    def update(self, config: Union[dict, Path, str]):
+        r"""Overwrites from a new config."""
+        config = Config(self._load_dict(config))
+        for key, val in config.flatten().items():
+            self[key] = val
+
+    def fill(self, config: Union[dict, Path, str]):
+        r"""Fills value from a new config."""
+        config = Config(self._load_dict(config))
         for key, val in config.flatten().items():
             try: # 'in' and 'setdefault' do not work
                 self[key]
             except:
                 self[key] = val
 
-        if defaults is None:
-            return
-        elif isinstance(defaults, (Path, str)):
-            with open(defaults, 'r') as f:
-                defaults = yaml.safe_load(f)
-        assert isinstance(defaults, dict)
-        for key, val in self.items():
+    def lookup(self, defaults: Union[dict, Path, str]):
+        r"""Looks up default values for instantiable config."""
+        defaults = self._load_dict(defaults)
+        if '_target_' in self and self._target_ in defaults:
+            self.fill(defaults[self._target_])
+        for val in self.values():
             if isinstance(val, Config):
-                if '_target_' in val and val._target_ in defaults:
-                    _config = defaults[val._target_]
-                else:
-                    _config = {}
-                val.fill(_config, defaults)
+                val.lookup(defaults)
 
     def clone(self):
         config = Config()

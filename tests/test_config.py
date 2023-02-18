@@ -36,7 +36,8 @@ class TestConfig(unittest.TestCase):
         config = Config({
             'data': 'CIFAR100',
         })
-        config.fill(self.config_path, self.defaults_path)
+        config.fill(self.config_path)
+        config.lookup(self.defaults_path)
         self.assertEqual(set(config.keys()), set(['data', 'model', 'train']))
         self.assertEqual(config.data, 'CIFAR100')
         self.assertEqual(
