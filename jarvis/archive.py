@@ -252,7 +252,7 @@ class Archive:
 
         """
         os.makedirs(dst_dir, exist_ok=True)
-        # check existing axv files
+        # check key consistency of existing axv files
         for file_name in os.listdir(dst_dir):
             if file_name.endswith('.axv'):
                 assert len(file_name)==(self.path_len+4), (
@@ -366,12 +366,12 @@ class HashableRecordArchive(Archive):
 
         """
         inv_dict = {} # dictionary for inverse archive
-        for key, val in super().items():
-            if val in inv_dict:
-                inv_dict[val].append(key)
+        for key, h_val in super().items():
+            if h_val in inv_dict:
+                inv_dict[h_val].append(key)
             else:
-                inv_dict[val] = [key]
-        duplicates = [(self._to_native(val), keys) for val, keys in inv_dict.items() if len(keys)>1]
+                inv_dict[h_val] = [key]
+        duplicates = [(self._to_native(h_val), keys) for h_val, keys in inv_dict.items() if len(keys)>1]
         return duplicates
 
 
@@ -392,3 +392,6 @@ class ConfigArchive(HashableRecordArchive):
 
     def __setitem__(self, key: str, val: dict):
         return super().__setitem__(key, Config(val))
+
+    def get_key(self, val: dict) -> Optional[str]:
+        return super().get_key(Config(val))
