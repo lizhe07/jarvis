@@ -1,4 +1,5 @@
 import sys, yaml, time, random
+from copy import deepcopy
 from pathlib import Path
 from importlib import import_module
 from typing import Optional, Union
@@ -118,10 +119,8 @@ class Config(dict):
                 val.lookup(defaults)
 
     def clone(self):
-        config = Config()
-        for key, val in self.flatten().items():
-            config[key] = val
-        return config
+        r"""Returns a clone of the configuration."""
+        return deepcopy(self)
 
     def instantiate(self, *args, **kwargs): # one-level instantiation
         r"""Instantiates an object using the configuration.
