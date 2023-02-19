@@ -68,17 +68,6 @@ class Archive:
         records = self._safe_read(store_path)
         return records[key]
 
-    def __delitem__(self, key: str):
-        store_path = self._store_path(key)
-        if not os.path.exists(store_path):
-            raise KeyError(key)
-        records = self._safe_read(store_path)
-        del records[key]
-        if records:
-            self._safe_write(records, store_path)
-        else:
-            os.remove(store_path) # remove empty external file
-
     def __contains__(self, key: str) -> bool:
         try:
             self[key]
@@ -198,6 +187,19 @@ class Archive:
             records = self._safe_read(store_path)
             for key, val in records.items():
                 yield key, val
+
+    def pop(self, key: str) -> Any:
+        r"""Removes a specified key and return its value."""
+        store_path = self._store_path(key)
+        if not os.path.exists(store_path):
+            return None
+        records = self._safe_read(store_path)
+        val = records.pop(key, None)
+        if records:
+            self._safe_write(records, store_path)
+        else:
+            os.remove(store_path) # remove empty external file
+        return val
 
     def prune(self) -> list[str]:
         r"""Removes corrupted files.
