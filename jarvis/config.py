@@ -88,19 +88,21 @@ class Config(dict):
         return f_dict
 
     @staticmethod
-    def _load_dict(config: Union[dict, Path, str]):
-        if isinstance(config, (Path, str)):
+    def _load_dict(config: Union[dict, Path, str, None]):
+        if config is None:
+            config = {}
+        elif isinstance(config, (Path, str)):
             with open(config, 'r') as f:
                 config = yaml.safe_load(f)
         return config
 
-    def update(self, config: Union[dict, Path, str]):
+    def update(self, config: Union[dict, Path, str, None]):
         r"""Overwrites from a new config."""
         config = Config(self._load_dict(config))
         for key, val in config.flatten().items():
             self[key] = val
 
-    def fill(self, config: Union[dict, Path, str]):
+    def fill(self, config: Union[dict, Path, str, None]):
         r"""Fills value from a new config."""
         config = Config(self._load_dict(config))
         for key, val in config.flatten().items():
@@ -109,7 +111,7 @@ class Config(dict):
             except:
                 self[key] = val
 
-    def lookup(self, defaults: Union[dict, Path, str]):
+    def lookup(self, defaults: Union[dict, Path, str, None]):
         r"""Looks up default values for instantiable config."""
         defaults = self._load_dict(defaults)
         if '_target_' in self and self._target_ in defaults:
