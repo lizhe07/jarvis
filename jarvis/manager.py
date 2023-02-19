@@ -4,7 +4,7 @@ from typing import Optional
 from collections.abc import Iterable
 
 from .config import Config
-from .archive import Archive
+from .archive import Archive, ConfigArchive
 from .utils import progress_str, time_str
 
 
@@ -26,13 +26,13 @@ class Manager:
     """
 
     def __init__(self,
-        store_dir: Optional[str] = None,
+        store_dir: str,
         *,
-        read_only: bool = False,
         s_path_len: int = 2, s_pause: float = 1.,
         l_path_len: int = 3, l_pause: float = 5.,
         eval_interval: int = 1, save_interval: int = 1,
-        verbose: int = 1,
+        disp_interval: Optional[int] = 1,
+        verbose: bool = True,
     ):
         r"""
         Args
@@ -40,8 +40,6 @@ class Manager:
         store_dir:
             Directory for storage. Archives including `configs`, `stats`,
             `ckpts` and `previews` will be saved in separate directories.
-        read_only:
-            If the job is read-only or not.
         s_path_len, s_pause:
             Short path length and pause time for `configs`, as well as `stats`
             and `previews`.
@@ -54,36 +52,26 @@ class Manager:
         save_interval:
             Checkpoint is saved every `save_interval` epochs.
         verbose:
-            Information display level, with '0' referring to quiet mode.
+            Verbose mode.
 
         """
         self.store_dir = store_dir
-        if self.store_dir is None:
-            self.configs = Archive(is_config=True)
-            self.stats = Archive()
-            self.ckpts = Archive()
-            self.previews = Archive()
-        else:
-            self.configs = Archive(
-                f'{self.store_dir}/configs', path_len=s_path_len, pause=s_pause, is_config=True,
-            )
-            self.stats = Archive(
-                f'{self.store_dir}/stats', path_len=s_path_len, pause=s_pause,
-            )
-            self.ckpts = Archive(
-                f'{self.store_dir}/ckpts', path_len=l_path_len, pause=l_pause,
-            )
-            self.previews = Archive(
-                f'{self.store_dir}/previews', path_len=s_path_len, pause=s_pause,
-            )
-        self.read_only = read_only
-        if self.store_dir is not None and self.read_only:
-            for axv in [self.configs, self.stats, self.previews]:
-                axv.to_internal()
+        self.configs = ConfigArchive(
+            f'{self.store_dir}/configs', path_len=s_path_len, pause=s_pause,
+        )
+        self.stats = Archive(
+            f'{self.store_dir}/stats', path_len=s_path_len, pause=s_pause,
+        )
+        self.ckpts = Archive(
+            f'{self.store_dir}/ckpts', path_len=l_path_len, pause=l_pause,
+        )
+        self.previews = Archive(
+            f'{self.store_dir}/previews', path_len=s_path_len, pause=s_pause,
+        )
         self.eval_interval = eval_interval
         self.save_interval = save_interval
+        self.disp_interval = disp_interval
         self.verbose = verbose
-        self.defaults = Config() # can be updated by child class `__init__`
 
     def get_config(self, config: Optional[dict] = None) -> Config:
         r"""Returns work configuration.
@@ -100,7 +88,7 @@ class Manager:
             return config
 
         """
-        return Config(config).clone().fill(self.defaults)
+        return Config(config)
 
     def setup(self, config: Config):
         r"""Sets up manager.
@@ -116,7 +104,7 @@ class Manager:
             # set up `self` properties
 
         """
-        self.config = config.clone()
+        self.config = config
 
     def init_ckpt(self):
         r"""Initializes checkpoint.
@@ -164,9 +152,10 @@ class Manager:
 
         """
         key = self.configs.get_key(self.config)
-        self.epoch = self.stats[key]['epoch']
-        self._t_train = self.stats[key].get('t_train', None)
-        self._t_eval = self.stats[key].get('t_eval', None)
+        stat = self.stats[key]
+        self.epoch = stat['epoch']
+        self._t_train = stat.get('t_train', None)
+        self._t_eval = stat.get('t_eval', None)
         self.ckpt = self.ckpts[key]
         self.preview = self.previews[key]
 
@@ -215,12 +204,12 @@ class Manager:
             assert resume
             self.load_ckpt()
             assert self.epoch>=0
-            if self.verbose>0:
+            if self.verbose:
                 print("Checkpoint{} loaded.".format(
                     '' if num_epochs==0 else f' (epoch {self.epoch})',
                 ))
         except:
-            if self.verbose>0:
+            if self.verbose:
                 print("No checkpoint loaded, initializing from scratch.")
             self.init_ckpt()
             tic = time.time()
@@ -229,9 +218,14 @@ class Manager:
             self._t_eval = toc-tic
             self.save_ckpt()
 
+        _verbose = self.verbose
         while self.epoch<num_epochs:
-            if self.verbose>0:
-                print(f"\nEpoch: {progress_str(self.epoch+1, num_epochs)}")
+            if self.disp_interval is None or self.epoch%self.disp_interval==0 or self.epoch==num_epochs:
+                self.verbose = _verbose
+            else:
+                self.verbose = False
+            if self.verbose:
+                print(f"Epoch: {progress_str(self.epoch+1, num_epochs)}")
 
             tic = time.time()
             self.train()
@@ -252,6 +246,7 @@ class Manager:
                     self._t_eval = 0.8*self._t_eval+0.2*(toc-tic)
             if self.epoch%self.save_interval==0 or self.epoch==num_epochs:
                 self.save_ckpt()
+        self.verbose = _verbose
 
     def batch(self,
         configs: Iterable[Config],
@@ -260,7 +255,6 @@ class Manager:
         count: int = 0,
         patience: float = 4.,
         max_errors: int = 0,
-        disp_interval: int = 1,
     ):
         r"""Batch processing.
 
@@ -280,9 +274,6 @@ class Manager:
         max_errors:
             Maximum number of allowed errors. If it is '0', the runtime error
             is immediately raised.
-        disp_interval:
-            Information display interval, `verbose` will be set to be non-zero
-            every `disp_interval` works.
 
         """
         def to_process(stat, num_epochs, patience):
@@ -299,7 +290,6 @@ class Manager:
         w_count = 0 # counter for processed works
         e_count = 0 # counter for runtime errors
         interrupted = False # flag for keyboard interruption
-        _verbose = self.verbose
         for config in configs:
             if config in completed:
                 continue
@@ -314,11 +304,7 @@ class Manager:
                 stat['toc'] = time.time() # update modified time
                 self.stats[key] = stat
 
-                if w_count%disp_interval==0 or (count>0 and w_count+1==count):
-                    self.verbose = _verbose
-                else:
-                    self.verbose = 0
-                if self.verbose>0:
+                if self.verbose:
                     print("------------")
                     print("Processing {} ({})...".format(
                         key, progress_str(w_count+1, count) if count>0 else w_count+1,
@@ -334,15 +320,14 @@ class Manager:
                 e_count += 1
                 if e_count==max_errors:
                     interrupted = True
-                    if _verbose>0:
+                    if self.verbose:
                         print(f"Max number of errors {max_errors} reached.")
                     break
                 else:
                     continue
             if count>0 and w_count==count:
                 break
-        self.verbose = _verbose
-        if self.verbose>0:
+        if self.verbose:
             print("{} works processed.".format(w_count))
             if not interrupted and (count==0 or w_count<count):
                 print("All works are processed or being processed.")
@@ -375,7 +360,7 @@ class Manager:
             config = Config()
             for i, key in enumerate(keys):
                 config[key] = vals[i][sub_idxs[i]]
-            config = self.get_config(config.nest())
+            config = self.get_config(config)
             yield config
 
     def sweep(self, choices: dict, order: str = 'random', **kwargs):
@@ -423,9 +408,9 @@ class Manager:
             - 't_eval': Average time of evaluation, in seconds.
 
         """
-        _keys = dict((v, k) for k, v in self.configs.items())
-        _stats = dict((k, v) for k, v in self.stats.items())
-        _previews = dict((k, v) for k, v in self.previews.items())
+        _keys = {self.configs._to_hashable(v): k for k, v in self.configs.items()}
+        _stats = {k: v for k, v in self.stats.items()}
+        _previews = {k: v for k, v in self.previews.items()}
         configs = list(set(self._config_gen(choices)))
         report = {
             'epoch': [],
@@ -437,7 +422,7 @@ class Manager:
             report[p_key] = []
         for config in configs:
             try:
-                key = _keys[config]
+                key = _keys[self.configs._to_hashable(config)]
                 stat = _stats[key]
                 epoch = stat['epoch']
                 t_train = stat.get('t_train') or np.nan
@@ -457,7 +442,7 @@ class Manager:
                     report[p_key].append(preview.get(p_key) or np.nan)
         for p_key in report:
             report[p_key] = np.array(report[p_key])
-        if self.verbose>0:
+        if self.verbose:
             if min_epoch is None:
                 print("Average number of trained epochs: {:.1f}".format(np.mean(report['epoch'])))
             else:
@@ -494,9 +479,8 @@ class Manager:
 
         """
         cond = Config(cond)
-        _configs = dict((k, v) for k, v in self.configs.items())
-        _stats = dict((k, v) for k, v in self.stats.items())
-        for key, stat in _stats.items():
+        _configs = {k: v for k, v in self.configs.items()}
+        for key, stat in self.stats.items():
             if stat['epoch']>=min_epoch:
                 try:
                     config = _configs[key]
@@ -548,7 +532,7 @@ class Manager:
                     best_val = val
                     best_key = key
             count += 1
-        if self.verbose>0:
+        if self.verbose:
             if min_epoch==1:
                 print(f"{count} completed works found.")
             else:
@@ -571,14 +555,15 @@ class Manager:
 
         """
         dups = self.configs.get_duplicates()
-        if self.verbose>0 and len(dups)>0:
+        if self.verbose and len(dups)>0:
             print(f"{len(dups)} duplicate works found.")
+        _stats = {k: v for k, v in self.stats.items()}
         for keys in dups.values():
             best_key, max_epoch = None, None
             for key in keys:
-                if key not in self.stats:
+                if key not in _stats:
                     continue
-                epoch = self.stats[key]['epoch']
+                epoch = _stats[key]['epoch']
                 if best_key is None or epoch>max_epoch:
                     best_key = key
                     max_epoch = epoch
@@ -640,15 +625,15 @@ class Manager:
     def _load_dir(self, src_dir: str, newer_only: bool = True):
         src_manager = Manager(store_dir=src_dir)
         # divide works into 'cloning' group and 'adding' group
-        _old_configs = dict((k, v) for k, v in self.configs.items())
-        _old_keys = dict((v, k) for k, v in self.configs.items())
-        _old_stats = dict((k, v) for k, v in self.stats.items())
-        _new_configs = dict((k, v) for k, v in src_manager.configs.items())
-        _new_stats = dict((k, v) for k, v in src_manager.stats.items())
+        _old_configs = {k: v for k, v in self.configs.items()}
+        _old_keys = {self.configs._to_hashable(v): k for k, v in self.configs.items()}
+        _old_stats = {k: v for k, v in self.stats.items()}
+        _new_configs = {k: v for k, v in src_manager.configs.items()}
+        _new_stats = {k: v for k, v in src_manager.stats.items()}
         clone_keys, add_keys = set(), set()
         for new_key, config in _new_configs.items():
             if config in _old_keys:
-                old_key = _old_keys[config]
+                old_key = _old_keys[self.configs._to_hashable(config)]
                 if newer_only and _new_stats[new_key]['epoch']<=_old_stats[old_key]['epoch']:
                     continue
                 if new_key==old_key:
@@ -668,7 +653,7 @@ class Manager:
         # use 'add' to insert 'adding' group one by one
         for src_key in add_keys:
             dst_key = self.configs.add(_new_configs[src_key])
-            self.stats[dst_key] = src_manager.stats[src_key]
+            self.stats[dst_key] = _new_stats[src_key]
             self.ckpts[dst_key] = src_manager.ckpts[src_key]
             self.previews[dst_key] = src_manager.previews[src_key]
 
