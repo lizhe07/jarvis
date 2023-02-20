@@ -1,5 +1,4 @@
 import sys, yaml, time, random
-from copy import deepcopy
 from pathlib import Path
 from importlib import import_module
 from typing import Optional, Union
@@ -71,9 +70,9 @@ class Config(dict):
             super().__setattr__(key, val)
 
     def __getattr__(self, key):
-        if self._is_valid_key(key):
+        try:
             return self[key]
-        else:
+        except:
             return super().__getattr__(key)
 
     def flatten(self) -> dict:
@@ -122,7 +121,7 @@ class Config(dict):
 
     def clone(self):
         r"""Returns a clone of the configuration."""
-        return deepcopy(self)
+        return Config(self.flatten())
 
     def instantiate(self, *args, **kwargs): # one-level instantiation
         r"""Instantiates an object using the configuration.
