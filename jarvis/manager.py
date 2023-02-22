@@ -1,9 +1,10 @@
 import random, time, tarfile, shutil
+from pathlib import Path
 import numpy as np
-from typing import Optional
+from typing import Optional, Union
 from collections.abc import Iterable
 
-from .config import Config
+from .config import Config, _load_dict
 from .archive import Archive, ConfigArchive
 from .utils import progress_str, time_str
 
@@ -27,6 +28,7 @@ class Manager:
 
     def __init__(self,
         store_dir: str,
+        base_config: Union[dict, Path, str, None] = None,
         *,
         s_path_len: int = 2, s_pause: float = 1.,
         l_path_len: int = 3, l_pause: float = 5.,
@@ -68,6 +70,8 @@ class Manager:
         self.previews = Archive(
             f'{self.store_dir}/previews', path_len=s_path_len, pause=s_pause,
         )
+        self.base_config = _load_dict(base_config)
+
         self.eval_interval = eval_interval
         self.save_interval = save_interval
         self.disp_interval = disp_interval
@@ -88,7 +92,9 @@ class Manager:
             return config
 
         """
-        return Config(config)
+        config = Config(config)
+        config.fill(self.base_config)
+        return config
 
     def setup(self, config: Config):
         r"""Sets up manager.

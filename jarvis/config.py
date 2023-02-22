@@ -88,27 +88,27 @@ class Config(dict):
 
     def update(self, new_config: Union[dict, Path, str, None]):
         r"""Overwrites from a new config."""
-        new_config = Config(_load_dict(new_config))
+        new_config = _load_dict(new_config)
         for key, val in new_config.flatten().items():
             self[key] = val
 
     def fill(self, base_config: Union[dict, Path, str, None]):
         r"""Fills value from a new config."""
-        base_config = Config(_load_dict(base_config))
+        base_config = _load_dict(base_config)
         for key, val in base_config.flatten().items():
             try: # 'in' and 'setdefault' do not work
                 self[key]
             except:
                 self[key] = val
 
-    def lookup(self, defaults: Union[dict, Path, str, None]):
-        r"""Looks up default values for instantiable config."""
-        defaults = _load_dict(defaults)
-        if '_target_' in self and self._target_ in defaults:
-            self.fill(defaults[self._target_])
-        for val in self.values():
-            if isinstance(val, Config):
-                val.lookup(defaults)
+    # def lookup(self, defaults: Union[dict, Path, str, None]):
+    #     r"""Looks up default values for instantiable config."""
+    #     defaults = _load_dict(defaults)
+    #     if '_target_' in self and self._target_ in defaults:
+    #         self.fill(defaults[self._target_])
+    #     for val in self.values():
+    #         if isinstance(val, Config):
+    #             val.lookup(defaults)
 
     def clone(self):
         r"""Returns a clone of the configuration."""
@@ -152,12 +152,11 @@ def from_cli(argv: Optional[list[str]] = None):
     return config
 
 
-def _load_dict(config: Union[dict, Path, str, None]):
-    if config is None:
-        config = {}
-    elif isinstance(config, (Path, str)):
+def _load_dict(config: Union[dict, Path, str, None]) -> Config:
+    if isinstance(config, (Path, str)):
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
+    config = Config(config)
     return config
 
 
