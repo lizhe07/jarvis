@@ -174,7 +174,7 @@ def sgd_optimizer(
     model: Module,
     lr: float,
     momentum: float = 0.9,
-    weight_decay: float = 0.,
+    weight_decay: float = 1e-4,
 ) -> Optimizer:
     r"""Returns a SGD optimizer.
 
