@@ -86,25 +86,16 @@ class Config(dict):
                 f_dict[p_key] = p_val
         return f_dict
 
-    @staticmethod
-    def _load_dict(config: Union[dict, Path, str, None]):
-        if config is None:
-            config = {}
-        elif isinstance(config, (Path, str)):
-            with open(config, 'r') as f:
-                config = yaml.safe_load(f)
-        return config
-
-    def update(self, config: Union[dict, Path, str, None]):
+    def update(self, new_config: Union[dict, Path, str, None]):
         r"""Overwrites from a new config."""
-        config = Config(self._load_dict(config))
-        for key, val in config.flatten().items():
+        new_config = Config(_load_dict(new_config))
+        for key, val in new_config.flatten().items():
             self[key] = val
 
-    def fill(self, config: Union[dict, Path, str, None]):
+    def fill(self, base_config: Union[dict, Path, str, None]):
         r"""Fills value from a new config."""
-        config = Config(self._load_dict(config))
-        for key, val in config.flatten().items():
+        base_config = Config(_load_dict(base_config))
+        for key, val in base_config.flatten().items():
             try: # 'in' and 'setdefault' do not work
                 self[key]
             except:
@@ -112,7 +103,7 @@ class Config(dict):
 
     def lookup(self, defaults: Union[dict, Path, str, None]):
         r"""Looks up default values for instantiable config."""
-        defaults = self._load_dict(defaults)
+        defaults = _load_dict(defaults)
         if '_target_' in self and self._target_ in defaults:
             self.fill(defaults[self._target_])
         for val in self.values():
@@ -158,6 +149,15 @@ def from_cli(argv: Optional[list[str]] = None):
         if wait>0:
             print("Wait for {:.1f} secs before execution.".format(wait))
             time.sleep(wait)
+    return config
+
+
+def _load_dict(config: Union[dict, Path, str, None]):
+    if config is None:
+        config = {}
+    elif isinstance(config, (Path, str)):
+        with open(config, 'r') as f:
+            config = yaml.safe_load(f)
     return config
 
 
