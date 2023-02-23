@@ -79,7 +79,7 @@ class Config(dict):
         r"""Returns a flattened dictionary."""
         f_dict = {}
         for p_key, p_val in self.items(): # parent key and value
-            if isinstance(p_val, Config):
+            if isinstance(p_val, Config) and len(p_val)>0:
                 for c_key, c_val in p_val.flatten().items(): # child key and value
                     f_dict[f'{p_key}.{c_key}'] = c_val
             else:
