@@ -226,12 +226,13 @@ class Manager:
 
         _verbose = self.verbose
         while self.epoch<num_epochs:
+            self.epoch += 1
             if self.disp_interval is None or self.epoch%self.disp_interval==0 or self.epoch==num_epochs:
                 self.verbose = _verbose
             else:
                 self.verbose = False
             if self.verbose:
-                print(f"Epoch: {progress_str(self.epoch+1, num_epochs)}")
+                print(f"Epoch: {progress_str(self.epoch, num_epochs)}")
 
             tic = time.time()
             self.train()
@@ -241,7 +242,6 @@ class Manager:
             else:
                 self._t_train = 0.8*self._t_train+0.2*(toc-tic)
 
-            self.epoch += 1
             if self.epoch%self.eval_interval==0 or self.epoch==num_epochs:
                 tic = time.time()
                 self.eval()
