@@ -41,7 +41,7 @@ class Config(dict):
         )
 
     def __setitem__(self, key, val):
-        assert self._is_valid_key(key)
+        assert self._is_valid_key(key), f"'{key}' is not a valid key."
         val = _format(val)
         dot_pos = key.find('.')
         if dot_pos==-1:
