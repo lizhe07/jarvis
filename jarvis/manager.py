@@ -32,8 +32,7 @@ class Manager:
         *,
         s_path_len: int = 2, s_pause: float = 1.,
         l_path_len: int = 3, l_pause: float = 5.,
-        eval_interval: int = 1, save_interval: int = 1,
-        disp_interval: Optional[int] = 1,
+        eval_interval: int = 1, save_interval: int = 1, disp_interval: int = 1,
         verbose: bool = True,
     ):
         r"""
@@ -53,6 +52,8 @@ class Manager:
             Work is evaluated every `eval_interval` epochs.
         save_interval:
             Checkpoint is saved every `save_interval` epochs.
+        disp_interval:
+            Information is printed every `disp_interval` epochs.
         verbose:
             Verbose mode.
 
@@ -227,7 +228,7 @@ class Manager:
         _verbose = self.verbose
         while self.epoch<num_epochs:
             self.epoch += 1
-            if self.disp_interval is None or self.epoch%self.disp_interval==0 or self.epoch==num_epochs:
+            if self.epoch%self.disp_interval==0 or self.epoch==num_epochs:
                 self.verbose = _verbose
             else:
                 self.verbose = False
@@ -291,13 +292,13 @@ class Manager:
         completed = set()
         for _key, _stat in _stats.items():
             if _key in _configs and _stat['epoch']>=num_epochs:
-                completed.add(_configs[_key])
+                completed.add(self.configs._to_hashable(_configs[_key]))
 
         w_count = 0 # counter for processed works
         e_count = 0 # counter for runtime errors
         interrupted = False # flag for keyboard interruption
         for config in configs:
-            if config in completed:
+            if self.configs._to_hashable(config) in completed:
                 continue
             try:
                 key = self.configs.add(config)
@@ -417,18 +418,20 @@ class Manager:
         _keys = {self.configs._to_hashable(v): k for k, v in self.configs.items()}
         _stats = {k: v for k, v in self.stats.items()}
         _previews = {k: v for k, v in self.previews.items()}
-        configs = list(set(self._config_gen(choices)))
+
+        keys = set()
+        for config in self._config_gen(choices):
+            _config = self.configs._to_hashable(config)
+            if _config in _keys:
+                keys.add(_keys[_config])
         report = {
             'epoch': [],
             't_train': [], 't_eval': [],
         }
-        if p_keys is None:
-            p_keys = []
-        for p_key in p_keys:
+        for p_key in (p_keys or []):
             report[p_key] = []
-        for config in configs:
+        for key in keys:
             try:
-                key = _keys[self.configs._to_hashable(config)]
                 stat = _stats[key]
                 epoch = stat['epoch']
                 t_train = stat.get('t_train') or np.nan
@@ -439,13 +442,9 @@ class Manager:
             report['epoch'].append(epoch)
             report['t_train'].append(t_train)
             report['t_eval'].append(t_eval)
-            if p_keys:
-                try:
-                    preview = _previews[key]
-                except:
-                    preview = {}
-                for p_key in p_keys:
-                    report[p_key].append(preview.get(p_key) or np.nan)
+            preview = _previews.get(key, {})
+            for p_key in (p_keys or []):
+                report[p_key].append(preview.get(p_key) or np.nan)
         for p_key in report:
             report[p_key] = np.array(report[p_key])
         if self.verbose:
