@@ -28,7 +28,7 @@ class Manager:
 
     def __init__(self,
         store_dir: str,
-        base_config: Union[dict, Path, str, None] = None,
+        defaults: Union[dict, Path, str, None] = None,
         *,
         s_path_len: int = 2, s_pause: float = 1.,
         l_path_len: int = 3, l_pause: float = 5.,
@@ -70,7 +70,7 @@ class Manager:
         self.previews = Archive(
             f'{self.store_dir}/previews', path_len=s_path_len, pause=s_pause,
         )
-        self.base_config = _load_dict(base_config)
+        self.defaults = _load_dict(defaults)
 
         self.eval_interval = eval_interval
         self.save_interval = save_interval
@@ -93,7 +93,7 @@ class Manager:
 
         """
         config = Config(config)
-        config.fill(self.base_config)
+        config.fill(self.defaults)
         return config
 
     def setup(self, config: Config):

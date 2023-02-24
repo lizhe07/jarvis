@@ -86,29 +86,20 @@ class Config(dict):
                 f_dict[p_key] = p_val
         return f_dict
 
-    def update(self, new_config: Union[dict, Path, str, None]):
+    def update(self, config: Union[dict, Path, str, None]):
         r"""Overwrites from a new config."""
-        new_config = _load_dict(new_config)
-        for key, val in new_config.flatten().items():
+        config = _load_dict(config)
+        for key, val in config.flatten().items():
             self[key] = val
 
-    def fill(self, base_config: Union[dict, Path, str, None]):
+    def fill(self, config: Union[dict, Path, str, None]):
         r"""Fills value from a new config."""
-        base_config = _load_dict(base_config)
-        for key, val in base_config.flatten().items():
+        config = _load_dict(config)
+        for key, val in config.flatten().items():
             try: # 'in' and 'setdefault' do not work
                 self[key]
             except:
                 self[key] = val
-
-    # def lookup(self, defaults: Union[dict, Path, str, None]):
-    #     r"""Looks up default values for instantiable config."""
-    #     defaults = _load_dict(defaults)
-    #     if '_target_' in self and self._target_ in defaults:
-    #         self.fill(defaults[self._target_])
-    #     for val in self.values():
-    #         if isinstance(val, Config):
-    #             val.lookup(defaults)
 
     def clone(self):
         r"""Returns a clone of the configuration."""
