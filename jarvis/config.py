@@ -125,7 +125,7 @@ class Config(dict):
         return _target(*args, **_kwargs)
 
 
-def from_cli(argv: Optional[list[str]] = None):
+def from_cli(argv: Optional[list[str]] = None) -> Config:
     r"""Constructs a configuration from command line."""
     if argv is None:
         argv = sys.argv[1:]
