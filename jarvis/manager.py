@@ -335,7 +335,7 @@ class Manager:
             if count>0 and w_count==count:
                 break
         if self.verbose:
-            print("{} works processed.".format(w_count))
+            print("\n{} works processed.".format(w_count))
             if not interrupted and (count==0 or w_count<count):
                 print("All works are processed or being processed.")
 
