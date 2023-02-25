@@ -486,13 +486,11 @@ class Manager:
         cond = Config(cond)
         _configs = {k: v for k, v in self.configs.items()}
         for key, stat in self.stats.items():
-            if stat['epoch']>=min_epoch:
-                try:
-                    config = _configs[key]
-                except:
-                    continue
-                if self._is_matched(config, cond):
-                    yield key
+            if (
+                stat['epoch']>=min_epoch and
+                self._is_matched(_configs.get(key, {}), cond)
+            ):
+                yield key
 
     def best_work(self,
         min_epoch: int = 0,
