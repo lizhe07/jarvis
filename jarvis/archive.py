@@ -293,16 +293,17 @@ class Archive:
 
 class HashableRecordArchive(Archive):
 
-    def _to_hashable(self, n_val):
+    @classmethod
+    def _to_hashable(cls, n_val):
         r"""Converts an object to a hashable record."""
         if isinstance(n_val, dict):
-            h_val = ('_D', frozenset((k, self._to_hashable(v)) for k, v in n_val.items()))
+            h_val = ('_D', frozenset((k, cls._to_hashable(v)) for k, v in n_val.items()))
         elif isinstance(n_val, list):
-            h_val = ('_L', tuple(self._to_hashable(v) for v in n_val))
+            h_val = ('_L', tuple(cls._to_hashable(v) for v in n_val))
         elif isinstance(n_val, tuple):
-            h_val = ('_T', tuple(self._to_hashable(v) for v in n_val))
+            h_val = ('_T', tuple(cls._to_hashable(v) for v in n_val))
         elif isinstance(n_val, set):
-            h_val = ('_S', frozenset(self._to_hashable(v) for v in n_val))
+            h_val = ('_S', frozenset(cls._to_hashable(v) for v in n_val))
         elif isinstance(n_val, Array):
             h_val = ('_A', (tuple(n_val.reshape(-1)), n_val.dtype, n_val.shape))
         else:
@@ -326,6 +327,10 @@ class HashableRecordArchive(Archive):
         else:
             n_val = h_val
         return n_val
+
+    @classmethod
+    def equals(cls, n_val_0, n_val_1):
+        return cls._to_hashable(n_val_0)==cls._to_hashable(n_val_1)
 
     def __setitem__(self, key: str, n_val: Any):
         super().__setitem__(key, self._to_hashable(n_val))
