@@ -41,8 +41,8 @@ class TestBasicArchive(ArchiveTestCase):
         self.assertEqual(len(self.axv), 1)
         self.assertIn(key, self.axv)
         self.assertEqual(self.axv[key], 3.14)
-        # check deletion
-        del self.axv[key]
+        # check pop
+        self.axv.pop(key)
         self.assertNotIn(key, self.axv)
 
 
