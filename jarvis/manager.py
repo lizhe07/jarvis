@@ -637,19 +637,19 @@ class Manager:
         _new_stats = {k: v for k, v in src_manager.stats.items()}
         clone_keys, add_keys = set(), set()
         for new_key, config in _new_configs.items():
-            if config in _old_keys:
-                old_key = _old_keys[self.configs._to_hashable(config)]
+            old_key = _old_keys.get(self.configs._to_hashable(config))
+            if old_key is None:
+                if new_key in _old_configs:
+                    add_keys.add(new_key)
+                else:
+                    clone_keys.add(new_key)
+            else:
                 if newer_only and _new_stats[new_key]['epoch']<=_old_stats[old_key]['epoch']:
                     continue
                 if new_key==old_key:
                     clone_keys.add(new_key)
                 else:
                     add_keys.add(new_key)
-            else:
-                if new_key in _old_configs:
-                    add_keys.add(new_key)
-                else:
-                    clone_keys.add(new_key)
         # use 'copy_to' to add 'cloning' group directly
         src_manager.configs.copy_to(self.configs.store_dir, clone_keys)
         src_manager.stats.copy_to(self.stats.store_dir, clone_keys)
