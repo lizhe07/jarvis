@@ -138,6 +138,29 @@ def cyclic_scheduler(
     return scheduler
 
 
+def numpy_dict(t_state_dict: dict) -> dict:
+    n_state_dict = {}
+    for key, val in t_state_dict.items():
+        if isinstance(val, dict):
+            n_state_dict[key] = numpy_dict(val)
+        elif isinstance(val, Tensor):
+            n_state_dict[key] = ('_T', val.data.cpu().clone().numpy(), val.dtype)
+        else:
+            n_state_dict[key] = val
+    return n_state_dict
+
+def tensor_dict(n_state_dict: dict, device='cpu') -> dict:
+    t_state_dict = {}
+    for key, val in n_state_dict.items():
+        if isinstance(val, dict):
+            t_state_dict[key] = tensor_dict(val, device)
+        elif isinstance(val, tuple) and len(val)==3 and val[0]=='_T':
+            t_state_dict[key] = torch.tensor(val[1], dtype=val[2], device=device)
+        else:
+            t_state_dict[key] = val
+    return t_state_dict
+
+
 def create_mlp_layers(
     in_features: int, out_features: int,
     num_features: Optional[list[int]] = None,
