@@ -122,8 +122,8 @@ class Archive:
             try:
                 with open(store_path, 'rb') as f:
                     records = pickle.load(f)
-            except KeyboardInterrupt:
-                raise
+            except KeyboardInterrupt as e:
+                raise e
             except:
                 count += 1
                 self._sleep()
@@ -140,8 +140,8 @@ class Archive:
             try:
                 with open(store_path, 'wb') as f:
                     pickle.dump(records, f)
-            except KeyboardInterrupt:
-                raise
+            except KeyboardInterrupt as e:
+                raise e
             except:
                 count += 1
                 self._sleep()

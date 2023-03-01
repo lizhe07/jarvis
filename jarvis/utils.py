@@ -39,7 +39,7 @@ def progress_str(i: int, n: int, show_percent: bool = False) -> str:
     field_width = int(np.log10(n))+1
     disp_str = '{{:{}d}}/{{:{}d}}'.format(field_width, field_width).format(i, n)
     if show_percent:
-        disp_str += ', ({:6.1%})'.format(i/n)
+        disp_str += ' ({:6.1%})'.format(i/n)
     return disp_str
 
 
