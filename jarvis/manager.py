@@ -490,13 +490,17 @@ class Manager:
 
         """
         cond = Config(cond)
-        _configs = {k: v for k, v in self.configs.items()}
-        for key, stat in self.stats.items():
-            if (
-                stat['epoch']>=min_epoch and
-                self._is_matched(_configs.get(key, {}), cond)
-            ):
-                yield key
+        file_names = set(self.configs._file_names())&set(self.stats._file_names())
+        for file_name in file_names:
+            _configs = self.configs._safe_read(f'{self.configs.store_dir}/{file_name}')
+            _configs = {k: self.configs._to_native(v) for k, v in _configs.items()}
+            _stats = self.stats._safe_read(f'{self.stats.store_dir}/{file_name}')
+            for key, stat in _stats.items():
+                if (
+                    stat['epoch']>=min_epoch and
+                    self._is_matched(_configs.get(key, {}), cond)
+                ):
+                    yield key
 
     def best_work(self,
         min_epoch: int = 0,

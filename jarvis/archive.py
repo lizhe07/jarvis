@@ -96,14 +96,19 @@ class Archive:
         if not self._is_valid_key(key):
             raise KeyError(key)
         return f'{self.store_dir}/{key[:self.path_len]}.axv'
+    
+    def _file_names(self) -> list[str]:
+        r"""Returns all valid file names in the directory."""
+        file_names = [
+            f for f in os.listdir(self.store_dir)
+            if f.endswith('.axv') and len(f)==(self.path_len+4)
+        ]
+        random.shuffle(file_names)
+        return file_names
 
     def _store_paths(self) -> list[str]:
         r"""Returns all valid external files in the directory."""
-        store_paths = [
-            f'{self.store_dir}/{f}' for f in os.listdir(self.store_dir)
-            if f.endswith('.axv') and len(f)==(self.path_len+4)
-        ]
-        random.shuffle(store_paths) # randomization to avoid cluster conflict
+        store_paths = [f'{self.store_dir}/{f}' for f in self._file_names()]
         return store_paths
 
     def _sleep(self):
@@ -268,12 +273,7 @@ class Archive:
                     f"{self.key_len}."
                 )
         # merge records
-        file_names = [
-            f for f in os.listdir(self.store_dir)
-            if f.endswith('.axv') and len(f)==(self.path_len+4)
-        ]
-        random.shuffle(file_names)
-        for file_name in file_names:
+        for file_name in self._file_names():
             src_path = f'{self.store_dir}/{file_name}'
             dst_path = f'{dst_dir}/{file_name}'
 
