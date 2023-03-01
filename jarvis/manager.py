@@ -563,7 +563,7 @@ class Manager:
         if self.verbose and len(dups)>0:
             print(f"{len(dups)} duplicate works found.")
         _stats = {k: v for k, v in self.stats.items()}
-        for keys in dups.values():
+        for _, keys in dups:
             best_key, max_epoch = None, None
             for key in keys:
                 if key not in _stats:
