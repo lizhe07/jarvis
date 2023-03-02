@@ -19,8 +19,12 @@ def time_str(t_elapse: float, progress: float = 1.) -> str:
         The estimated progress, used for estimating field width.
 
     """
-    field_width = int(np.log10(max(t_elapse, 1e-6)/60/progress))+1
-    return '{{:{}d}}m{{:05.2f}}s'.format(field_width).format(int(t_elapse//60), t_elapse%60)
+    t_str = ''
+    if t_elapse>40:
+        field_width = int(np.log10(max(t_elapse, 1e-6)/60/progress))+1
+        t_str += '{{:{}d}}m'.format(field_width).format(int(t_elapse//60))
+    t_str += '{:05.2f}s'.format(t_elapse%60)
+    return t_str
 
 
 def progress_str(i: int, n: int, show_percent: bool = False) -> str:
