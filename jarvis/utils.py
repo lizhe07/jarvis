@@ -8,7 +8,7 @@ from torch.utils.data import (
 from .alias import Tensor, Module, Optimizer, Scheduler
 
 
-def time_str(t_elapse: float, progress: float = 1.) -> str:
+def time_str(t_elapse: float, progress: Optional[float] = None) -> str:
     r"""Returns a formatted string for a duration.
 
     Args
@@ -18,10 +18,10 @@ def time_str(t_elapse: float, progress: float = 1.) -> str:
     progress:
         The estimated progress, used for estimating field width.
 
-    """
+    """    
     t_str = ''
-    if t_elapse>40:
-        field_width = int(np.log10(max(t_elapse, 1e-6)/60/progress))+1
+    if t_elapse>40 or progress is not None:
+        field_width = int(np.log10(max(t_elapse, 1e-6)/60/(progress or 1)))+1
         t_str += '{{:{}d}}m'.format(field_width).format(int(t_elapse//60))
     t_str += '{:05.2f}s'.format(t_elapse%60)
     return t_str
