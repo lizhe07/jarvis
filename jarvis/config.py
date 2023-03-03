@@ -85,6 +85,17 @@ class Config(dict):
             else:
                 f_dict[p_key] = p_val
         return f_dict
+    
+    def asdict(self) -> dict:
+        r"""Returns basic dict version."""
+        # TODO deal with list and set
+        n_dict = {}
+        for key, val in self.items():
+            if isinstance(val, Config):
+                n_dict[key] = val.asdict()
+            else:
+                n_dict[key] = val
+        return n_dict
 
     def update(self, config: Union[dict, Path, str, None]):
         r"""Overwrites from a new config."""
