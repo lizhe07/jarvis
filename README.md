@@ -1,6 +1,5 @@
 # jarvis
-`jarvis` is designed to be a butler that helps model training. It contains data structures and
-functions for general purposes.
+`jarvis` is designed to be a butler that helps model training.
 
 Run the `pip` install commands at the repository folder to install the package.
 ```bash
