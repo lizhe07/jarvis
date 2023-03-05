@@ -1,121 +1,120 @@
 import sys, yaml, time, random
-from copy import deepcopy
+from pathlib import Path
 from importlib import import_module
-from typing import Optional, Callable
+from typing import Optional, Union
+from collections.abc import Callable
 
-from .hashable import HashableList, HashableSet, HashableDict, HashableArray
-from .utils import flatten, nest
+def _format(val):
+    r"""Formats an object to configuration style.
 
-def _convert(spec):
-    r"""Converts an object to Config value.
-
-    If `spec` is a container, use the hashable container class for nesting.
+    Dicts are converted to Config objects and tuples are converted to lists.
 
     """
-    if isinstance(spec, (list, tuple)) and not isinstance(spec, HashableArray):
-        # replace tuple with list since Config usually deals with yaml file
-        return HashableList([_convert(v) for v in spec])
-    if isinstance(spec, set):
-        return HashableSet([_convert(v) for v in spec])
-    if isinstance(spec, dict):
-        return Config(spec)
-    return spec
+    if isinstance(val, dict):
+        return Config({k: _format(v) for k, v in val.items()})
+    elif isinstance(val, (list, tuple)):
+        return [_format(v) for v in val]
+    elif isinstance(val, set):
+        return set(_format(v) for v in val)
+    else:
+        return val
 
 
-class Config(HashableDict):
+class Config(dict):
     r"""Configuration class.
 
-    Compared to `HashableDict`, a few new features are implemented. Items can be
-    accessed via dot expression. An object can be instantiated if a callable
-    `_target_` field exists.
+    Dot notation is supported. When a callable '_target_' is specified, an
+    object can be instantiated according to the configuration.
 
     """
 
     def __init__(self, config: Optional[dict] = None):
-        super(Config, self).__init__(config or {})
-        for key, val in self.items():
-            self[key] = _convert(val)
+        super().__init__()
+        for key, val in (config or {}).items():
+            self[key] = val
 
-        # deal with existing nested keys
-        keys = list(self.keys())
-        for key in keys:
-            if isinstance(key, str) and '.' in key:
-                self.update(Config._create(key.split('.'), self.pop(key)))
+    def _is_valid_key(self, key):
+        return isinstance(key, str) and not (
+            key in super().__dir__()
+            or len(key)==0 or key[0]=='.' or key[-1]=='.'
+            or '..' in key
+        )
 
-    @classmethod
-    def _create(cls, keys: list[str], val) -> dict:
-        r"""Creates nested dictionary.
-
-        Args
-        ----
-        keys:
-            A list of strings specifying the nested key.
-        val:
-            Dictionary value.
-
-        """
-        if len(keys)==1:
-            return {keys[0]: val}
+    def __setitem__(self, key, val):
+        assert self._is_valid_key(key), f"'{key}' is not a valid key."
+        val = _format(val)
+        dot_pos = key.find('.')
+        if dot_pos==-1:
+            super().__setitem__(key, val)
         else:
-            return {keys[0]: cls._create(keys[1:], val)}
+            key_head, key_tail = key[:dot_pos], key[dot_pos+1:]
+            if key_head in self:
+                assert isinstance(self[key_head], Config)
+                self[key_head][key_tail] = val
+            else:
+                self[key_head] = Config({key_tail: val})
+
+    def __getitem__(self, key):
+        dot_pos = key.find('.')
+        if dot_pos==-1:
+            return super().__getitem__(key)
+        else:
+            key_head, key_tail = key[:dot_pos], key[dot_pos+1:]
+            assert key_head in self and isinstance(self[key_head], Config)
+            return self[key_head][key_tail]
+
+    def __setattr__(self, key, val):
+        if self._is_valid_key(key):
+            self[key] = val
+        else:
+            super().__setattr__(key, val)
 
     def __getattr__(self, key):
-        r"""Returns configuration value."""
         try:
             return self[key]
         except:
-            return getattr(super(Config, self), key)
+            return super().__getattr__(key)
 
-    def __setitem__(self, key, val):
-        super(Config, self).__setitem__(key, _convert(val))
+    def flatten(self) -> dict:
+        r"""Returns a flattened dictionary."""
+        f_dict = {}
+        for p_key, p_val in self.items(): # parent key and value
+            if isinstance(p_val, Config) and len(p_val)>0:
+                for c_key, c_val in p_val.flatten().items(): # child key and value
+                    f_dict[f'{p_key}.{c_key}'] = c_val
+            else:
+                f_dict[p_key] = p_val
+        return f_dict
+    
+    def asdict(self) -> dict:
+        r"""Returns basic dict version."""
+        # TODO deal with list and set
+        n_dict = {}
+        for key, val in self.items():
+            if isinstance(val, Config):
+                n_dict[key] = val.asdict()
+            else:
+                n_dict[key] = val
+        return n_dict
 
-    def __setattr__(self, key, val):
-        r"""Sets configuration value."""
-        try:
+    def update(self, config: Union[dict, Path, str, None]):
+        r"""Overwrites from a new config."""
+        config = _load_dict(config)
+        for key, val in config.flatten().items():
             self[key] = val
-        except:
-            setattr(super(Config, self), key, val)
 
-    def get(self, key):
-        # TODO implement for nested key as dot string
-        return super(Config, self).get(key)
+    def fill(self, config: Union[dict, Path, str, None]):
+        r"""Fills value from a new config."""
+        config = _load_dict(config)
+        for key, val in config.flatten().items():
+            try: # 'in' and 'setdefault' do not work
+                self[key]
+            except:
+                self[key] = val
 
     def clone(self):
         r"""Returns a clone of the configuration."""
-        return deepcopy(self)
-
-    def flatten(self):
-        r"""Returns a flat configuration."""
-        return Config(flatten(self))
-
-    def nest(self):
-        r"""Returns a nested configuration."""
-        return Config(nest(self))
-
-    def update(self, config: dict, ignore_unknown: bool = False):
-        r"""Updates the configuration.
-
-        Args
-        ----
-        config:
-            The new configuration, can be partially defined.
-        ignore_unknown:
-            Whether unknown fields should be ignored.
-
-        """
-        f_config = self.flatten()
-        for key, val in Config(config).clone().flatten().items():
-            if key in f_config or not ignore_unknown:
-                f_config[key] = val
-        super(Config, self).update(f_config.nest())
-
-    def fill(self, defaults: dict):
-        r"""Returns a configuration with filled default values."""
-        f_config = self.flatten()
-        for key, val in Config(defaults).clone().flatten().items():
-            if key not in f_config:
-                f_config[key] = val
-        return f_config.nest()
+        return Config(self.flatten())
 
     def instantiate(self, *args, **kwargs): # one-level instantiation
         r"""Instantiates an object using the configuration.
@@ -137,19 +136,16 @@ class Config(HashableDict):
         return _target(*args, **_kwargs)
 
 
-def from_cli(argv: Optional[list[str]] = None):
+def from_cli(argv: Optional[list[str]] = None) -> Config:
     r"""Constructs a configuration from command line."""
     if argv is None:
         argv = sys.argv[1:]
     config = Config()
     for _argv in argv:
         assert _argv.count('=')==1, f"Expects one '=' in '{_argv}'."
-        keys, val = _argv.split('=')
-        keys = keys.split('.')
-        val = yaml.safe_load(val)
-        config.update(Config._create(keys, val), ignore_unknown=False)
-
-    # implement random wait to avoid file reading conflicts in cluster usage
+        key, val = _argv.split('=')
+        config[key] = yaml.safe_load(val)
+    # add random wait to avoid conflicts in the following I/O operations on cluster
     if 'max_wait' in config:
         wait = config.pop('max_wait')*random.random()
         if wait>0:
@@ -158,26 +154,27 @@ def from_cli(argv: Optional[list[str]] = None):
     return config
 
 
+def _load_dict(config: Union[dict, Path, str, None]) -> Config:
+    if isinstance(config, (Path, str)):
+        with open(config, 'r') as f:
+            config = yaml.safe_load(f)
+    config = Config(config)
+    return config
+
+
 def _locate(path: str) -> Callable:
     r"""Returns a callable object from string.
 
-    This is a simplied version of hydra._internal.utils._locate.
+    This is a simplified version of 'hydra._internal.utils._locate' (==1.3.1).
 
     """
     parts = path.split('.')
-
     part = parts[0]
-    try:
-        obj = import_module(part)
-    except:
-        raise
+    obj = import_module(part)
     for m in range(1, len(parts)):
         part = parts[m]
         try:
             obj = getattr(obj, part)
         except:
-            try:
-                obj = import_module('.'.join(parts[:(m+1)]))
-            except:
-                raise
+            obj = import_module('.'.join(parts[:(m+1)]))
     return obj

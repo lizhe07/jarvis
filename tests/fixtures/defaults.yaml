@@ -1,0 +1,6 @@
+jarvis.models.resnet.resnet18:
+  conv0_channels: 32
+
+jarvis.utils.sgd_optimizer:
+  lr: 1.e-3
+  momentum: 0.99

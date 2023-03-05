@@ -1,10 +1,14 @@
-import argparse, random, torch
+import random, torch
 import numpy as np
+from typing import Optional
+from torch.utils.data import (
+    TensorDataset, DataLoader, WeightedRandomSampler,
+)
 
-from .alias import Module, Optimizer, Scheduler
+from .alias import Tensor, Module, Optimizer, Scheduler
 
 
-def time_str(t_elapse: float, progress: float = 1.) -> str:
+def time_str(t_elapse: float, progress: Optional[float] = None) -> str:
     r"""Returns a formatted string for a duration.
 
     Args
@@ -14,9 +18,13 @@ def time_str(t_elapse: float, progress: float = 1.) -> str:
     progress:
         The estimated progress, used for estimating field width.
 
-    """
-    field_width = int(np.log10(max(t_elapse, 1e-6)/60/progress))+1
-    return '{{:{}d}}m{{:05.2f}}s'.format(field_width).format(int(t_elapse//60), t_elapse%60)
+    """    
+    t_str = ''
+    if t_elapse>40 or progress is not None:
+        field_width = int(np.log10(max(t_elapse, 1e-6)/60/(progress or 1)))+1
+        t_str += '{{:{}d}}m'.format(field_width).format(int(t_elapse//60))
+    t_str += '{:05.2f}s'.format(t_elapse%60)
+    return t_str
 
 
 def progress_str(i: int, n: int, show_percent: bool = False) -> str:
@@ -35,7 +43,7 @@ def progress_str(i: int, n: int, show_percent: bool = False) -> str:
     field_width = int(np.log10(n))+1
     disp_str = '{{:{}d}}/{{:{}d}}'.format(field_width, field_width).format(i, n)
     if show_percent:
-        disp_str += ', ({:6.1%})'.format(i/n)
+        disp_str += ' ({:6.1%})'.format(i/n)
     return disp_str
 
 
@@ -57,138 +65,11 @@ def set_seed(seed, strict=False):
         torch.backends.cudnn.benchmark = False
 
 
-def flatten(nested_dict: dict) -> dict:
-    r"""Flattens a nested dictionary.
-
-    A nested dictionary like `{'A': {'B', val}}` will be converted to
-    `{('B', '@', 'A'), val}`.
-
-    Args
-    ----
-    nested_dict: dict
-        A nested dictionary possibly contains dictionaries as values.
-
-    Returns
-    -------
-    flat_dict: dict
-        A flat dictionary with tuple keys for hierarchy.
-
-    """
-    flat_dict = {}
-    for key, val in nested_dict.items():
-        if isinstance(val, dict) and len(val)>0:
-            for subkey, subval in flatten(val).items():
-                flat_dict[(subkey, '@', key)] = subval
-        else:
-            flat_dict[key] = val
-    return flat_dict
-
-
-def nest(flat_dict: dict) -> dict:
-    r"""Nests a flat dictionary.
-
-    A flat dictionary like `{('B', '@', 'A'), val}` will be converted to
-    `{'A': {'B', val}}`.
-
-    Args
-    ----
-    flat_dict: dict
-        A flat dictionary with tuple keys for hierarchy.
-
-    Returns
-    -------
-    nested_dict: dict
-        A nested dictionary possibly contains dictionaries as values.
-
-    """
-    nested_dict = {}
-    for key, val in flat_dict.items():
-        if isinstance(key, tuple) and len(key)==3 and key[1]=='@':
-            subkey, _, parkey = key
-            if parkey in nested_dict:
-                assert isinstance(nested_dict[parkey], dict)
-            else:
-                nested_dict[parkey] = {}
-            nested_dict[parkey][subkey] = val
-        else:
-            if key in nested_dict:
-                assert isinstance(nested_dict[key], dict) and isinstance(val, dict)
-                nested_dict[key].update(val)
-            else:
-                nested_dict[key] = val
-    for key, val in nested_dict.items():
-        if isinstance(val, dict):
-            nested_dict[key] = nest(val)
-    return nested_dict
-
-
-def numpy_dict(state: dict) -> dict:
-    r"""Returns a state dictionary with tensors replaced by numpy arrays.
-
-    Each tensor is converted to a tuple containing the numpy array and tensor
-    dtype.
-
-    Args
-    ----
-    state:
-        State dictionary potentially containing tensors, returned by torch
-        module, optimizer or scheduler.
-
-    Returns
-    -------
-    A dictionary with same structure, with tensors converted to numpy arrays.
-
-    """
-    f_state = flatten(state)
-    for key, val in f_state.items():
-        if isinstance(val, torch.Tensor):
-            f_state[key] = (val.data.cpu().clone().numpy(), val.dtype)
-    return nest(f_state)
-
-
-def tensor_dict(state: dict, device='cpu') -> dict:
-    r"""Returns a state dictionary with numpy arrays replaced by tensors.
-
-    This is the inverted function of `numpy_dict`.
-
-    Args
-    ----
-    state:
-        The state dictionary converted by `numpy_dict`.
-    device:
-        Tensor device of the converted state dictionary.
-
-    """
-    f_state = flatten(state)
-    for key, val in f_state.items():
-        if isinstance(val, tuple) and len(val)==2 and isinstance(val[0], np.ndarray) and isinstance(val[1], torch.dtype):
-            f_state[key] = torch.tensor(val[0], dtype=val[1], device=device)
-    return nest(f_state)
-
-
-def job_parser():
-    r"""Returns a base parser for job processing."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--max-wait', default=1, type=float,
-        help="Maximum seconds of random wait before computation, to avoid file I/O conficts."
-    )
-    parser.add_argument('--num-works', default=0, type=int,
-        help="Number of works to be trained before exit. '0' means to train all works."
-    )
-    parser.add_argument('--patience', default=168, type=float,
-        help="Number of hours from last modification of a training to be considered as running."
-    )
-    parser.add_argument('--max-errors', default=0, type=int,
-        help="Maximum number of runtime errors."
-    )
-    return parser
-
-
 def sgd_optimizer(
     model: Module,
     lr: float,
     momentum: float = 0.9,
-    weight_decay: float = 0.,
+    weight_decay: float = 1e-4,
 ) -> Optimizer:
     r"""Returns a SGD optimizer.
 
@@ -259,3 +140,50 @@ def cyclic_scheduler(
         optimizer, lambda epoch: gamma**((epoch%cycle_len)//phase_len),
     )
     return scheduler
+
+
+def numpy_dict(t_state_dict: dict) -> dict:
+    n_state_dict = {}
+    for key, val in t_state_dict.items():
+        if isinstance(val, dict):
+            n_state_dict[key] = numpy_dict(val)
+        elif isinstance(val, Tensor):
+            n_state_dict[key] = ('_T', val.data.cpu().clone().numpy(), val.dtype)
+        else:
+            n_state_dict[key] = val
+    return n_state_dict
+
+def tensor_dict(n_state_dict: dict, device='cpu') -> dict:
+    t_state_dict = {}
+    for key, val in n_state_dict.items():
+        if isinstance(val, dict):
+            t_state_dict[key] = tensor_dict(val, device)
+        elif isinstance(val, tuple) and len(val)==3 and val[0]=='_T':
+            t_state_dict[key] = torch.tensor(val[1], dtype=val[2], device=device)
+        else:
+            t_state_dict[key] = val
+    return t_state_dict
+
+
+def create_mlp_layers(
+    in_features: int, out_features: int,
+    num_features: Optional[list[int]] = None,
+    nonlinearity: str = 'ReLU',
+    last_linear: bool = True,
+) -> torch.nn.ModuleList:
+    nonlinearity = getattr(torch.nn, nonlinearity)
+    layers = torch.nn.ModuleList()
+    for l_idx in range(len(num_features)+1):
+        if l_idx==0:
+            _in_features = in_features
+        else:
+            _in_features = num_features[l_idx-1]
+        if l_idx==len(num_features):
+            _out_features = out_features
+        else:
+            _out_features = num_features[l_idx]
+        layers.append(torch.nn.Sequential(
+            torch.nn.Linear(_in_features, _out_features),
+            nonlinearity() if l_idx<len(num_features) or not last_linear else torch.nn.Identity(),
+        ))
+    return layers

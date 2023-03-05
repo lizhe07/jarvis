@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Oct 28 11:42:08 2020
-
-@author: Zhe
-"""
-
 from typing import List, Any
 
 import torch
