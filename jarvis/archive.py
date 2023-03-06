@@ -211,16 +211,17 @@ class Archive:
 
         Returns
         -------
-        removed:
-            The name of removed files.
+        keys:
+            The keys of remaining valid records.
 
         """
-        removed = []
+        keys, removed = [], []
         store_paths = self._store_paths()
         verbose, tic = None, time.time()
         for i, store_path in enumerate(store_paths, 1):
             try:
-                self._safe_read(store_path)
+                records = self._safe_read(store_path)
+                keys += list(records.keys())
             except:
                 print("{} corrupted, will be removed".format(store_path))
                 os.remove(store_path)
@@ -237,9 +238,7 @@ class Archive:
                     ))
         if removed:
             print(f"{len(removed)} corrupted files removed.")
-        else:
-            print("No corrupted files detected.")
-        return removed
+        return keys
 
     def copy_to(self,
         dst_dir: str,
@@ -274,21 +273,24 @@ class Archive:
                 )
         # merge records
         for file_name in self._file_names():
-            src_path = f'{self.store_dir}/{file_name}'
-            dst_path = f'{dst_dir}/{file_name}'
+            try:
+                src_path = f'{self.store_dir}/{file_name}'
+                dst_path = f'{dst_dir}/{file_name}'
 
-            src_records = self._safe_read(src_path)
-            src_records = {k: v for k, v in src_records.items() if keys is None or k in keys}
-            dst_records = self._safe_read(dst_path) if os.path.exists(dst_path) else {}
-            if not overwrite:
-                for key in src_records:
-                    assert key not in dst_records, (
-                        f"Existing key '{key}' detected in the destination '{dst_dir}', cloning "
-                        "operation aborted."
-                    )
-            dst_records.update(src_records)
-            if dst_records:
-                self._safe_write(dst_records, dst_path)
+                src_records = self._safe_read(src_path)
+                src_records = {k: v for k, v in src_records.items() if keys is None or k in keys}
+                dst_records = self._safe_read(dst_path) if os.path.exists(dst_path) else {}
+                if not overwrite:
+                    for key in src_records:
+                        assert key not in dst_records, (
+                            f"Existing key '{key}' detected in the destination '{dst_dir}', cloning "
+                            "operation aborted."
+                        )
+                dst_records.update(src_records)
+                if dst_records:
+                    self._safe_write(dst_records, dst_path)
+            except MaxTryIOError as e:
+                print(str(e))
 
 
 class HashableRecordArchive(Archive):

@@ -559,8 +559,20 @@ class Manager:
         ckpt = self.ckpts.pop(key)
         preview = self.previews.pop(key)
         return config, stat, ckpt, preview
-
+    
     def prune(self):
+        r"""Remove corrupted records."""
+        self.configs.prune()
+        s_keys = self.stats.prune()
+        c_keys = self.ckpts.prune()
+        p_keys = self.previews.prune()
+        # remove records without checkpoints
+        for key in set(s_keys)-set(c_keys):
+            self.stats.pop(key)
+        for key in set(p_keys)-set(c_keys):
+            self.previews.pop(key)
+
+    def remove_duplicates(self):
         r"""Removes duplicate works.
 
         Duplicated works may exist due to accident, remove all records except
