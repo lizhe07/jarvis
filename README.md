@@ -14,8 +14,8 @@ auxiliary information are stored in separate archive directories.
 ### Initialization
 A `Manager` object is initialized with:
 - `store_dir`, directory for storing training data
-- `defaults` (Optional), a dictionary or a yaml file name containing a one that
-provides default values of a training configuration.
+- `defaults` (Optional), a dictionary or a yaml file name containing one that provides default
+values of a training configuration.
 ```python
 store_dir = 'store'
 defaults = 'defaults.yaml'
