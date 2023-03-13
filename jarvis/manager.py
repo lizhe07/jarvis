@@ -471,9 +471,9 @@ class Manager:
         flat_config, flat_cond = config.flatten(), cond.flatten()
         for key in flat_cond:
             if not (key in flat_config and (
-                flat_config[key]==flat_cond[key]
-                or
                 (callable(flat_cond[key]) and flat_cond[key](flat_config[key]))
+                or
+                flat_config[key]==flat_cond[key]
             )):
                 return False
         return True
@@ -559,7 +559,7 @@ class Manager:
         ckpt = self.ckpts.pop(key)
         preview = self.previews.pop(key)
         return config, stat, ckpt, preview
-    
+
     def prune(self):
         r"""Remove corrupted records."""
         self.configs.prune()

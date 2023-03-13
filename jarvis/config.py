@@ -85,7 +85,7 @@ class Config(dict):
             else:
                 f_dict[p_key] = p_val
         return f_dict
-    
+
     def asdict(self) -> dict:
         r"""Returns basic dict version."""
         # TODO deal with list and set

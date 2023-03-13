@@ -96,7 +96,7 @@ class Archive:
         if not self._is_valid_key(key):
             raise KeyError(key)
         return f'{self.store_dir}/{key[:self.path_len]}.axv'
-    
+
     def _file_names(self) -> list[str]:
         r"""Returns all valid file names in the directory."""
         file_names = [
