@@ -31,7 +31,7 @@ them.
 ### Train a model
 A few methods need to be overridden or implemented before the `manager` can work properly, the
 requirements for subclassing the `Manager` will be detailed in
-[this section](###pipeline-and-subclassing).
+[this section](#pipeline-and-subclassing).
 
 After a `Manager` class has been properly subclassed, we can train one model as below.
 ```python
