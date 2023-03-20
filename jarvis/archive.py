@@ -215,13 +215,13 @@ class Archive:
             The keys of remaining valid records.
 
         """
-        keys, removed = [], []
+        valid_keys, removed = [], []
         store_paths = self._store_paths()
         verbose, tic = None, time.time()
         for i, store_path in enumerate(store_paths, 1):
             try:
                 records = self._safe_read(store_path)
-                keys += list(records.keys())
+                valid_keys += list(records.keys())
             except:
                 print("{} corrupted, will be removed".format(store_path))
                 os.remove(store_path)
@@ -238,7 +238,7 @@ class Archive:
                     ))
         if removed:
             print(f"{len(removed)} corrupted files removed.")
-        return keys
+        return valid_keys
 
     def copy_to(self,
         dst_dir: str,
