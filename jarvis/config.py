@@ -75,6 +75,12 @@ class Config(dict):
         except:
             return super().__getattr__(key)
 
+    def get(self, key, val=None):
+        try:
+            return self[key]
+        except:
+            return val
+
     def flatten(self) -> dict:
         r"""Returns a flattened dictionary."""
         f_dict = {}
