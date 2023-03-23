@@ -647,7 +647,7 @@ class Manager:
         toc = time.time()
         print(f"Data exported to {tar_path} ({time_str(toc-tic)}).")
 
-    def _load_dir(self, src_dir: str, newer_only: bool = True):
+    def _load_dir(self, src_dir: str, newer_only: bool = True, overwrite: bool = False):
         src_manager = Manager(store_dir=src_dir)
         # divide works into 'cloning' group and 'adding' group
         _old_configs = {k: v for k, v in self.configs.items()}
@@ -664,17 +664,20 @@ class Manager:
                 else:
                     clone_keys.add(new_key)
             else:
-                if newer_only and _new_stats[new_key]['epoch']<=_old_stats[old_key]['epoch']:
+                if newer_only and (
+                    new_key in _new_stats and old_key in _old_stats and
+                    _new_stats[new_key]['epoch']<=_old_stats[old_key]['epoch']
+                ):
                     continue
                 if new_key==old_key:
                     clone_keys.add(new_key)
                 else:
                     add_keys.add(new_key)
         # use 'copy_to' to add 'cloning' group directly
-        src_manager.configs.copy_to(self.configs.store_dir, clone_keys)
-        src_manager.stats.copy_to(self.stats.store_dir, clone_keys)
-        src_manager.ckpts.copy_to(self.ckpts.store_dir, clone_keys)
-        src_manager.previews.copy_to(self.previews.store_dir, clone_keys)
+        src_manager.configs.copy_to(self.configs.store_dir, clone_keys, overwrite=True)
+        src_manager.stats.copy_to(self.stats.store_dir, clone_keys, overwrite=overwrite)
+        src_manager.ckpts.copy_to(self.ckpts.store_dir, clone_keys, overwrite=overwrite)
+        src_manager.previews.copy_to(self.previews.store_dir, clone_keys, overwrite=overwrite)
         # use 'add' to insert 'adding' group one by one
         for src_key in add_keys:
             dst_key = self.configs.add(_new_configs[src_key])
@@ -682,7 +685,7 @@ class Manager:
             self.ckpts[dst_key] = src_manager.ckpts[src_key]
             self.previews[dst_key] = src_manager.previews[src_key]
 
-    def load_tar(self, tar_path: str, compresslevel: int = 1):
+    def load_tar(self, tar_path: str, compresslevel: int = 1, **kwargs):
         r"""Loads manager data from a tar file.
 
         Args
@@ -700,7 +703,7 @@ class Manager:
         try:
             with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as f:
                 f.extractall(tmp_dir)
-            self._load_dir(tmp_dir)
+            self._load_dir(tmp_dir, **kwargs)
         except:
             raise
         finally:
