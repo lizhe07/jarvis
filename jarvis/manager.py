@@ -602,32 +602,56 @@ class Manager:
         keys: Optional[set] = None,
         min_epoch: int = 0,
         cond: Optional[dict] = None,
-    ):
+        minus_hours: float = float('inf'),
+    ) -> None:
+        r"""Exports manager data to a directory.
+
+        Args
+        ----
+        dst_dir:
+            Destination directory.
+        keys:
+            Keys of works that will be potentially exported. If ``None``, all
+            works satisfying the criterion will be exported.
+        min_epoch, cond:
+            Minimum number of trained epochs and conditioned values for the
+            works to export. See `completed` for more details.
+        minus_hours:
+            Only the latest modified work will be exported. For example, if only
+            the ones modified within one day is needed, use `minus_hours=24`.
+
+        """
         dst_manager = Manager(store_dir=dst_dir)
         if keys is None:
             keys = set(self.completed(min_epoch, cond))
-        self.configs.copy_to(dst_manager.configs.store_dir, keys)
-        self.stats.copy_to(dst_manager.stats.store_dir, keys)
-        self.ckpts.copy_to(dst_manager.ckpts.store_dir, keys)
-        self.previews.copy_to(dst_manager.previews.store_dir, keys)
+        _keys = set()
+        tic = time.time()
+        for key in self.completed(min_epoch, cond):
+            if (tic-self.stats.get(key, {}).get('toc', -float('inf')))>minus_hours:
+                continue
+            _keys.add(key)
+        if keys is not None:
+            _keys.intersection_update(keys)
+        self.configs.copy_to(dst_manager.configs.store_dir, _keys)
+        self.stats.copy_to(dst_manager.stats.store_dir, _keys)
+        self.ckpts.copy_to(dst_manager.ckpts.store_dir, _keys)
+        self.previews.copy_to(dst_manager.previews.store_dir, _keys)
 
     def export_tar(self,
         tar_path: str = 'store.tar.gz',
-        min_epoch: int = 0,
-        cond: Optional[dict] = None,
         compresslevel: int = 1,
-    ):
+        **kwargs,
+    ) -> None:
         r"""Exports manager data to a tar file.
 
         Args
         ----
         tar_path:
             Path of the file to export to.
-        min_epoch, cond:
-            Minimum number of trained epochs and conditioned values for the
-            works to export. See `completed` for more details.
         compressionlevel:
             Compression level of gzip.
+        kwargs:
+            Optional arguments for `_export_dir`.
 
         """
         assert self.store_dir is not None
@@ -635,7 +659,7 @@ class Manager:
 
         tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
         try:
-            self._export_dir(tmp_dir, min_epoch=min_epoch, cond=cond)
+            self._export_dir(tmp_dir, **kwargs)
             with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as f:
                 for axv_name in ['configs', 'stats', 'ckpts', 'previews']:
                     f.add(f'{tmp_dir}/{axv_name}', arcname=axv_name)
