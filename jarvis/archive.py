@@ -331,7 +331,8 @@ class HashableRecordArchive(Archive):
         return n_val
 
     @classmethod
-    def equals(cls, n_val_0, n_val_1):
+    def equals(cls, n_val_0, n_val_1) -> bool:
+        r"""Checks if two values are equal."""
         return cls._to_hashable(n_val_0)==cls._to_hashable(n_val_1)
 
     def __setitem__(self, key: str, n_val: Any):
@@ -404,3 +405,21 @@ class ConfigArchive(HashableRecordArchive):
 
     def get_key(self, val: dict) -> Optional[str]:
         return super().get_key(Config(val))
+
+    @classmethod
+    def diffs(cls, config_0: Config, config_1: Config) -> tuple[Config, Config]:
+        r"""Returns the different parts of two configs."""
+        res_0, res_1 = Config(), Config()
+        f_dict_0, f_dict_1 = config_0.flatten(), config_1.flatten()
+        for key_0, val_0 in f_dict_0.items():
+            if key_0 not in f_dict_1:
+                res_0[key_0] = val_0
+        for key_1, val_1 in f_dict_1.items():
+            if key_1 not in f_dict_0:
+                res_1[key_1] = val_1
+        for key in f_dict_0.keys()&f_dict_1.keys():
+            val_0, val_1 = f_dict_0[key], f_dict_1[key]
+            if not HashableRecordArchive.equals(val_0, val_1):
+                res_0[key] = val_0
+                res_1[key] = val_1
+        return res_0, res_1
