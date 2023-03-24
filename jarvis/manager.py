@@ -478,7 +478,7 @@ class Manager:
                 return False
         return True
 
-    def completed(self, min_epoch: int = 0, cond: Optional[dict] = None) -> str:
+    def completed(self, min_epoch: int = 0, cond: Optional[dict] = None) -> tuple[str, Config]:
         r"""A generator for completed works.
 
         Args
@@ -496,11 +496,12 @@ class Manager:
             _configs = {k: self.configs._to_native(v) for k, v in _configs.items()}
             _stats = self.stats._safe_read(f'{self.stats.store_dir}/{file_name}')
             for key, stat in _stats.items():
-                if (
-                    stat['epoch']>=min_epoch and
-                    self._is_matched(_configs.get(key, {}), cond)
-                ):
-                    yield key
+                if stat['epoch']<min_epoch:
+                    continue
+                if key in _configs:
+                    config = _configs[key]
+                    if self._is_matched(config, cond):
+                        yield key, config
 
     def best_work(self,
         min_epoch: int = 0,
@@ -534,7 +535,7 @@ class Manager:
         best_val = -float('inf') if reverse else float('inf')
         best_key = None
         count = 0
-        for key in self.completed(min_epoch, cond):
+        for key, _ in self.completed(min_epoch, cond):
             val = self.previews[key][p_key]
             if reverse:
                 if val>best_val:
@@ -622,11 +623,9 @@ class Manager:
 
         """
         dst_manager = Manager(store_dir=dst_dir)
-        if keys is None:
-            keys = set(self.completed(min_epoch, cond))
         _keys = set()
         tic = time.time()
-        for key in self.completed(min_epoch, cond):
+        for key, _ in self.completed(min_epoch, cond):
             if (tic-self.stats.get(key, {}).get('toc', -float('inf')))>minus_hours:
                 continue
             _keys.add(key)
