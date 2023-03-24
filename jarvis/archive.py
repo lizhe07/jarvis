@@ -407,19 +407,25 @@ class ConfigArchive(HashableRecordArchive):
         return super().get_key(Config(val))
 
     @classmethod
-    def diffs(cls, config_0: Config, config_1: Config) -> tuple[Config, Config]:
-        r"""Returns the different parts of two configs."""
-        res_0, res_1 = Config(), Config()
-        f_dict_0, f_dict_1 = config_0.flatten(), config_1.flatten()
-        for key_0, val_0 in f_dict_0.items():
-            if key_0 not in f_dict_1:
-                res_0[key_0] = val_0
-        for key_1, val_1 in f_dict_1.items():
-            if key_1 not in f_dict_0:
-                res_1[key_1] = val_1
-        for key in f_dict_0.keys()&f_dict_1.keys():
-            val_0, val_1 = f_dict_0[key], f_dict_1[key]
-            if not HashableRecordArchive.equals(val_0, val_1):
-                res_0[key] = val_0
-                res_1[key] = val_1
-        return res_0, res_1
+    def diffs(cls, configs: list[Config]) -> list[Config]:
+        r"""Returns the different parts of multiple configs."""
+        f_dicts = [config.flatten() for config in configs]
+        shared_keys = None
+        for f_dict in f_dicts:
+            if shared_keys is None:
+                shared_keys = set(f_dict.keys())
+            else:
+                shared_keys &= set(f_dict.keys())
+        keys_with_diff_vals = set()
+        for key in shared_keys:
+            vals = set()
+            for f_dict in f_dicts:
+                vals.add(HashableRecordArchive._to_hashable(f_dict[key]))
+            if len(vals)>1:
+                keys_with_diff_vals.add(key)
+        shared_keys -= keys_with_diff_vals
+        residuals = [
+            Config({k: v for k, v in f_dict.items() if k not in shared_keys})
+            for f_dict in f_dicts
+        ]
+        return residuals
