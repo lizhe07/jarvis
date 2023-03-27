@@ -2,7 +2,7 @@ import random, time, tarfile, shutil
 from pathlib import Path
 import numpy as np
 from typing import Optional, Union
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from .config import Config, _load_dict
 from .archive import Archive, ConfigArchive
@@ -478,7 +478,10 @@ class Manager:
                 return False
         return True
 
-    def completed(self, min_epoch: int = 0, cond: Optional[dict] = None) -> tuple[str, Config]:
+    def completed(self,
+        min_epoch: int = 0,
+        cond: Optional[dict[str, Union[list, Callable[..., bool]]]] = None,
+    ) -> tuple[str, Config]:
         r"""A generator for completed works.
 
         Args
