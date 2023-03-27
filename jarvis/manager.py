@@ -2,7 +2,7 @@ import random, time, tarfile, shutil
 from pathlib import Path
 import numpy as np
 from typing import Optional, Union
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from .config import Config, _load_dict
 from .archive import Archive, ConfigArchive
@@ -466,9 +466,9 @@ class Manager:
         return report
 
     @staticmethod
-    def _is_matched(config: Config, cond: Config) -> bool:
+    def _is_matched(config: Config, flat_cond: dict) -> bool:
         r"""Checks if a configuration matches condition."""
-        flat_config, flat_cond = config.flatten(), cond.flatten()
+        flat_config = config.flatten()
         for key in flat_cond:
             if not (key in flat_config and (
                 (callable(flat_cond[key]) and flat_cond[key](flat_config[key]))
@@ -478,7 +478,10 @@ class Manager:
                 return False
         return True
 
-    def completed(self, min_epoch: int = 0, cond: Optional[dict] = None) -> tuple[str, Config]:
+    def completed(self,
+        min_epoch: int = 0,
+        cond: Optional[dict[str, Union[list, Callable[..., bool]]]] = None,
+    ) -> tuple[str, Config]:
         r"""A generator for completed works.
 
         Args
@@ -489,7 +492,7 @@ class Manager:
             Conditioned value of work configurations.
 
         """
-        cond = Config(cond)
+        flat_cond = Config(cond).flatten()
         file_names = set(self.configs._file_names())&set(self.stats._file_names())
         for file_name in file_names:
             _configs = self.configs._safe_read(f'{self.configs.store_dir}/{file_name}')
@@ -500,7 +503,7 @@ class Manager:
                     continue
                 if key in _configs:
                     config = _configs[key]
-                    if self._is_matched(config, cond):
+                    if self._is_matched(config, flat_cond):
                         yield key, config
 
     def best_work(self,

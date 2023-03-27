@@ -193,6 +193,12 @@ class Archive:
             for key, val in records.items():
                 yield key, val
 
+    def get(self, key: str, val: Any = None) -> Any:
+        try:
+            return self[key]
+        except:
+            return val
+
     def pop(self, key: str) -> Any:
         r"""Removes a specified key and return its value."""
         store_path = self._store_path(key)
@@ -407,7 +413,7 @@ class ConfigArchive(HashableRecordArchive):
         return super().get_key(Config(val))
 
     @classmethod
-    def diffs(cls, configs: list[Config]) -> list[Config]:
+    def diffs(cls, configs: list[Config]) -> tuple[Config, list[Config]]:
         r"""Returns the different parts of multiple configs."""
         f_dicts = [config.flatten() for config in configs]
         shared_keys = None
@@ -424,8 +430,9 @@ class ConfigArchive(HashableRecordArchive):
             if len(vals)>1:
                 keys_with_diff_vals.add(key)
         shared_keys -= keys_with_diff_vals
+        shared = Config({k: f_dicts[0][k] for k in shared_keys})
         residuals = [
             Config({k: v for k, v in f_dict.items() if k not in shared_keys})
             for f_dict in f_dicts
         ]
-        return residuals
+        return shared, residuals
