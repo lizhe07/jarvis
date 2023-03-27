@@ -1,6 +1,7 @@
 import random, time, tarfile, shutil
 from pathlib import Path
 import numpy as np
+
 from typing import Optional, Union
 from collections.abc import Callable, Iterable
 
@@ -355,11 +356,8 @@ class Manager:
         """
         choices = Config(choices).flatten()
         keys = list(choices.keys())
-        vals, dims = [], []
-        for key in keys:
-            assert isinstance(choices[key], list)
-            vals.append(choices[key])
-            dims.append(len(choices[key]))
+        vals = [list(choices[key]) for key in keys]
+        dims = [len(val) for val in vals]
         total_num = np.prod(dims)
 
         for idx in random.sample(range(total_num), total_num):
@@ -409,25 +407,29 @@ class Manager:
             A dictionary containing different values from all works specified
             by `configs`. Besides the custom keys in `p_keys`, there are default
             keys:
+            - 'keys': Key of each work.
             - 'epoch': Number of epochs of each work.
             - 't_train': Average time of training one epoch, in seconds.
             - 't_eval': Average time of evaluation, in seconds.
 
         """
+        p_keys = p_keys or []
         _keys = {self.configs._to_hashable(v): k for k, v in self.configs.items()}
         _stats = {k: v for k, v in self.stats.items()}
         _previews = {k: v for k, v in self.previews.items()}
 
-        keys = set()
+        keys, _pool = set(), set()
         for config in configs:
             _config = self.configs._to_hashable(config)
             if _config in _keys:
                 keys.add(_keys[_config])
+            _pool.add(_config)
+        keys, total = list(keys), len(_pool)
         report = {
             'keys': keys, 'epochs': [],
             't_train': [], 't_eval': [],
         }
-        for p_key in (p_keys or []):
+        for p_key in p_keys:
             report[p_key] = []
         for key in keys:
             try:
@@ -442,23 +444,29 @@ class Manager:
             report['t_train'].append(t_train)
             report['t_eval'].append(t_eval)
             preview = _previews.get(key, {})
-            for p_key in (p_keys or []):
+            for p_key in p_keys:
                 report[p_key].append(preview.get(p_key) or np.nan)
         for p_key in report:
             report[p_key] = np.array(report[p_key])
         if self.verbose:
-            print("Found {} trained agents.".format((report['epochs']>=0).sum()))
+            print("{}/{} agents trained.".format((report['epochs']>=0).sum(), total))
             if min_epoch is None:
-                print("Average number of trained epochs: {:.1f}".format(
+                print("Mean number of trained epochs: {:.1f}".format(
                     np.clip(report['epochs'], 0, None).mean(),
                 ))
             else:
-                print("Average progress of training: {:.1%} ({} epochs as complete).".format(
+                print("Mean progress of training: {:.1%} ({} epochs as complete).".format(
                     np.clip(report['epochs']/min_epoch, 0, 1).mean(), min_epoch,
                 ))
             t_train = np.nanmean(report['t_train'])
             if not np.isnan(t_train):
-                print("Approximate training time: {} per epoch.".format(time_str(t_train)))
+                head_str = "Approximate training speed"
+                if t_train>=30:
+                    print("{}: {}/epoch.".format(head_str, time_str(t_train)))
+                elif t_train>0.5:
+                    print("{}: {:.2f} epochs/min.".format(head_str, 60/t_train))
+                elif t_train>1e-5:
+                    print("{}: {:.2f} epochs/sec.".format(head_str, 1/t_train))
             t_eval = np.nanmean(report['t_eval'])
             if not np.isnan(t_eval) and t_eval>=30:
                 print("Approximate evaluation time: {}.".format(time_str(t_eval)))
