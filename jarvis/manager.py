@@ -386,20 +386,19 @@ class Manager:
             raise NotImplementedError
         self.batch(self._config_gen(choices), **kwargs)
 
-    def overview(self,
+    def monitor(self,
         configs: Iterable[Config],
         min_epoch: Optional[int] = None,
         p_keys: Optional[list[str]] = None,
     ) -> dict:
-        r"""Returns an overview report of the sweep.
+        r"""Returns a report about batch processing progress.
 
         Args
         ----
-        choices:
-            The configuration value grid, see `_config_gen` for more details.
+        configs:
+            Work configurations to process, see `batch` for more details.
         min_epoch:
-            Minimum number of epochs to be considered as complete, useful when
-            printing information about the progress of a sweep.
+            Minimum number of epochs to be considered as complete.
         p_keys:
             A list of keys in `preview` of each work. Expected to gather float
             numbers at `preview[key]` of all processed works.
@@ -408,7 +407,7 @@ class Manager:
         -------
         report:
             A dictionary containing different values from all works specified
-            by `choices`. Besides the custom keys in `p_keys`, there are default
+            by `configs`. Besides the custom keys in `p_keys`, there are default
             keys:
             - 'epoch': Number of epochs of each work.
             - 't_train': Average time of training one epoch, in seconds.
@@ -461,7 +460,7 @@ class Manager:
             if not np.isnan(t_train):
                 print("Approximate training time: {} per epoch.".format(time_str(t_train)))
             t_eval = np.nanmean(report['t_eval'])
-            if not np.isnan(t_eval):
+            if not np.isnan(t_eval) and t_eval>=30:
                 print("Approximate evaluation time: {}.".format(time_str(t_eval)))
         return report
 
