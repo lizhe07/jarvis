@@ -487,7 +487,7 @@ class Manager:
 
     def completed(self,
         min_epoch: int = 0,
-        cond: Optional[dict[str, Union[list, Callable[..., bool]]]] = None,
+        cond: Optional[dict] = None,
     ) -> tuple[str, Config]:
         r"""A generator for completed works.
 
