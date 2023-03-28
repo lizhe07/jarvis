@@ -413,7 +413,7 @@ class ConfigArchive(HashableRecordArchive):
         return super().get_key(Config(val))
 
     @classmethod
-    def diffs(cls, configs: list[Config]) -> tuple[Config, list[Config]]:
+    def compare(cls, configs: list[Config]) -> tuple[Config, list[Config]]:
         r"""Returns the different parts of multiple configs."""
         f_dicts = [config.flatten() for config in configs]
         shared_keys = None
@@ -431,8 +431,8 @@ class ConfigArchive(HashableRecordArchive):
                 keys_with_diff_vals.add(key)
         shared_keys -= keys_with_diff_vals
         shared = Config({k: f_dicts[0][k] for k in shared_keys})
-        residuals = [
+        diffs = [
             Config({k: v for k, v in f_dict.items() if k not in shared_keys})
             for f_dict in f_dicts
         ]
-        return shared, residuals
+        return shared, diffs
