@@ -500,7 +500,8 @@ class Manager:
 
         """
         flat_cond = Config(cond).flatten()
-        file_names = set(self.configs._file_names())&set(self.stats._file_names())
+        file_names = list(set(self.configs._file_names())&set(self.stats._file_names()))
+        random.shuffle(file_names)
         for file_name in file_names:
             _configs = self.configs._safe_read(f'{self.configs.store_dir}/{file_name}')
             _configs = {k: self.configs._to_native(v) for k, v in _configs.items()}
