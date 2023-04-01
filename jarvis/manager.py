@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 
 from typing import Optional, Union
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 
 from .config import Config, _load_dict
 from .archive import Archive, ConfigArchive
@@ -113,6 +113,7 @@ class Manager:
 
         """
         self.config = config
+        self._key = self.configs.add(self.config)
 
     def init_ckpt(self):
         r"""Initializes checkpoint.
@@ -140,7 +141,7 @@ class Manager:
             super().save_ckpt()
 
         """
-        key = self.configs.add(self.config)
+        key = self._key
         self.stats[key] = {
             'epoch': self.epoch, 'toc': time.time(),
             't_train': self._t_train, 't_eval': self._t_eval,
@@ -159,7 +160,7 @@ class Manager:
             # self.model.load_state_dict(self.ckpt['model_state'])
 
         """
-        key = self.configs.get_key(self.config)
+        key = self._key
         stat = self.stats[key]
         self.epoch = stat['epoch']
         self._t_train = stat.get('t_train', None)
@@ -191,6 +192,7 @@ class Manager:
         config: Config,
         num_epochs: int = 0,
         resume: bool = True,
+        progress: Optional[tuple[int, int]] = None,
     ):
         r"""Processes a work.
 
@@ -207,6 +209,13 @@ class Manager:
 
         """
         self.setup(config)
+        if self.verbose:
+            if progress is None:
+                tag = ''
+            else:
+                i, n = progress
+                tag = ' ({})'.format(progress_str(i, n) if n>0 else i)
+            print("Processing {}{}...".format(self._key, tag))
 
         try: # load existing checkpoint
             assert resume
@@ -314,10 +323,7 @@ class Manager:
 
                 if self.verbose:
                     print("------------")
-                    print("Processing {} ({})...".format(
-                        key, progress_str(w_count+1, count) if count>0 else w_count+1,
-                    ))
-                self.process(config, num_epochs, resume)
+                self.process(config, num_epochs, resume, (w_count+1, count))
                 w_count += 1
             except KeyboardInterrupt:
                 interrupted = True
