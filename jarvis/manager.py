@@ -1,8 +1,8 @@
-import random, time, tarfile, shutil
+import random, time, tarfile, shutil, yaml
 from pathlib import Path
 import numpy as np
 
-from typing import Optional, Union
+from typing import Any, Optional, Union
 from collections.abc import Iterable
 
 from .config import Config, _load_dict
@@ -345,6 +345,46 @@ class Manager:
             print("\n{} works processed.".format(w_count))
             if not interrupted and (count==0 or w_count<count):
                 print("All works are processed or being processed.")
+
+    def _draw_val(self, vals) -> Any:
+        rng = np.random.default_rng()
+        try:
+            assert len(vals)==2
+            assert vals[0] in ['Gaussian', 'Gamma', 'Beta'] and isinstance(vals[1], dict)
+
+            d_type = vals[0]
+            d_params = Config(vals[1])
+            if d_type=='Gaussian': # unbounded
+                d_params.fill({'mu': 0., 'sigma': 1.})
+                return rng.normal(loc=d_params.mu, scale=d_params.sigma)
+            if d_type=='Gamma':
+                d_params.fill({'bound': 0., 'k': 1., 'theta': 1.})
+                if d_params.k>0: # left bounded
+                    return rng.gamma(d_params.k, scale=d_params.theta)+d_params.bound
+                else: # right bounded
+                    return d_params.bound-rng.gamma(-d_params.k, scale=d_params.theta)
+            if d_type=='Beta': # bounded
+                d_params.fill({'low': 0., 'high': 1., 'alpha': 1., 'beta': 1.})
+                return rng.beta(d_params.alpha, d_params.beta)*(d_params.high-d_params.low)+d_params.low
+        except:
+            try:
+                return vals()
+            except:
+                vals = list(vals)
+                return vals[rng.choice(len(vals))]
+
+    def _spec2gen(self,
+        spec: Union[dict[str, Union[Iterable, tuple[str, dict]]], Path, str],
+    ) -> Config:
+        if isinstance(spec, (Path, str)):
+            with open(spec, 'r') as f:
+                spec = yaml.safe_load(f)
+        spec = Config(spec).flatten()
+        while True:
+            config = self.get_config({
+                key: self._draw_val(vals) for key, vals in spec.items()
+            })
+            yield config
 
     def _config_gen(self, choices: dict) -> Config:
         r"""Generator of configurations.
