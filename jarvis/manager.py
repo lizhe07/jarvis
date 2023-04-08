@@ -376,15 +376,41 @@ class Manager:
     def _spec2gen(self,
         spec: Union[dict[str, Union[Iterable, tuple[str, dict]]], Path, str],
     ) -> Config:
-        if isinstance(spec, (Path, str)):
-            with open(spec, 'r') as f:
-                spec = yaml.safe_load(f)
-        spec = Config(spec).flatten()
+        spec = _load_dict(spec).flatten()
         while True:
             config = self.get_config({
                 key: self._draw_val(vals) for key, vals in spec.items()
             })
             yield config
+
+    def _is_in_range(self, bounds):
+        low = bounds.get('low', -np.inf)
+        high = bounds.get('high', np.inf)
+        def _is_in(x):
+            return low<x<high
+        return _is_in
+
+    def _is_in_list(self, vals):
+        def _is_in(x):
+            return x in vals
+        return _is_in
+
+    def _is_in(self, val):
+        if len(val)==2 and val[0]=='Range' and set(val[1].keys()).issubset(['low', 'high']):
+            return self._is_in_range(val[1])
+        else:
+            return self._is_in_list(val)
+
+    def _spec2cond(self,
+        spec: Union[dict[str, Union[Iterable, tuple[str, dict]]], Path, str],
+    ) -> Config:
+        cond = _load_dict(spec).flatten()
+        for key, val in cond.items():
+            if callable(val):
+                continue
+            assert isinstance(val, list)
+            cond[key] = self._is_in(val)
+        return cond
 
     def _config_gen(self, choices: dict) -> Config:
         r"""Generator of configurations.
