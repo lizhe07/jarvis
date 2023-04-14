@@ -395,7 +395,7 @@ class Manager:
             return x in vals
         return _is_in
 
-    def _is_in(self, val):
+    def _is_in(self, val: list) -> bool:
         if len(val)==2 and val[0]=='Range' and set(val[1].keys()).issubset(['low', 'high']):
             return self._is_in_range(val[1])
         else:
