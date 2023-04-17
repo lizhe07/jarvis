@@ -656,7 +656,7 @@ class Manager:
         for key in set(p_keys)-set(c_keys):
             self.previews.pop(key)
 
-    def remove_duplicates(self):
+    def remove_dups(self):
         r"""Removes duplicate works.
 
         Duplicated works may exist due to accident, remove all records except
