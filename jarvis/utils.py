@@ -171,6 +171,8 @@ def create_mlp_layers(
     nonlinearity: str = 'ReLU',
     last_linear: bool = True,
 ) -> torch.nn.ModuleList:
+    if num_features is None:
+        num_features = [4*int((in_features*out_features)**0.5)]
     nonlinearity = getattr(torch.nn, nonlinearity)
     layers = torch.nn.ModuleList()
     for l_idx in range(len(num_features)+1):
