@@ -77,12 +77,13 @@ class Config(dict):
 
     def get(self, key, val=None):
         try:
-            return self[key]
+            val = self[key]
         except:
-            if val is None or isinstance(val, dict):
-                return Config(val)
-            else:
-                return val
+            pass
+        if val is None or isinstance(val, dict):
+            return Config(val)
+        else:
+            return val
 
     def flatten(self) -> dict:
         r"""Returns a flattened dictionary."""
