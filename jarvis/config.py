@@ -79,7 +79,10 @@ class Config(dict):
         try:
             return self[key]
         except:
-            return val
+            if val is None or isinstance(val, dict):
+                return Config(val)
+            else:
+                return val
 
     def flatten(self) -> dict:
         r"""Returns a flattened dictionary."""
