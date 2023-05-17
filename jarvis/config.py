@@ -80,7 +80,7 @@ class Config(dict):
             val = self[key]
         except:
             pass
-        if val is None or isinstance(val, dict):
+        if isinstance(val, dict):
             return Config(val)
         else:
             return val
