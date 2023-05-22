@@ -20,7 +20,7 @@ def time_str(t_elapse: float, progress: Optional[float] = None) -> str:
 
     """
     t_str = ''
-    if t_elapse>40 or progress is not None:
+    if t_elapse>50 or progress is not None:
         field_width = int(np.log10(max(t_elapse, 1e-6)/60/(progress or 1)))+1
         t_str += '{{:{}d}}m'.format(field_width).format(int(t_elapse//60))
     t_str += '{:05.2f}s'.format(t_elapse%60)
