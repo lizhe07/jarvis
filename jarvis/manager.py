@@ -1,4 +1,4 @@
-import random, time, tarfile, shutil, yaml
+import random, time, tarfile, shutil, datetime
 from pathlib import Path
 import numpy as np
 
@@ -208,6 +208,9 @@ class Manager:
             each work from scratch.
 
         """
+        def print_now():
+            print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
         self.setup(config)
         if self.verbose:
             if progress is None:
@@ -217,6 +220,8 @@ class Manager:
                 tag = ' ({})'.format(progress_str(i, n) if n>0 else i)
             print("Processing {}{}...".format(self._key, tag))
 
+        if self.verbose:
+            print_now()
         try: # load existing checkpoint
             assert resume
             self.load_ckpt()
@@ -243,6 +248,7 @@ class Manager:
             else:
                 self.verbose = False
             if self.verbose:
+                print_now()
                 print(f"Epoch: {progress_str(self.epoch, num_epochs)}")
 
             tic = time.time()
