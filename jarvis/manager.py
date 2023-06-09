@@ -220,8 +220,6 @@ class Manager:
                 tag = ' ({})'.format(progress_str(i, n) if n>0 else i)
             print("Processing {}{}...".format(self._key, tag))
 
-        if self.verbose:
-            print_now()
         try: # load existing checkpoint
             assert resume
             self.load_ckpt()
@@ -233,6 +231,7 @@ class Manager:
         except:
             if self.verbose:
                 print("No checkpoint loaded, initializing from scratch.")
+                print_now()
             self.init_ckpt()
             tic = time.time()
             self.eval()
