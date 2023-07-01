@@ -116,7 +116,7 @@ class Config(dict):
     def fill(self, config: Union[dict, Path, str, None]):
         r"""Fills value from a new config."""
         config = _load_dict(config)
-        if not('_target_' in self and '_target_' in config) or self._target_==config._target_:
+        if not('_target_' in self and '_target_' in config and self._target_!=config._target_):
             for key, val in config.items():
                 if key in self:
                     if isinstance(self[key], Config) and isinstance(val, Config):
