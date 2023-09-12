@@ -123,6 +123,7 @@ class Config(dict):
                         self[key].fill(val)
                 else:
                     self[key] = val
+        return self
 
     def clone(self):
         r"""Returns a clone of the configuration."""
