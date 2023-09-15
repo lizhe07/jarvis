@@ -144,7 +144,7 @@ class Config(dict):
             assert callable(_target)
         except:
             raise RuntimeError(f"The '_target_' ({_target}) is not callable.")
-        _kwargs = {k: v for k, v in self.items() if k!='_target_'}
+        _kwargs = Config({k: v for k, v in self.items() if k!='_target_'})
         _kwargs.update(kwargs)
         return _target(*args, **_kwargs)
 
