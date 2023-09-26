@@ -98,7 +98,7 @@ class Manager:
         config.fill(self.defaults)
         return config
 
-    def setup(self, config: Config):
+    def setup(self, config: Config) -> None:
         r"""Sets up manager.
 
         The method sets `self` properties for future training, for example
@@ -112,10 +112,10 @@ class Manager:
             # set up `self` properties
 
         """
-        self.config = config
+        self.config = config.clone()
         self._key = self.configs.add(self.config)
 
-    def init_ckpt(self):
+    def init_ckpt(self) -> None:
         r"""Initializes checkpoint.
 
         Overriding
@@ -131,7 +131,7 @@ class Manager:
         self.ckpt = {'eval_records': {}}
         self.preview = {}
 
-    def save_ckpt(self):
+    def save_ckpt(self) -> None:
         r"""Saves checkpoint.
 
         Overriding
@@ -149,7 +149,7 @@ class Manager:
         self.ckpts[key] = self.ckpt
         self.previews[key] = self.preview
 
-    def load_ckpt(self):
+    def load_ckpt(self) -> None:
         r"""Loads checkpoint.
 
         Overriding
@@ -168,7 +168,7 @@ class Manager:
         self.ckpt = self.ckpts[key]
         self.preview = self.previews[key]
 
-    def train(self):
+    def train(self) -> None:
         r"""Trains the model for one epoch.
 
         Learning rate scheduler should be called at the end if it exists.
@@ -176,7 +176,7 @@ class Manager:
         """
         raise NotImplementedError
 
-    def eval(self):
+    def eval(self) -> None:
         r"""Evaluates the model.
 
         Typically creates a dictionary of evaluation results and adds it to
@@ -193,7 +193,7 @@ class Manager:
         num_epochs: int = 0,
         resume: bool = True,
         progress: Optional[tuple[int, int]] = None,
-    ):
+    ) -> None:
         r"""Processes a work.
 
         Args
@@ -277,7 +277,7 @@ class Manager:
         count: int = 0,
         patience: float = 4.,
         max_errors: int = 0,
-    ):
+    ) -> None:
         r"""Batch processing.
 
         Args
@@ -388,14 +388,14 @@ class Manager:
             })
             yield config
 
-    def _is_in_range(self, bounds):
+    def _is_in_range(self, bounds) -> bool:
         low = bounds.get('low', -np.inf)
         high = bounds.get('high', np.inf)
         def _is_in(x):
             return low<x<high
         return _is_in
 
-    def _is_in_list(self, vals):
+    def _is_in_list(self, vals) -> bool:
         def _is_in(x):
             return x in vals
         return _is_in
@@ -445,7 +445,7 @@ class Manager:
             config = self.get_config(config)
             yield config
 
-    def sweep(self, choices: dict, order: str = 'random', **kwargs):
+    def sweep(self, choices: dict, order: str = 'random', **kwargs) -> None:
         r"""Sweep on a grid of configurations.
 
         Args
