@@ -7,9 +7,10 @@ from torch.utils.data import (
 
 from .alias import Tensor, Module, Optimizer, Scheduler
 
-from tqdm.std import tqdm as std_tqdm
 from tqdm.auto import tqdm as auto_tqdm
-if auto_tqdm==std_tqdm:
+from tqdm.asyncio import tqdm as asyncio_tqdm
+
+if auto_tqdm==asyncio_tqdm:
     tqdm_kwargs = {'ncols': 80, 'ascii': True}
 else:
     tqdm_kwargs = {'ncols': 600}
