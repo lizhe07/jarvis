@@ -7,6 +7,18 @@ from torch.utils.data import (
 
 from .alias import Tensor, Module, Optimizer, Scheduler
 
+from tqdm.std import tqdm as std_tqdm
+from tqdm.auto import tqdm as auto_tqdm
+if auto_tqdm==std_tqdm:
+    tqdm_kwargs = {'ncols': 80, 'ascii': True}
+else:
+    tqdm_kwargs = {'ncols': 600}
+def tqdm(*args, **kwargs):
+    for key, val in tqdm_kwargs.items():
+        if key not in kwargs:
+            kwargs[key] = val
+    return auto_tqdm(*args, **kwargs)
+
 
 def time_str(t_elapse: float, progress: Optional[float] = None) -> str:
     r"""Returns a formatted string for a duration.
