@@ -148,6 +148,9 @@ class Config(dict):
         _kwargs.update(kwargs)
         return _target(*args, **_kwargs)
 
+    # aliasing 'instantiate' for function calling
+    call = instantiate
+
 
 def from_cli(argv: Optional[list[str]] = None) -> Config:
     r"""Constructs a configuration from command line."""
