@@ -301,6 +301,10 @@ class Archive:
 
 class HashableRecordArchive(Archive):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._data = {k: v for k, v in super().items()}
+
     @classmethod
     def _to_hashable(cls, n_val):
         r"""Converts an object to a hashable record."""
@@ -358,7 +362,11 @@ class HashableRecordArchive(Archive):
     def get_key(self, n_val) -> Optional[str]:
         r"""Returns the key of a record."""
         h_val = self._to_hashable(n_val)
-        for key, val in super().items():
+        for key, val in self._data.items():
+            if val==h_val:
+                return key
+        self._data = {k: v for k, v in super().items()}
+        for key, val in self._data.items():
             if val==h_val:
                 return key
         return None
