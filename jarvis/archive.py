@@ -346,7 +346,9 @@ class HashableRecordArchive(Archive):
         return cls._to_hashable(n_val_0)==cls._to_hashable(n_val_1)
 
     def __setitem__(self, key: str, n_val: Any):
-        super().__setitem__(key, self._to_hashable(n_val))
+        h_val = self._to_hashable(n_val)
+        self._data[key] = h_val
+        super().__setitem__(key, h_val)
 
     def __getitem__(self, key: str) -> Any:
         return self._to_native(super().__getitem__(key))
