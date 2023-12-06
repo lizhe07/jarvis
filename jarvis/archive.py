@@ -3,7 +3,7 @@ import numpy as np
 from typing import Any, Optional
 
 from .config import Config
-from .utils import progress_str, time_str
+from .utils import tqdm
 from .alias import Array
 
 
@@ -65,7 +65,6 @@ class Archive:
         store_path = self._store_path(key)
         records = self._safe_read(store_path) if os.path.exists(store_path) else {}
         if self.buffer is not None:
-            self.buffer.update(records)
             if key in self.buffer:
                 raise RuntimeError(f"Trying to overwrite an existing key {key} in buffer mode.")
             else:
@@ -79,8 +78,6 @@ class Archive:
             if not os.path.exists(store_path):
                 raise KeyError(key)
             records = self._safe_read(store_path)
-            if key not in self.buffer:
-                self.buffer.update(records)
         return records[key] if self.buffer is None else self.buffer[key]
 
     def __contains__(self, key: str) -> bool:
@@ -151,6 +148,8 @@ class Archive:
                 break
         if count==self.max_try:
             raise MaxTryIOError(store_path, count)
+        if self.buffer is not None:
+            self.buffer.update(records)
         return records
 
     def _safe_write(self, records: dict, store_path: str):
@@ -229,39 +228,23 @@ class Archive:
             os.remove(store_path) # remove empty external file
         return val
 
-    def prune(self) -> list[str]:
-        r"""Removes corrupted files.
-
-        Returns
-        -------
-        keys:
-            The keys of remaining valid records.
-
-        """
-        valid_keys, removed = [], []
-        store_paths = self._store_paths()
-        verbose, tic = None, time.time()
-        for i, store_path in enumerate(store_paths, 1):
+    def _prune(self) -> None:
+        r"""Removes corrupted files."""
+        max_try, pause = self.max_try, self.pause
+        self.max_try, self.pause = 1, 0.
+        if self.buffer is not None:
+            self.buffer = {}
+        to_remove = []
+        for store_path in self._store_paths():
             try:
-                records = self._safe_read(store_path)
-                valid_keys += list(records.keys())
+                self._safe_read(store_path)
             except:
-                print("{} corrupted, will be removed".format(store_path))
-                os.remove(store_path)
-                removed.append(store_path[(-4-self.path_len):-4])
-            if i%(-(-len(store_paths)//10))==0 or i==len(store_paths):
-                toc = time.time()
-                if verbose is None:
-                    # display progress if estimated time is longer than 20 mins
-                    verbose = (toc-tic)/i*len(store_paths)>1200
-                if verbose:
-                    print("{} ({})".format(
-                        progress_str(i, len(store_paths)),
-                        time_str(toc-tic, progress=i/len(store_paths)),
-                    ))
-        if removed:
-            print(f"{len(removed)} corrupted files removed.")
-        return valid_keys
+                to_remove.append(store_path)
+        for store_path in tqdm(to_remove, unit='file', leave=False):
+            os.remove(store_path)
+        if to_remove:
+            print(f"{len(to_remove)} corrupted files removed.")
+        self.max_try, self.pause = max_try, pause
 
     def copy_to(self,
         dst_dir: str,
@@ -318,9 +301,8 @@ class Archive:
 
 class HashableRecordArchive(Archive):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._data = {k: v for k, v in super().items()}
+    def __init__(self, *args, path_len: int = 2, use_buffer: bool = True, **kwargs):
+        super().__init__(*args, path_len=path_len, use_buffer=use_buffer, **kwargs)
 
     @classmethod
     def _to_hashable(cls, n_val):
@@ -364,7 +346,6 @@ class HashableRecordArchive(Archive):
 
     def __setitem__(self, key: str, n_val: Any):
         h_val = self._to_hashable(n_val)
-        self._data[key] = h_val
         super().__setitem__(key, h_val)
 
     def __getitem__(self, key: str) -> Any:
@@ -381,11 +362,11 @@ class HashableRecordArchive(Archive):
     def get_key(self, n_val) -> Optional[str]:
         r"""Returns the key of a record."""
         h_val = self._to_hashable(n_val)
-        for key, val in self._data.items():
-            if val==h_val:
-                return key
-        self._data = {k: v for k, v in super().items()}
-        for key, val in self._data.items():
+        if self.buffer is not None:
+            for key, val in self.buffer.items():
+                if val==h_val:
+                    return key
+        for key, val in super().items():
             if val==h_val:
                 return key
         return None
