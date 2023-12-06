@@ -26,16 +26,16 @@ class Archive:
     def __init__(self,
         store_dir: str,
         key_len: int = 8,
-        path_len: int = 2,
+        path_len: int = 3,
         max_try: int = 30,
         pause: float = 0.5,
+        use_buffer: bool = False,
     ):
         r"""
         Args
         ----
         store_dir:
-            The directory for storing data. If `store_dir` is ``None``, an
-            internal dictionary `__store__` is used.
+            The directory for storing data.
         key_len:
             The length of keys.
         path_len:
@@ -45,12 +45,18 @@ class Archive:
             The maximum number of trying to read/write external files.
         pause:
             The time (seconds) between two consecutive read/write attempts.
+        use_buffer:
+            Whether to use a buffer in memory. If ``True``, some methods will be
+            attempted on an internal dict first before loading external files.
+            Overwriting will be disabled since many Archive objects may be
+            running at the same time.
 
         """
         self.store_dir, self.key_len = store_dir, key_len
         assert key_len>=path_len, "File name length should be no greater than key length."
         os.makedirs(self.store_dir, exist_ok=True)
         self.path_len, self.max_try, self.pause = path_len, max_try, pause
+        self.buffer = {} if use_buffer else None
 
     def __repr__(self) -> str:
         return f"Archive object stored in {self.store_dir}."
@@ -58,15 +64,24 @@ class Archive:
     def __setitem__(self, key: str, val: Any):
         store_path = self._store_path(key)
         records = self._safe_read(store_path) if os.path.exists(store_path) else {}
+        if self.buffer is not None:
+            self.buffer.update(records)
+            if key in self.buffer:
+                raise RuntimeError(f"Trying to overwrite an existing key {key} in buffer mode.")
+            else:
+                self.buffer[key] = val
         records[key] = val
         self._safe_write(records, store_path)
 
     def __getitem__(self, key: str) -> Any:
         store_path = self._store_path(key)
-        if not os.path.exists(store_path):
-            raise KeyError(key)
-        records = self._safe_read(store_path)
-        return records[key]
+        if self.buffer is None or key not in self.buffer:
+            if not os.path.exists(store_path):
+                raise KeyError(key)
+            records = self._safe_read(store_path)
+            if key not in self.buffer:
+                self.buffer.update(records)
+        return records[key] if self.buffer is None else self.buffer[key]
 
     def __contains__(self, key: str) -> bool:
         try:
@@ -201,6 +216,8 @@ class Archive:
 
     def pop(self, key: str) -> Any:
         r"""Removes a specified key and return its value."""
+        if self.buffer is not None:
+            raise RuntimeError("Attempting to pop values in buffer mode.")
         store_path = self._store_path(key)
         if not os.path.exists(store_path):
             return None
