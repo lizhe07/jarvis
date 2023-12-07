@@ -26,7 +26,7 @@ def tqdm(*args, **kwargs):
             except:
                 total = None
         if total is not None:
-            kwargs['smoothing'] = min(50/total, 0.3)
+            kwargs['smoothing'] = 50/max(total, 150)
     return auto_tqdm(*args, **kwargs)
 
 
