@@ -1,4 +1,5 @@
 import os, pickle, random, time
+from pathlib import Path
 import numpy as np
 from typing import Any, Optional
 
@@ -26,7 +27,7 @@ class Archive:
     def __init__(self,
         store_dir: str,
         key_len: int = 8,
-        path_len: int = 3,
+        path_len: int = 4,
         max_try: int = 30,
         pause: float = 0.5,
         use_buffer: bool = False,
@@ -107,14 +108,24 @@ class Archive:
         r"""Returns the path of external file associated with a key."""
         if not self._is_valid_key(key):
             raise KeyError(key)
-        return f'{self.store_dir}/{key[:self.path_len]}.axv'
+        return f"{self.store_dir}/{'/'.join(key[:self.path_len])}.axv"
 
     def _file_names(self) -> list[str]:
         r"""Returns all valid file names in the directory."""
-        file_names = [
-            f for f in os.listdir(self.store_dir)
-            if f.endswith('.axv') and len(f)==(self.path_len+4)
-        ]
+        def get_names(folder_name, depth: int):
+            if depth==1:
+                file_names = [
+                    f for f in os.listdir(folder_name)
+                    if len(f)==5 and f.endswith('.axv') and f[0] in self._alphabet
+                ]
+            else:
+                file_names = []
+                for subfolder_name in os.listdir(folder_name):
+                    if subfolder_name in self._alphabet:
+                        for file_name in get_names(f'{folder_name}/{subfolder_name}', depth-1):
+                            file_names.append(f'{subfolder_name}/{file_name}')
+            return file_names
+        file_names = get_names(self.store_dir, depth=self.path_len)
         random.shuffle(file_names)
         return file_names
 
@@ -157,6 +168,7 @@ class Archive:
         count = 0
         while count<self.max_try:
             try:
+                os.makedirs(Path(store_path).parent, exist_ok=True)
                 with open(store_path, 'wb') as f:
                     pickle.dump(records, f)
             except KeyboardInterrupt as e:
@@ -185,6 +197,24 @@ class Archive:
         r"""Removes all data."""
         for store_path in self._store_paths():
             os.remove(store_path)
+
+    def _prune(self) -> None:
+        r"""Removes corrupted files."""
+        max_try, pause = self.max_try, self.pause
+        self.max_try, self.pause = 1, 0.
+        if self.buffer is not None:
+            self.buffer = {}
+        to_remove = []
+        for store_path in self._store_paths():
+            try:
+                self._safe_read(store_path)
+            except:
+                to_remove.append(store_path)
+        for store_path in tqdm(to_remove, unit='file', leave=False):
+            os.remove(store_path)
+        if to_remove:
+            print(f"{len(to_remove)} corrupted files removed.")
+        self.max_try, self.pause = max_try, pause
 
     def keys(self) -> str:
         r"""A generator for keys."""
@@ -228,24 +258,6 @@ class Archive:
             os.remove(store_path) # remove empty external file
         return val
 
-    def _prune(self) -> None:
-        r"""Removes corrupted files."""
-        max_try, pause = self.max_try, self.pause
-        self.max_try, self.pause = 1, 0.
-        if self.buffer is not None:
-            self.buffer = {}
-        to_remove = []
-        for store_path in self._store_paths():
-            try:
-                self._safe_read(store_path)
-            except:
-                to_remove.append(store_path)
-        for store_path in tqdm(to_remove, unit='file', leave=False):
-            os.remove(store_path)
-        if to_remove:
-            print(f"{len(to_remove)} corrupted files removed.")
-        self.max_try, self.pause = max_try, pause
-
     def copy_to(self,
         dst_dir: str,
         keys: Optional[set[str]] = None,
@@ -263,6 +275,7 @@ class Archive:
             Whether to overwrite existing keys.
 
         """
+        raise NotImplementedError
         os.makedirs(dst_dir, exist_ok=True)
         # check key consistency of existing axv files
         for file_name in os.listdir(dst_dir):
