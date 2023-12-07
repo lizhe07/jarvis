@@ -18,6 +18,15 @@ def tqdm(*args, **kwargs):
     for key, val in tqdm_kwargs.items():
         if key not in kwargs:
             kwargs[key] = val
+    if 'smoothing' not in kwargs:
+        total = kwargs.get('total', None)
+        if total is None:
+            try:
+                total = len(args[0])
+            except:
+                total = None
+        if total is not None:
+            kwargs['smoothing'] = min(50/total, 0.3)
     return auto_tqdm(*args, **kwargs)
 
 
