@@ -258,6 +258,29 @@ class Archive:
             os.remove(store_path) # remove empty external file
         return val
 
+    def delete(self, keys: list[str]) -> None:
+        r"""Removes keys in batch processing."""
+        if self.buffer is not None:
+            raise RuntimeError("Attempting to delete keys in buffer mode.")
+        to_remove = {}
+        for key in keys:
+            store_path = self._store_path(key)
+            if store_path in to_remove:
+                to_remove[store_path].append(key)
+            else:
+                to_remove[store_path] = [key]
+        for store_path in tqdm(to_remove, unit='file', leave=False):
+            if not os.path.exists(store_path):
+                continue
+            records = self._safe_read(store_path)
+            for key in to_remove[store_path]:
+                if key in records:
+                    records.pop(key)
+            if records:
+                self._safe_write(records, store_path)
+            else:
+                os.remove(store_path)
+
     def copy_to(self,
         dst_dir: str,
         keys: Optional[set[str]] = None,
