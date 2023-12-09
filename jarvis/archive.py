@@ -273,13 +273,16 @@ class Archive:
             if not os.path.exists(store_path):
                 continue
             records = self._safe_read(store_path)
+            modified = False
             for key in to_remove[store_path]:
                 if key in records:
                     records.pop(key)
-            if records:
-                self._safe_write(records, store_path)
-            else:
-                os.remove(store_path)
+                    modified = True
+            if modified:
+                if records:
+                    self._safe_write(records, store_path)
+                else:
+                    os.remove(store_path)
 
     def copy_to(self,
         dst_dir: str,
