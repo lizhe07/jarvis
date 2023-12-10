@@ -110,24 +110,24 @@ class Archive:
             raise KeyError(key)
         return f"{self.store_dir}/{'/'.join(key[:self.path_len])}.axv"
 
-    def _file_names(self) -> list[str]:
-        r"""Returns all valid file names in the directory."""
-        def get_names(folder_name, depth: int):
-            if depth==1:
-                file_names = [
-                    f for f in os.listdir(folder_name)
-                    if len(f)==5 and f.endswith('.axv') and f[0] in self._alphabet
-                ]
-            else:
-                file_names = []
-                for subfolder_name in os.listdir(folder_name):
-                    if subfolder_name in self._alphabet:
-                        for file_name in get_names(f'{folder_name}/{subfolder_name}', depth-1):
-                            file_names.append(f'{subfolder_name}/{file_name}')
-            return file_names
-        file_names = get_names(self.store_dir, depth=self.path_len)
-        random.shuffle(file_names)
-        return file_names
+    def _file_names(self, folder_name: Optional[str] = None, depth: Optional[int] = None) -> str:
+        r"""A generator for names of existing records file."""
+        if folder_name is None:
+            folder_name = self.store_dir
+        if depth is None:
+            depth = self.path_len
+        if depth==1:
+            file_names = os.listdir(folder_name)
+            random.shuffle(file_names)
+            for file_name in file_names:
+                if len(file_name)==5 and file_name[0] in self._alphabet and file_name.endswith('.axv'):
+                    yield file_name
+        else:
+            subfolder_names = [f for f in os.listdir(folder_name) if f in self._alphabet]
+            random.shuffle(subfolder_names)
+            for subfolder_name in subfolder_names:
+                for file_name in self._file_names(f'{folder_name}/{subfolder_name}', depth-1):
+                    yield f'{subfolder_name}/{file_name}'
 
     def _store_paths(self) -> list[str]:
         r"""Returns all valid external files in the directory."""
