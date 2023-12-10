@@ -104,35 +104,36 @@ class Archive:
                 return False
         return True
 
+    @staticmethod
+    def _file_name(key: str, path_len: int) -> str:
+        return '/'.join(key[:path_len])+'.axv'
+
     def _store_path(self, key: str) -> str:
         r"""Returns the path of external file associated with a key."""
         if not self._is_valid_key(key):
             raise KeyError(key)
-        return f"{self.store_dir}/{'/'.join(key[:self.path_len])}.axv"
+        return f'{self.store_dir}/{self._file_name(key, self.path_len)}'
 
-    def _file_names(self, folder_name: Optional[str] = None, depth: Optional[int] = None) -> str:
+    @staticmethod
+    def _file_names(folder_name: str, depth: int) -> str:
         r"""A generator for names of existing records file."""
-        if folder_name is None:
-            folder_name = self.store_dir
-        if depth is None:
-            depth = self.path_len
         if depth==1:
             file_names = os.listdir(folder_name)
             random.shuffle(file_names)
             for file_name in file_names:
-                if len(file_name)==5 and file_name[0] in self._alphabet and file_name.endswith('.axv'):
+                if len(file_name)==5 and file_name[0] in Archive._alphabet and file_name.endswith('.axv'):
                     yield file_name
         else:
-            subfolder_names = [f for f in os.listdir(folder_name) if f in self._alphabet]
+            subfolder_names = [f for f in os.listdir(folder_name) if f in Archive._alphabet]
             random.shuffle(subfolder_names)
             for subfolder_name in subfolder_names:
-                for file_name in self._file_names(f'{folder_name}/{subfolder_name}', depth-1):
+                for file_name in Archive._file_names(f'{folder_name}/{subfolder_name}', depth-1):
                     yield f'{subfolder_name}/{file_name}'
 
     def _store_paths(self) -> list[str]:
         r"""Returns all valid external files in the directory."""
-        store_paths = [f'{self.store_dir}/{f}' for f in self._file_names()]
-        return store_paths
+        for file_name in self._file_names(self.store_dir, self.path_len):
+            yield f'{self.store_dir}/{file_name}'
 
     def _sleep(self):
         r"""Waits for a random period of time."""
@@ -284,7 +285,7 @@ class Archive:
                 else:
                     os.remove(store_path)
 
-    def copy_to(self,
+    def migrate(self,
         dst_dir: str,
         keys: Optional[set[str]] = None,
         overwrite: bool = False,
@@ -301,41 +302,60 @@ class Archive:
             Whether to overwrite existing keys.
 
         """
-        raise NotImplementedError
         os.makedirs(dst_dir, exist_ok=True)
-        # check key consistency of existing axv files
-        for file_name in os.listdir(dst_dir):
-            if file_name.endswith('.axv'):
-                assert len(file_name)==(self.path_len+4), (
-                    f"Data in the destination '{dst_dir}' have inconsistent file name length "
-                    f"{self.path_len}."
-                )
-                _records = self._safe_read(f'{dst_dir}/{file_name}')
-                _key = next(iter(_records.keys()))
-                assert len(_key)==self.key_len, (
-                    f"Data in the destination '{dst_dir}' have inconsistent key length "
-                    f"{self.key_len}."
-                )
-        # merge records
-        for file_name in self._file_names():
-            try:
-                src_path = f'{self.store_dir}/{file_name}'
-                dst_path = f'{dst_dir}/{file_name}'
-
+        # check key consistency
+        path_len = []
+        for depth in range(1, self.key_len+1):
+            file_name =  next(iter(self._file_names(dst_dir, depth)), None)
+            if file_name is not None:
+                path_len.append(depth)
+        if len(path_len)>1:
+            raise RuntimeError(f"Multiple hierarchies detected in {dst_dir}")
+        elif len(path_len)==1:
+            dst_path_len = path_len[0]
+            file_name =  next(iter(self._file_names(dst_dir, dst_path_len)), None)
+            records = self._safe_read(f'{dst_dir}/{file_name}')
+            key = next(iter(records.keys()))
+            assert self._is_valid_key(key), f"Invalid key detected in {dst_dir} ({key})"
+        else:
+            dst_path_len = self.path_len
+        # prepare generator of source file paths
+        if keys is None:
+            src_paths = list(self._store_paths())
+        else:
+            src_paths = set()
+            for key in keys:
+                src_paths.add(self._store_path(key))
+            src_paths = list(src_paths)
+        # copy records to destination directory
+        if dst_path_len>=self.path_len:
+            random.shuffle(src_paths)
+            for src_path in tqdm(src_paths, unit='file', leave=False):
                 src_records = self._safe_read(src_path)
-                src_records = {k: v for k, v in src_records.items() if keys is None or k in keys}
-                dst_records = self._safe_read(dst_path) if os.path.exists(dst_path) else {}
-                if not overwrite:
-                    for key in src_records:
-                        assert key not in dst_records, (
-                            f"Existing key '{key}' detected in the destination '{dst_dir}', cloning "
-                            "operation aborted."
-                        )
-                dst_records.update(src_records)
-                if dst_records:
-                    self._safe_write(dst_records, dst_path)
-            except MaxTryIOError as e:
-                print(str(e))
+                src_keys = [k for k in src_records if keys is None or k in keys]
+                key_dicts = {}
+                for key in src_keys:
+                    _key = key[:dst_path_len]
+                    if _key in key_dicts:
+                        key_dicts[_key].append(key)
+                    else:
+                        key_dicts[_key] = [key]
+                for dst_keys in key_dicts.values():
+                    dst_path = f'{dst_dir}/{self._file_name(dst_keys[0], dst_path_len)}'
+                    if os.path.exists(dst_path):
+                        dst_records = self._safe_read(dst_path)
+                        modified = False
+                    else:
+                        dst_records = {}
+                        modified = True
+                    for key in dst_keys:
+                        if key not in dst_records or overwrite:
+                            dst_records[key] = src_records[key]
+                            modified = True
+                    if modified:
+                        self._safe_write(dst_records, dst_path)
+        else:
+            raise NotImplementedError
 
 
 class HashableRecordArchive(Archive):
