@@ -462,8 +462,6 @@ class ConfigArchive(HashableRecordArchive):
 
     def __init__(self, *args, max_try: int = 300, **kwargs):
         super().__init__(*args, max_try=max_try, **kwargs)
-        if self.buffer is not None:
-            list(self.keys()) # browse the whole archive to update buffer
 
     def _to_native(self, h_val):
         n_val = super()._to_native(h_val)
