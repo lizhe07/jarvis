@@ -7,13 +7,15 @@ from collections.abc import Callable
 def _format(val):
     r"""Formats an object to configuration style.
 
-    Dicts are converted to Config objects and tuples are converted to lists.
+    Dicts are converted to Config objects.
 
     """
     if isinstance(val, dict):
         return Config({k: _format(v) for k, v in val.items()})
-    elif isinstance(val, (list, tuple)):
+    elif isinstance(val, list):
         return [_format(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(_format(v) for v in val)
     elif isinstance(val, set):
         return set(_format(v) for v in val)
     else:
