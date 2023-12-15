@@ -499,3 +499,28 @@ class ConfigArchive(HashableRecordArchive):
             for f_dict in f_dicts
         ]
         return shared, diffs
+
+    def filter(self, cond: dict) -> str:
+        r"""Generator of matching record key.
+
+        Args
+        ----
+        cond:
+            Filter conditions, specifying parts of config values.
+
+        """
+        f_cond = Config(cond).flatten()
+        for key, config in self.items():
+            f_config = config.flatten()
+            matched = True
+            for k, v in f_cond.items():
+                if not (
+                    k in f_config and (
+                        (callable(v) and v(f_config[k])==True) or
+                        f_config[k]==v
+                    )
+                ):
+                    matched = False
+                    break
+            if matched:
+                yield key
