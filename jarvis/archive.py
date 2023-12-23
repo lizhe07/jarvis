@@ -159,8 +159,16 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            raise MaxTryIOError(store_path, count)
+            # raise MaxTryIOError(store_path, count)
+            os.remove(store_path)
+            records = {}
         if self.buffer is not None:
+            parts = store_path.split('/')[-self.path_len:]
+            parts[-1] = parts[-1][0]
+            head = ''.join(parts)
+            for key in self.buffer:
+                if key.startswith(head) and key not in records:
+                    self.buffer.pop(key)
             self.buffer.update(records)
         return records
 
