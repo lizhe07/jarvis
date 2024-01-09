@@ -263,7 +263,7 @@ class Archive:
         val = records.pop(key, None)
         if records:
             self._safe_write(records, store_path)
-        else:
+        elif os.path.exists(store_path):
             os.remove(store_path) # remove empty external file
         return val
 
