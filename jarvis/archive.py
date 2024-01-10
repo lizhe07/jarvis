@@ -142,8 +142,8 @@ class Archive:
     def _safe_read(self, store_path: str) -> dict:
         r"""Safely reads a file.
 
-        This is designed for cluster use. A MaxTryIOError is raised when too
-        many attempts have failed.
+        This is designed for cluster use, if too many tries have failed, try to
+        delete the file.
 
         """
         count = 0
@@ -159,8 +159,8 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            # raise MaxTryIOError(store_path, count)
-            os.remove(store_path)
+            if os.path.exists(store_path):
+                os.remove(store_path)
             records = {}
         if self.buffer is not None:
             parts = store_path.split('/')[-self.path_len:]
@@ -213,16 +213,8 @@ class Archive:
         self.max_try, self.pause = 1, 0.
         if self.buffer is not None:
             self.buffer = {}
-        to_remove = []
         for store_path in self._store_paths():
-            try:
-                self._safe_read(store_path)
-            except:
-                to_remove.append(store_path)
-        for store_path in tqdm(to_remove, unit='file', leave=False):
-            os.remove(store_path)
-        if to_remove:
-            print(f"{len(to_remove)} corrupted files removed.")
+            self._safe_read(store_path) # corrupted files are removed in `_safe_read`
         self.max_try, self.pause = max_try, pause
 
     def keys(self) -> str:
@@ -290,7 +282,7 @@ class Archive:
             if modified:
                 if records:
                     self._safe_write(records, store_path)
-                else:
+                elif os.path.exists(store_path):
                     os.remove(store_path)
 
     def migrate(self,
