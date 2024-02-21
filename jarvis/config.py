@@ -131,24 +131,10 @@ class Config(dict):
         r"""Returns a clone of the configuration."""
         return Config(self.flatten())
 
-    def instantiate(self, *args, **kwargs): # one-level instantiation
-        r"""Instantiates an object using the configuration.
-
-        When a callable object is specified by a string in '_target_', this
-        method will use other key-values as arguments to instantiate a new
-        object. '_target_' should be a string that can be imported from the
-        working directory, it can be a class or a function.
-
-        """
-        assert '_target_' in self, "A callable needs to be specified as '_target_'."
-        try:
-            _target = _locate(self._target_)
-            assert callable(_target)
-        except:
-            raise RuntimeError(f"The '_target_' ({_target}) is not callable.")
-        _kwargs = Config({k: v for k, v in self.items() if k!='_target_'})
-        _kwargs.update(kwargs)
-        return _target(*args, **_kwargs)
+    def instantiate(self, **kwargs):
+        spec = self.clone()
+        spec.update(kwargs)
+        return _instantiate(spec)
 
     # aliasing 'instantiate' for function calling
     call = instantiate
@@ -196,3 +182,19 @@ def _locate(path: str) -> Callable:
         except:
             obj = import_module('.'.join(parts[:(m+1)]))
     return obj
+
+
+def _instantiate(spec):
+    r"""Instantiates an object."""
+    if isinstance(spec, list):
+        return [_instantiate(val) for val in spec]
+    elif isinstance(spec, tuple):
+        return tuple(_instantiate(val) for val in spec)
+    elif isinstance(spec, dict):
+        if '_target_' in spec:
+            _target = _locate(spec['_target_'])
+            return _target(**{k: _instantiate(v) for k, v in spec.items() if k!='_target_'})
+        else:
+            return {k: _instantiate(v) for k, v in spec.items()}
+    else:
+        return spec

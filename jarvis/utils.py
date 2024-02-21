@@ -1,6 +1,5 @@
 import random, torch
 import numpy as np
-from typing import Optional
 from torch.utils.data import (
     TensorDataset, DataLoader, WeightedRandomSampler,
 )
@@ -30,7 +29,7 @@ def tqdm(*args, **kwargs):
     return auto_tqdm(*args, **kwargs)
 
 
-def time_str(t_elapse: float, progress: Optional[float] = None) -> str:
+def time_str(t_elapse: float, progress: float|None = None) -> str:
     r"""Returns a formatted string for a duration.
 
     Args
@@ -189,7 +188,7 @@ def tensor_dict(n_state_dict: dict, device='cpu') -> dict:
 
 def create_mlp_layers(
     in_features: int, out_features: int,
-    num_features: Optional[list[int]] = None,
+    num_features: list[int]|None = None,
     nonlinearity: str = 'ReLU',
     last_linear: bool = True,
 ) -> torch.nn.ModuleList:
