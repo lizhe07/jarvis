@@ -1,7 +1,6 @@
 import sys, yaml, time, random
 from pathlib import Path
 from importlib import import_module
-from typing import Optional, Union
 from collections.abc import Callable
 
 def _format(val):
@@ -30,7 +29,7 @@ class Config(dict):
 
     """
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict|None = None):
         super().__init__()
         for key, val in (config or {}).items():
             self[key] = val
@@ -109,13 +108,13 @@ class Config(dict):
                 n_dict[key] = val
         return n_dict
 
-    def update(self, config: Union[dict, Path, str, None]):
+    def update(self, config: dict|Path|str|None):
         r"""Overwrites from a new config."""
         config = _load_dict(config)
         for key, val in config.flatten().items():
             self[key] = val
 
-    def fill(self, config: Union[dict, Path, str, None]):
+    def fill(self, config: dict|Path|str|None):
         r"""Fills value from a new config."""
         config = _load_dict(config)
         if not('_target_' in self and '_target_' in config and self._target_!=config._target_):
@@ -140,7 +139,7 @@ class Config(dict):
     call = instantiate
 
 
-def from_cli(argv: Optional[list[str]] = None) -> Config:
+def from_cli(argv: list[str]|None = None) -> Config:
     r"""Constructs a configuration from command line."""
     if argv is None:
         argv = sys.argv[1:]
@@ -158,7 +157,7 @@ def from_cli(argv: Optional[list[str]] = None) -> Config:
     return config
 
 
-def _load_dict(config: Union[dict, Path, str, None]) -> Config:
+def _load_dict(config: dict|Path|str|None) -> Config:
     if isinstance(config, (Path, str)):
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
@@ -186,15 +185,15 @@ def _locate(path: str) -> Callable:
 
 def _instantiate(spec):
     r"""Instantiates an object."""
-    if isinstance(spec, list):
-        return [_instantiate(val) for val in spec]
-    elif isinstance(spec, tuple):
-        return tuple(_instantiate(val) for val in spec)
-    elif isinstance(spec, dict):
+    if isinstance(spec, dict):
         if '_target_' in spec:
             _target = _locate(spec['_target_'])
             return _target(**{k: _instantiate(v) for k, v in spec.items() if k!='_target_'})
         else:
             return {k: _instantiate(v) for k, v in spec.items()}
+    elif isinstance(spec, list):
+        return [_instantiate(val) for val in spec]
+    elif isinstance(spec, tuple):
+        return tuple(_instantiate(val) for val in spec)
     else:
         return spec
