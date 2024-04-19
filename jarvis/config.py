@@ -131,9 +131,9 @@ class Config(dict):
         return Config(self.flatten())
 
     def instantiate(self, **kwargs):
-        spec = self.clone()
-        spec.update(kwargs)
-        return _instantiate(spec)
+        return instantiate(dict(
+            **{k: self[k] for k in self if k not in kwargs}, **kwargs,
+        ))
 
     # aliasing 'instantiate' for function calling
     call = instantiate
@@ -183,17 +183,17 @@ def _locate(path: str) -> Callable:
     return obj
 
 
-def _instantiate(spec):
+def instantiate(spec):
     r"""Instantiates an object."""
     if isinstance(spec, dict):
         if '_target_' in spec:
             _target = _locate(spec['_target_'])
-            return _target(**{k: _instantiate(v) for k, v in spec.items() if k!='_target_'})
+            return _target(**{k: v for k, v in spec.items() if k!='_target_'})
         else:
-            return {k: _instantiate(v) for k, v in spec.items()}
+            return {k: instantiate(v) for k, v in spec.items()}
     elif isinstance(spec, list):
-        return [_instantiate(val) for val in spec]
+        return [instantiate(val) for val in spec]
     elif isinstance(spec, tuple):
-        return tuple(_instantiate(val) for val in spec)
+        return tuple(instantiate(val) for val in spec)
     else:
         return spec
