@@ -1,140 +1,180 @@
-import time
-from pathlib import Path
+import os, time
 import functools
 import inspect
-from collections.abc import Callable
-from typing import Any
+from pathlib import Path
+import numpy as np
+from typing import Any, Union, Optional
+from collections.abc import Iterable, Callable
 
-from .config import Config
-from .archive import Archive, ConfigArchive
-
-
-class OutOfPatienceError(RuntimeError):
-    r"""Raised when too many attempts to open an file fail."""
-
-    def __init__(self, key: str, patience: int):
-        self.key, self.patience = key, patience
-        msg = f"Max number ({patience}) of wait reached for {key}."
-        super().__init__(msg)
+from jarvis.config import Config, _locate
+from jarvis.archive import Archive, ConfigArchive
+from jarvis.utils import tqdm
 
 
 class Cache:
-    r"""A cache that stores previously computed results."""
 
     def __init__(self,
-        cache_dir: Path|str,
+        store_dir: Union[str, Path],
         *,
-        path_len: int = 4, s_pause: float = 1., l_pause: float = 30.,
-        patience: int = 0, wait: float = 60.,
+        s_pause: float = 1., l_pause: float = 30.,
     ):
-        r"""
-        Args
-        ----
-        cache_dir:
-            Path to the cache folder, three subfolders 'configs', 'stats',
-            'results' will be created if needed.
-        path_len:
-            External file name length, see `Archive.path_len` for more details.
-        s_pause, l_pause:
-            Short and long pause time for archives, see `Archive.pause` for more
-            details. `configs` and `stats` use `s_pause`, and `results` uses
-            `l_pause`.
-        patience:
-            Maximum number of waits in `process`. During cluster use, a job can
-            be running by another node, the cache will wait for a period of time
-            before checking the latest stat.
-        wait:
-            Wait time in seconds before each stat check.
+        self.store_dir = Path(store_dir)
+        self.configs = ConfigArchive(
+            self.store_dir/'configs', path_len=3, pause=s_pause,
+        )
+        self.stats = Archive(
+            self.store_dir/'stats', path_len=3, pause=s_pause,
+        )
+        self.results = Archive(
+            self.store_dir/'results', path_len=4, pause=l_pause,
+        )
 
-        """
-        self.cache_dir = Path(cache_dir)
-        self.configs = ConfigArchive(self.cache_dir/'configs', path_len=path_len, pause=s_pause)
-        self.stats = Archive(self.cache_dir/'stats', path_len=path_len, pause=s_pause)
-        self.results = Archive(self.cache_dir/'results', path_len=path_len, pause=l_pause)
-        self.patience, self.wait = patience, wait
-
-    def process(self,
-        config: Config,
-        func: Callable,
-        key_only: bool = False,
-    ) -> tuple[str, Any]:
-        r"""Process a job from configuration.
-
-        If the job has already been computed, the previous result will be
-        fetched. If it is being computed by other machines, the function waits
-        until out of patience.
-
-        Args
-        ----
-        config:
-            Configuration of the job, typically contains '_module_' and '_name_'
-            that identifies the function, and sometimes '_spec_' to identify an
-            object when `func` is a method. Other items are treated as keyword
-            arguments for `func`.
-        func:
-            The function to call. When the job is to call an method, the object
-            is embedded in `func`.
-        key_only:
-            Whether to only return the key in cache, useful for batch processing.
-
-        Returns
-        -------
-        key, result:
-            The key and result of the job.
-
-        """
+    def process(self, config: Config, patience: float = 60.) -> str:
+        assert '_target_' in config, "Function must be specified by '_target_'"
+        _target = _locate(config._target_)
+        sig = inspect.signature(_target)
+        for k, v in sig.parameters.items():
+            if k not in config and v.default is not inspect.Parameter.empty:
+                config[k] = v.default
         key = self.configs.add(config)
-
-        # wait for other nodes in cluster to finish
-        count = 0
-        while True:
-            stat = self.stats.get(key, {'processed': False, 't_modified': -float('inf')})
-            if stat['processed'] or time.time()-stat['t_modified']>=self.wait:
-                break
-            count += 1
-            if count>self.patience:
-                raise OutOfPatienceError(key, self.patience)
-            time.sleep(self.wait)
-
-        if stat['processed']: # fetch from cache
-            result = None if key_only else self.results[key]
-        else: # compute from scratch
+        stat = self.stats.get(key, {'processed': False, 't_modified': -float('inf')})
+        sleep_count = 0
+        while not stat['processed'] and time.time()-stat['t_modified']<patience:
+            time.sleep(patience)
+            stat = self.stats[key]
+            sleep_count += 1
+            assert sleep_count<60, f"Too many sleeps for {key}"
+        if not stat['processed']:
             self.stats[key] = {'processed': False, 't_modified': time.time()}
-            result = func(**{
-                k: v for k, v in config.items() if k not in ['_module_', '_name_', '_spec_']
-            })
+            result = config.call()
             self.results[key] = result
             self.stats[key] = {'processed': True, 't_modified': time.time()}
-        return key, result
+        return key
+
+    def batch(self,
+        configs: Iterable[Config],
+        total: Optional[int] = None,
+        patience: float = 60.,
+        max_errors: int = 0,
+        tqdm_kwargs: Optional[dict] = None,
+    ) -> None:
+        try:
+            _total = len(configs)
+            if total is None:
+                total = _total
+            else:
+                total = min(total, _total)
+        except:
+            pass
+        if tqdm_kwargs is None:
+            tqdm_kwargs = {'leave': False}
+        w_count = 0 # counter for processed works
+        e_count = 0 # counter for runtime errors
+        with tqdm(total=total, **tqdm_kwargs) as pbar:
+            for config in configs:
+                try:
+                    self.process(config, patience)
+                    w_count += 1
+                except KeyboardInterrupt:
+                    raise
+                except:
+                    e_count += 1
+                    if e_count>max_errors:
+                        raise
+                pbar.update()
+                if w_count==total:
+                    break
+
+    def sweep(self,
+        func: Callable,
+        choices: dict[str, list],
+        **kwargs,
+    ):
+        choices = Config(choices).flatten()
+        keys = list(choices.keys())
+        vals = [list(choices[key]) for key in keys]
+        dims = [len(val) for val in vals]
+        total = np.prod(dims)
+
+        def _config_gen():
+            rng = np.random.default_rng()
+            for idx in rng.permutation(total):
+                sub_idxs = np.unravel_index(idx, dims)
+                config = Config({
+                    '_target_': f'{func.__module__}.{func.__name__}.__wrapped__',
+                })
+                for i, key in enumerate(keys):
+                    config[key] = vals[i][sub_idxs[i]]
+                yield config
+        self.batch(_config_gen(), total=total, **kwargs)
+
+    def prune(self):
+        file_names = list(self.results._store_paths())
+        print("Check result files...")
+        max_try, pause = self.results.max_try, self.results.pause
+        self.results.max_try, self.results.pause = 1, 0.
+        r_tags = []
+        for file_name in tqdm(file_names, unit='file'):
+            try:
+                self.results._safe_read(file_name)
+            except:
+                try:
+                    os.remove(file_name)
+                except:
+                    pass
+                parts = file_name.split('/')[-self.results.path_len:]
+                parts[-1] = parts[-1][0]
+                r_tags.append(''.join(parts))
+        self.results.max_try, self.results.pause = max_try, pause
+        print(f"{len(r_tags)} broken files found.")
+        if r_tags:
+            groups = {}
+            for r_tag in r_tags:
+                c_tag = r_tag[:self.configs.path_len]
+                if c_tag in groups:
+                    groups[c_tag].append(r_tag)
+                else:
+                    groups[c_tag] = [r_tag]
+            print(f"Clean records...")
+            use_buffer = isinstance(self.configs.buffer, dict)
+            self.configs.buffer = None
+            for axv in [self.configs, self.stats]:
+                max_try, pause = axv.max_try, axv.pause
+                axv.max_try, axv.pause = 1, 0.
+                for c_tag in tqdm(groups, unit='file'):
+                    file_name = axv._store_path(c_tag+'0'*(axv.path_len-axv.key_len))
+                    records = axv._safe_read(file_name)
+                    for key in records:
+                        if key[:self.results.path_len] in groups[c_tag]:
+                            records.pop(key)
+                    axv._safe_write(records, file_name)
+                axv.max_try, axv.pause = max_try, pause
+            if use_buffer:
+                self.configs.buffer = {}
 
 
-def cached(cache: Cache):
-    r"""Returns decorator that reads from and writes to a cache."""
-    def decorator(func: Callable):
-        # wrapper for basic function
+def cached(cache_dir: Union[str, Path]):
+    cache_dir = Path(cache_dir)
+    def decorator(func):
         @functools.wraps(func)
-        def wrapped_func(*args, **kwargs):
-            ba = inspect.signature(func).bind(*args, **kwargs)
-            ba.apply_defaults()
+        def wrapped(session: dict, **kwargs):
+            session_id = '{:08d}'.format(int(session['session_start_time']%1e8))
+            cache = Cache(cache_dir/session_id)
             config = Config({
-                '_module_': func.__module__,
-                '_name_': func.__name__,
-            }).fill(ba.arguments)
-            _, result = cache.process(config, func)
-            return result
-        # wrapper for method
-        @functools.wraps(func)
-        def wrapped_method(obj, *args, **kwargs):
-            ba = inspect.signature(func).bind(obj, *args, **kwargs)
-            ba.apply_defaults()
-            config = Config({
-                '_module_': func.__module__,
-                '_name_': func.__qualname__,
-                '_spec_': obj.spec,
-            }).fill(
-                {k: v for k, v in ba.arguments.items() if k!='self'}
-            )
-            _, result = cache.process(config, lambda **kwargs: func(obj, **kwargs))
-            return result
-        return wrapped_func if func.__name__==func.__qualname__ else wrapped_method
+                '_target_': f'{func.__module__}.{func.__name__}.__wrapped__',
+                'session': session,
+            })
+            config.update(kwargs)
+            e_count = 0
+            while e_count<10:
+                try:
+                    key = cache.process(config)
+                    result = cache.results[key]
+                    return result
+                except KeyError:
+                    pass
+                e_count += 1
+                cache.stats[key] = {'processed': False, 't_modified': -float('inf')}
+            raise RuntimeError(f"Too many failed attempt for \n{config}")
+        return wrapped
     return decorator
