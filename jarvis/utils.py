@@ -1,8 +1,5 @@
 import random, torch
 import numpy as np
-from torch.utils.data import (
-    TensorDataset, DataLoader, WeightedRandomSampler,
-)
 
 from .alias import Tensor, Module, Optimizer, Scheduler
 
