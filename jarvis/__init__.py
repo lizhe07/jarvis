@@ -4,4 +4,3 @@ with open(Path(__file__).parent/'VERSION.txt', 'r') as f:
 
 from .config import Config
 from .archive import Archive
-from .manager import Manager

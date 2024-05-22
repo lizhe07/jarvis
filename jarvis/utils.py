@@ -1,14 +1,32 @@
 import random, torch
 import numpy as np
-from typing import Optional
-from torch.utils.data import (
-    TensorDataset, DataLoader, WeightedRandomSampler,
-)
 
 from .alias import Tensor, Module, Optimizer, Scheduler
 
+from tqdm.auto import tqdm as auto_tqdm
+from tqdm.asyncio import tqdm as asyncio_tqdm
 
-def time_str(t_elapse: float, progress: Optional[float] = None) -> str:
+if auto_tqdm==asyncio_tqdm:
+    tqdm_kwargs = {'ncols': 80, 'ascii': True}
+else:
+    tqdm_kwargs = {'ncols': 600}
+def tqdm(*args, **kwargs):
+    for key, val in tqdm_kwargs.items():
+        if key not in kwargs:
+            kwargs[key] = val
+    if 'smoothing' not in kwargs:
+        total = kwargs.get('total', None)
+        if total is None:
+            try:
+                total = len(args[0])
+            except:
+                total = None
+        if total is not None:
+            kwargs['smoothing'] = 50/max(total, 150)
+    return auto_tqdm(*args, **kwargs)
+
+
+def time_str(t_elapse: float, progress: float|None = None) -> str:
     r"""Returns a formatted string for a duration.
 
     Args
@@ -167,7 +185,7 @@ def tensor_dict(n_state_dict: dict, device='cpu') -> dict:
 
 def create_mlp_layers(
     in_features: int, out_features: int,
-    num_features: Optional[list[int]] = None,
+    num_features: list[int]|None = None,
     nonlinearity: str = 'ReLU',
     last_linear: bool = True,
 ) -> torch.nn.ModuleList:

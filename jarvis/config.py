@@ -1,19 +1,20 @@
 import sys, yaml, time, random
 from pathlib import Path
 from importlib import import_module
-from typing import Optional, Union
 from collections.abc import Callable
 
 def _format(val):
     r"""Formats an object to configuration style.
 
-    Dicts are converted to Config objects and tuples are converted to lists.
+    Dicts are converted to Config objects.
 
     """
     if isinstance(val, dict):
         return Config({k: _format(v) for k, v in val.items()})
-    elif isinstance(val, (list, tuple)):
+    elif isinstance(val, list):
         return [_format(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(_format(v) for v in val)
     elif isinstance(val, set):
         return set(_format(v) for v in val)
     else:
@@ -28,7 +29,7 @@ class Config(dict):
 
     """
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict|None = None):
         super().__init__()
         for key, val in (config or {}).items():
             self[key] = val
@@ -107,13 +108,13 @@ class Config(dict):
                 n_dict[key] = val
         return n_dict
 
-    def update(self, config: Union[dict, Path, str, None]):
+    def update(self, config: dict|Path|str|None):
         r"""Overwrites from a new config."""
         config = _load_dict(config)
         for key, val in config.flatten().items():
             self[key] = val
 
-    def fill(self, config: Union[dict, Path, str, None]):
+    def fill(self, config: dict|Path|str|None):
         r"""Fills value from a new config."""
         config = _load_dict(config)
         if not('_target_' in self and '_target_' in config and self._target_!=config._target_):
@@ -129,27 +130,16 @@ class Config(dict):
         r"""Returns a clone of the configuration."""
         return Config(self.flatten())
 
-    def instantiate(self, *args, **kwargs): # one-level instantiation
-        r"""Instantiates an object using the configuration.
+    def instantiate(self, **kwargs):
+        return instantiate(dict(
+            **{k: self[k] for k in self if k not in kwargs}, **kwargs,
+        ))
 
-        When a callable object is specified by a string in '_target_', this
-        method will use other key-values as arguments to instantiate a new
-        object. '_target_' should be a string that can be imported from the
-        working directory, it can be a class or a function.
-
-        """
-        assert '_target_' in self, "A callable needs to be specified as '_target_'."
-        try:
-            _target = _locate(self._target_)
-            assert callable(_target)
-        except:
-            raise RuntimeError(f"The '_target_' ({_target}) is not callable.")
-        _kwargs = Config({k: v for k, v in self.items() if k!='_target_'})
-        _kwargs.update(kwargs)
-        return _target(*args, **_kwargs)
+    # aliasing 'instantiate' for function calling
+    call = instantiate
 
 
-def from_cli(argv: Optional[list[str]] = None) -> Config:
+def from_cli(argv: list[str]|None = None) -> Config:
     r"""Constructs a configuration from command line."""
     if argv is None:
         argv = sys.argv[1:]
@@ -167,7 +157,7 @@ def from_cli(argv: Optional[list[str]] = None) -> Config:
     return config
 
 
-def _load_dict(config: Union[dict, Path, str, None]) -> Config:
+def _load_dict(config: dict|Path|str|None) -> Config:
     if isinstance(config, (Path, str)):
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
@@ -191,3 +181,19 @@ def _locate(path: str) -> Callable:
         except:
             obj = import_module('.'.join(parts[:(m+1)]))
     return obj
+
+
+def instantiate(spec):
+    r"""Instantiates an object."""
+    if isinstance(spec, dict):
+        if '_target_' in spec:
+            _target = _locate(spec['_target_'])
+            return _target(**{k: v for k, v in spec.items() if k!='_target_'})
+        else:
+            return {k: instantiate(v) for k, v in spec.items()}
+    elif isinstance(spec, list):
+        return [instantiate(val) for val in spec]
+    elif isinstance(spec, tuple):
+        return tuple(instantiate(val) for val in spec)
+    else:
+        return spec
