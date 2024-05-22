@@ -67,7 +67,7 @@ class TestConfigArchive(ArchiveTestCase):
 
     def setUp(self):
         super().setUp()
-        self.config_path = Path(__file__).parent/'fixtures'/'resnet_config.yaml'
+        self.config_path = Path(__file__).parent/'fixtures/resnet.yaml'
 
     def test_adding_config(self):
         self.axv._clear()
