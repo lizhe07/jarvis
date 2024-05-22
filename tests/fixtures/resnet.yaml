@@ -1,10 +1,8 @@
 data: 'CIFAR10'
-model:
-  _target_: 'jarvis.models.resnet.resnet18'
-  base_channels: 64
 train:
   pretrained: false
   batch_size: 64
   optimizer:
     _target_: 'jarvis.utils.sgd_optimizer'
     lr: 1.e-4
+    momentum: 0.99
