@@ -6,8 +6,8 @@ from .alias import Tensor, Module, Optimizer, Scheduler
 from tqdm.auto import tqdm as auto_tqdm
 from tqdm.asyncio import tqdm as asyncio_tqdm
 class dummy_tqdm:
-    def __init__(self, *args, **kwargs):
-        ...
+    def __init__(self, iterable=None, *args, **kwargs):
+        self.iterable = iterable
     def __enter__(self):
         return self
     def __exit__(self, *args):
@@ -16,6 +16,9 @@ class dummy_tqdm:
         ...
     def set_description(self, *args, **kwargs):
         ...
+    def __iter__(self):
+        for obj in self.iterable:
+            yield obj
 
 if auto_tqdm==asyncio_tqdm:
     tqdm_kwargs = {'ncols': 80, 'ascii': True}
@@ -26,7 +29,7 @@ def tqdm(*args, **kwargs):
         if key not in kwargs:
             kwargs[key] = val
     if kwargs.get('disable', False):
-        return dummy_tqdm()
+        return dummy_tqdm(*args, **kwargs)
     if 'smoothing' not in kwargs:
         total = kwargs.get('total', None)
         if total is None:
