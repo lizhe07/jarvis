@@ -1,7 +1,8 @@
 import os, pickle, random, time
 from pathlib import Path
 import numpy as np
-from typing import Any, Optional
+from typing import Any
+from collections.abc import Iterator
 
 from .config import Config
 from .utils import tqdm
@@ -21,7 +22,27 @@ class MaxTryIOError(RuntimeError):
 
 
 class Archive:
-    r"""Dictionary-like class that stores data externally."""
+    r"""Dictionary-like class that stores data externally.
+
+    Args
+    ----
+    store_dir:
+        The directory for storing data.
+    key_len:
+        The length of keys.
+    path_len:
+        The length of external file names, should be no greater than `key_len`.
+    max_try:
+        The maximum number of trying to read/write external files.
+    pause:
+        The time (seconds) between two consecutive read/write attempts.
+    use_buffer:
+        Whether to use a buffer in memory. If ``True``, some methods will be
+        attempted on an internal dict first before loading external files.
+        Overwriting will be disabled since many Archive objects may be running
+        at the same time.
+
+    """
     _alphabet = ['{:X}'.format(i) for i in range(16)]
 
     def __init__(self,
@@ -32,28 +53,7 @@ class Archive:
         pause: float = 0.5,
         use_buffer: bool = False,
     ):
-        r"""
-        Args
-        ----
-        store_dir:
-            The directory for storing data.
-        key_len:
-            The length of keys.
-        path_len:
-            The length of external file names, should be no greater than
-            `key_len`.
-        max_try:
-            The maximum number of trying to read/write external files.
-        pause:
-            The time (seconds) between two consecutive read/write attempts.
-        use_buffer:
-            Whether to use a buffer in memory. If ``True``, some methods will be
-            attempted on an internal dict first before loading external files.
-            Overwriting will be disabled since many Archive objects may be
-            running at the same time.
-
-        """
-        self.store_dir, self.key_len = store_dir, key_len
+        self.store_dir, self.key_len = Path(store_dir), key_len
         assert key_len>=path_len, "File name length should be no greater than key length."
         os.makedirs(self.store_dir, exist_ok=True)
         self.path_len, self.max_try, self.pause = path_len, max_try, pause
@@ -108,42 +108,43 @@ class Archive:
     def _file_name(key: str, path_len: int) -> str:
         return '/'.join(key[:path_len])+'.axv'
 
-    def _store_path(self, key: str) -> str:
+    def _store_path(self, key: str) -> Path:
         r"""Returns the path of external file associated with a key."""
         if not self._is_valid_key(key):
             raise KeyError(key)
-        return f'{self.store_dir}/{self._file_name(key, self.path_len)}'
+        return self.store_dir/self._file_name(key, self.path_len)
 
     @staticmethod
-    def _file_names(folder_name: str, depth: int) -> str:
+    def _file_names(store_dir: Path, depth: int) -> Iterator[str]:
         r"""A generator for names of existing records file."""
         if depth==1:
-            file_names = os.listdir(folder_name)
+            file_names = os.listdir(store_dir)
             random.shuffle(file_names)
             for file_name in file_names:
                 if len(file_name)==5 and file_name[0] in Archive._alphabet and file_name.endswith('.axv'):
                     yield file_name
         else:
-            subfolder_names = [f for f in os.listdir(folder_name) if f in Archive._alphabet]
-            random.shuffle(subfolder_names)
-            for subfolder_name in subfolder_names:
-                for file_name in Archive._file_names(f'{folder_name}/{subfolder_name}', depth-1):
-                    yield f'{subfolder_name}/{file_name}'
+            subdir_names = [f for f in os.listdir(store_dir) if f in Archive._alphabet]
+            random.shuffle(subdir_names)
+            for subdir_name in subdir_names:
+                for file_name in Archive._file_names(store_dir/subdir_name, depth-1):
+                    yield f'{subdir_name}/{file_name}'
 
-    def _store_paths(self) -> list[str]:
+    def _store_paths(self) -> Iterator[Path]:
         r"""Returns all valid external files in the directory."""
         for file_name in self._file_names(self.store_dir, self.path_len):
-            yield f'{self.store_dir}/{file_name}'
+            yield self.store_dir/file_name
 
     def _sleep(self):
         r"""Waits for a random period of time."""
         time.sleep(self.pause*(0.8+random.random()*0.4))
 
-    def _safe_read(self, store_path: str) -> dict:
+    def _safe_read(self, store_path: Path) -> dict:
         r"""Safely reads a file.
 
         This is designed for cluster use, if too many tries have failed, try to
-        delete the file.
+        delete the file. If `buffer` is used, it will be updated gradually every
+        time a file is read.
 
         """
         count = 0
@@ -163,21 +164,22 @@ class Archive:
                 os.remove(store_path)
             records = {}
         if self.buffer is not None:
-            parts = store_path.split('/')[-self.path_len:]
+            parts = list(store_path.parts)[-self.path_len:]
             parts[-1] = parts[-1][0]
             head = ''.join(parts)
             for key in self.buffer:
                 if key.startswith(head) and key not in records:
+                    # remove values do not exist any more
                     self.buffer.pop(key)
             self.buffer.update(records)
         return records
 
-    def _safe_write(self, records: dict, store_path: str):
+    def _safe_write(self, records: dict, store_path: Path):
         r"""Safely writes a file."""
         count = 0
         while count<self.max_try:
             try:
-                os.makedirs(Path(store_path).parent, exist_ok=True)
+                os.makedirs(store_path.parent, exist_ok=True)
                 with open(store_path, 'wb') as f:
                     pickle.dump(records, f)
             except KeyboardInterrupt as e:
@@ -217,7 +219,7 @@ class Archive:
             self._safe_read(store_path) # corrupted files are removed in `_safe_read`
         self.max_try, self.pause = max_try, pause
 
-    def keys(self) -> str:
+    def keys(self) -> Iterator[str]:
         r"""A generator for keys."""
         for store_path in self._store_paths():
             records = self._safe_read(store_path)
@@ -231,7 +233,7 @@ class Archive:
             for val in records.values():
                 yield val
 
-    def items(self) -> tuple[str, Any]:
+    def items(self) -> Iterator[tuple[str, Any]]:
         r"""A generator for items."""
         for store_path in self._store_paths():
             records = self._safe_read(store_path)
@@ -287,7 +289,7 @@ class Archive:
 
     def migrate(self,
         dst_dir: str,
-        keys: Optional[set[str]] = None,
+        keys: set[str]|None = None,
         overwrite: bool = False,
     ):
         r"""Clones the archive to a new directory.
@@ -333,7 +335,7 @@ class Archive:
             for src_path in tqdm(src_paths, unit='file', leave=False):
                 src_records = self._safe_read(src_path)
                 src_keys = [k for k in src_records if keys is None or k in keys]
-                key_dicts = {}
+                key_dicts = {} # keys grouped by files in dst_dir
                 for key in src_keys:
                     _key = key[:dst_path_len]
                     if _key in key_dicts:
@@ -355,13 +357,14 @@ class Archive:
                     if modified:
                         self._safe_write(dst_records, dst_path)
         else:
-            raise NotImplementedError
+            raise NotImplementedError("Files from src_dir needs to be merged.")
 
 
 class HashableRecordArchive(Archive):
+    r"""Archive class for hashable record."""
 
-    def __init__(self, *args, path_len: int = 2, use_buffer: bool = True, **kwargs):
-        super().__init__(*args, path_len=path_len, use_buffer=use_buffer, **kwargs)
+    def __init__(self, *args, use_buffer: bool = True, **kwargs):
+        super().__init__(*args, use_buffer=use_buffer, **kwargs)
 
     @classmethod
     def _to_hashable(cls, n_val):
@@ -418,10 +421,10 @@ class HashableRecordArchive(Archive):
         for key, val in super().items():
             yield key, self._to_native(val)
 
-    def get_key(self, n_val) -> Optional[str]:
+    def get_key(self, n_val) -> str|None:
         r"""Returns the key of a record."""
         h_val = self._to_hashable(n_val)
-        if self.buffer is not None:
+        if self.buffer is not None: # search in buffer first
             for key, val in self.buffer.items():
                 if val==h_val:
                     return key
@@ -459,6 +462,7 @@ class HashableRecordArchive(Archive):
 
 
 class ConfigArchive(HashableRecordArchive):
+    r"""Archive class for Config objects."""
 
     def __init__(self, *args, max_try: int = 300, **kwargs):
         super().__init__(*args, max_try=max_try, **kwargs)
@@ -472,7 +476,7 @@ class ConfigArchive(HashableRecordArchive):
     def __setitem__(self, key: str, val: dict):
         return super().__setitem__(key, Config(val))
 
-    def get_key(self, val: dict) -> Optional[str]:
+    def get_key(self, val: dict) -> str|None:
         return super().get_key(Config(val))
 
     @classmethod
@@ -500,13 +504,14 @@ class ConfigArchive(HashableRecordArchive):
         ]
         return shared, diffs
 
-    def filter(self, cond: dict) -> str:
+    def filter(self, cond: dict) -> Iterator[str]:
         r"""Generator of matching record key.
 
         Args
         ----
         cond:
-            Filter conditions, specifying parts of config values.
+            Filter conditions, specifying parts of config values. Each value can
+            be an exact match or a callable function that defines a criterion.
 
         """
         f_cond = Config(cond).flatten()
@@ -516,8 +521,7 @@ class ConfigArchive(HashableRecordArchive):
             for k, v in f_cond.items():
                 if not (
                     k in f_config and (
-                        (callable(v) and v(f_config[k])==True) or
-                        f_config[k]==v
+                        (callable(v) and v(f_config[k])==True) or f_config[k]==v
                     )
                 ):
                     matched = False
