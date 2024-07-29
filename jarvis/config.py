@@ -86,6 +86,17 @@ class Config(dict):
         else:
             return val
 
+    def pop(self, key):
+        dot_pos = key.find('.')
+        if dot_pos==-1:
+            return super().pop(key)
+        else:
+            key_head, key_tail = key[:dot_pos], key[dot_pos+1:]
+            val = self[key_head].pop(key_tail)
+            if len(self[key_head])==0:
+                super().pop(key_head)
+            return val
+
     def flatten(self) -> dict:
         r"""Returns a flattened dictionary."""
         f_dict = {}
