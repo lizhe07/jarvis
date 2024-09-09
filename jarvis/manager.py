@@ -157,7 +157,8 @@ class Manager:
                 key = self.configs.add(config)
                 stat = self.get_stat(key)
                 if (
-                    stat['complete'] or stat['epoch']>=num_epochs or
+                    stat['complete'] or
+                    (num_epochs is not None and stat['epoch']>=num_epochs) or
                     (time.time()-stat['t_modified'])/3600<self.patience
                 ):
                     continue
