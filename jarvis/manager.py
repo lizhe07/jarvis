@@ -94,10 +94,11 @@ class Manager:
             num_epochs = max_epochs
         else:
             num_epochs = min(num_epochs, max_epochs)
-        epoch = self.get_stat(key)['epoch']
+        stat = self.get_stat(key)
+        epoch = stat['epoch']
         if epoch>=num_epochs:
             return
-        elif epoch>=0: # checkpoint exists
+        if epoch>=0: # checkpoint exists
             ckpt = self.ckpts[key]
             self.load_ckpt(ckpt)
         else:
@@ -162,6 +163,8 @@ class Manager:
                     (time.time()-stat['t_modified'])/3600<self.patience
                 ):
                     continue
+                stat['t_modified'] = time.time()
+                self.stats[key] = stat
                 try:
                     self.process(config, num_epochs, **process_kw)
                     w_count += 1
