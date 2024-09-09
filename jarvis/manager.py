@@ -24,7 +24,7 @@ class Manager:
     save_interval:
         Number of epochs between two successive saves.
     patience:
-        The time to wait for a running work to finish, in seconds.
+        The time to wait for a running work to finish, in hours.
 
     """
 
@@ -39,7 +39,7 @@ class Manager:
         store_dir: Path|str,
         *,
         s_pause: float = 1., l_pause: float = 5.,
-        save_interval: int = 1, patience: float = 10.,
+        save_interval: int = 1, patience: float = 1.,
     ):
         self.store_dir = Path(store_dir)
         self.configs = ConfigArchive(
@@ -155,7 +155,11 @@ class Manager:
         with tqdm(total=num_works, **pbar_kw) as pbar:
             for config in configs:
                 key = self.configs.add(config)
-                if self.get_stat(key)['complete']:
+                stat = self.get_stat(key)
+                if (
+                    stat['complete'] or stat['epoch']>=num_epochs or
+                    (time.time()-stat['t_modified'])/3600<self.patience
+                ):
                     continue
                 try:
                     self.process(config, num_epochs, **process_kw)
