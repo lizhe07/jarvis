@@ -72,7 +72,8 @@ class Manager:
 
     def process(self,
         config: Config, num_epochs: int|None = None,
-        pbar_kw: dict|None = None, pbar_desc: str|None = None,
+        pbar_kw: dict|None = None,
+        pbar_desc: Callable[[Config], str]|str|None = None,
     ) -> None:
         r"""Processes a work for given number of epochs.
 
@@ -86,7 +87,9 @@ class Manager:
         pbar_kw:
             Keyword argument for progress bar of one work.
         pbar_desc:
-            Description of progress bar.
+            Description of progress bar. It can be a callable function which
+            takes `config` as a single input and returns a string. If ``None``,
+            the key will be used.
 
         """
         pbar_kw = Config(pbar_kw).fill({'unit': 'epoch', 'leave': True})
@@ -96,19 +99,21 @@ class Manager:
             num_epochs = max_epochs
         else:
             num_epochs = min(num_epochs, max_epochs)
-        print(f'{num_epochs=}')
         try:
             ckpt = self.ckpts[key]
             epoch = self.load_ckpt(ckpt)
         except:
-            print('resetting...')
             self.reset()
             epoch = 0
             self.save_ckpt(key, epoch, max_epochs)
         if epoch>=num_epochs:
             return
+        if callable(pbar_desc):
+            pbar_desc = pbar_desc(config)
+        elif pbar_desc is None:
+            pbar_desc = key
         with tqdm(total=num_epochs, **pbar_kw) as pbar:
-            pbar.set_description(key if pbar_desc is None else pbar_desc)
+            pbar.set_description(pbar_desc)
             pbar.update(epoch)
             while epoch<num_epochs:
                 self.step()
