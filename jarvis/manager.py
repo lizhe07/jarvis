@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from collections import deque
 from collections.abc import Callable
 from typing import Any
 
@@ -141,7 +142,8 @@ class Manager:
             Number of epochs of each work, see `self.process` for more details.
         num_works:
             Number of works to process. If `None`, the batch processing stops
-            only when no work is left pending in `configs`.
+            only when no work is left pending in `configs`, and the progress bar
+            will update for complete works in this mode.
         max_errors:
             Maximum number of errors allowed. If `0`, the runtime error is
             immediately raised. `KeyboardInterrupt` error is always raised
@@ -152,24 +154,27 @@ class Manager:
             Keyword argument for `self.process`.
 
         """
+        configs = deque(configs)
         if num_works is None:
-            num_works = len(configs)
+            total = len(configs)
         else:
-            num_works = min(num_works, len(configs))
+            total = min(num_works, len(configs))
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': False})
         process_kw = Config(process_kw).fill({'pbar_kw.leave': False})
 
         w_count = 0 # counter for processed works
         e_count = 0 # counter for runtime errors
-        with tqdm(total=num_works, **pbar_kw) as pbar:
-            for config in configs:
+        with tqdm(total=total, **pbar_kw) as pbar:
+            while len(configs)>0:
+                config = configs.popleft()
                 key = self.configs.add(config)
                 stat = self.get_stat(key)
-                if (
-                    stat['complete'] or
-                    (num_epochs is not None and stat['epoch']>=num_epochs) or
-                    (time.time()-stat['t_modified'])/3600<self.patience
-                ):
+                if stat['complete'] or (num_epochs is not None and stat['epoch']>=num_epochs):
+                    if num_works is None:
+                        pbar.update()
+                    continue
+                if (time.time()-stat['t_modified'])/3600<self.patience:
+                    configs.append(config)
                     continue
                 stat['t_modified'] = time.time()
                 self.stats[key] = stat
