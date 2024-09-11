@@ -33,7 +33,7 @@ class Manager:
     reset: Callable[[], None] # resets when a work initiates, i.e. epoch=0
     step: Callable[[], None] # runs one epoch
     get_ckpt: Callable[[], Any] # prepares checkpoint data
-    load_ckpt: Callable[[Any], None] # loads checkpoint data
+    load_ckpt: Callable[[Any], int] # loads checkpoint data and returns actual epoch
 
     def __init__(self,
         store_dir: Path|str,
@@ -72,7 +72,7 @@ class Manager:
 
     def process(self,
         config: Config, num_epochs: int|None = None,
-        pbar_kw: dict|None = None,
+        pbar_kw: dict|None = None, pbar_desc: str|None = None,
     ) -> None:
         r"""Processes a work for given number of epochs.
 
@@ -85,6 +85,8 @@ class Manager:
             `max_epochs` returned by `self.setup`.
         pbar_kw:
             Keyword argument for progress bar of one work.
+        pbar_desc:
+            Description of progress bar.
 
         """
         pbar_kw = Config(pbar_kw).fill({'unit': 'epoch', 'leave': True})
@@ -94,18 +96,19 @@ class Manager:
             num_epochs = max_epochs
         else:
             num_epochs = min(num_epochs, max_epochs)
-        stat = self.get_stat(key)
-        epoch = stat['epoch']
-        if epoch>=num_epochs:
-            return
-        if epoch>=0: # checkpoint exists
+        print(f'{num_epochs=}')
+        try:
             ckpt = self.ckpts[key]
-            self.load_ckpt(ckpt)
-        else:
+            epoch = self.load_ckpt(ckpt)
+        except:
+            print('resetting...')
             self.reset()
             epoch = 0
             self.save_ckpt(key, epoch, max_epochs)
+        if epoch>=num_epochs:
+            return
         with tqdm(total=num_epochs, **pbar_kw) as pbar:
+            pbar.set_description(key if pbar_desc is None else pbar_desc)
             pbar.update(epoch)
             while epoch<num_epochs:
                 self.step()
