@@ -187,6 +187,7 @@ class Manager:
                 except:
                     e_count += 1
                     if e_count>max_errors:
+                        print(f"\nMax number of errors {max_errors} reached (current work '{key}')")
                         raise
                 if w_count==num_works:
                     break
