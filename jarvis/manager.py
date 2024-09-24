@@ -75,7 +75,7 @@ class Manager:
         config: Config, num_epochs: int|None = None,
         pbar_kw: dict|None = None,
         pbar_desc: Callable[[Config], str]|str|None = None,
-    ) -> None:
+    ) -> Any:
         r"""Processes a work for given number of epochs.
 
         Args
@@ -91,6 +91,11 @@ class Manager:
             Description of progress bar. It can be a callable function which
             takes `config` as a single input and returns a string. If ``None``,
             the key will be used.
+
+        Returns
+        -------
+        ckpt:
+            Latest checkpoint of the processed work.
 
         """
         pbar_kw = Config(pbar_kw).fill({'unit': 'epoch', 'leave': True})
@@ -108,7 +113,7 @@ class Manager:
             epoch = 0
             self.save_ckpt(key, epoch, max_epochs)
         if epoch>=num_epochs:
-            return
+            return self.ckpts[key]
         if callable(pbar_desc):
             pbar_desc = pbar_desc(config)
         elif pbar_desc is None:
@@ -122,6 +127,7 @@ class Manager:
                 if epoch%self.save_interval==0 or epoch==num_epochs:
                     self.save_ckpt(key, epoch, max_epochs)
                 pbar.update()
+        return self.ckpts[key]
 
     def batch(self,
         configs: list[Config],
