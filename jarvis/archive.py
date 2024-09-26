@@ -215,7 +215,9 @@ class Archive:
         self.max_try, self.pause = 1, 0.
         if self.buffer is not None:
             self.buffer = {}
-        for store_path in self._store_paths():
+        for store_path in tqdm(
+            list(self._store_paths()), desc='Pruning', unit='file',
+        ):
             self._safe_read(store_path) # corrupted files are removed in `_safe_read`
         self.max_try, self.pause = max_try, pause
 
