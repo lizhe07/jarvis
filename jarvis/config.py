@@ -1,4 +1,5 @@
 import sys, yaml, time, random
+import numpy as np
 from pathlib import Path
 from importlib import import_module
 from collections.abc import Callable
@@ -208,3 +209,42 @@ def instantiate(spec):
         return tuple(instantiate(val) for val in spec)
     else:
         return spec
+
+
+def choices2configs(choices: dict|Path|str, num_configs: int|None = None) -> list[Config]:
+    r"""Generates configs on a mesh grid.
+
+    Args
+    ----
+    choices:
+        A config-like object, except the leaf nodes are list of value choices.
+        The list of random configs will be constructed as the outer product. If
+        a file path is provided, it is expected to be a yaml file.
+    num_configs:
+        The number of configs to return. If not provided, will return all
+        possible combinations of choices.
+
+    Returns
+    -------
+    configs:
+        The list of configs randomly selected from the mesh grid.
+
+    """
+    if isinstance(choices, (Path, str)):
+        with open(choices, 'r') as f:
+            choices = yaml.safe_load(f)
+    choices = Config(choices).flatten()
+    keys = list(choices.keys())
+    vals = [list(choices[key]) for key in keys]
+    dims = [len(val) for val in vals]
+    total_num = np.prod(dims)
+    num_configs = total_num if num_configs is None else min(total_num, num_configs)
+
+    configs = []
+    for idx in random.sample(range(total_num), num_configs):
+        sub_idxs = np.unravel_index(idx, dims)
+        config = Config()
+        for i, key in enumerate(keys):
+            config[key] = vals[i][sub_idxs[i]]
+        configs.append(config)
+    return configs
