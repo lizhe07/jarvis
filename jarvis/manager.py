@@ -35,6 +35,7 @@ class Manager:
     step: Callable[[], None] # runs one epoch
     get_ckpt: Callable[[], Any] # prepares checkpoint data
     load_ckpt: Callable[[Any], int] # loads checkpoint data and returns actual epoch
+    pbar_desc: Callable[[Config], str]|None = None # description of a work
 
     def __init__(self,
         store_dir: Path|str,
@@ -72,9 +73,8 @@ class Manager:
         }
 
     def process(self,
-        config: Config, num_epochs: int|None = None,
+        config: dict, num_epochs: int|None = None,
         pbar_kw: dict|None = None,
-        pbar_desc: Callable[[Config], str]|str|None = None,
     ) -> Any:
         r"""Processes a work for given number of epochs.
 
@@ -87,10 +87,6 @@ class Manager:
             `max_epochs` returned by `self.setup`.
         pbar_kw:
             Keyword argument for progress bar of one work.
-        pbar_desc:
-            Description of progress bar. It can be a callable function which
-            takes `config` as a single input and returns a string. If ``None``,
-            the key will be used.
 
         Returns
         -------
@@ -98,8 +94,12 @@ class Manager:
             Latest checkpoint of the processed work.
 
         """
-        pbar_kw = Config(pbar_kw).fill({'unit': 'epoch', 'leave': True})
+        config = Config(config)
         key = self.configs.add(config)
+        pbar_kw = Config(pbar_kw).fill({
+            'desc': key if self.pbar_desc is None else self.pbar_desc(config),
+            'unit': 'epoch', 'leave': True,
+        })
         max_epochs = self.setup(config)
         if num_epochs is None:
             num_epochs = max_epochs
@@ -114,12 +114,7 @@ class Manager:
             self.save_ckpt(key, epoch, max_epochs)
         if epoch>=num_epochs:
             return self.ckpts[key]
-        if callable(pbar_desc):
-            pbar_desc = pbar_desc(config)
-        elif pbar_desc is None:
-            pbar_desc = key
         with tqdm(total=num_epochs, **pbar_kw) as pbar:
-            pbar.set_description(pbar_desc)
             pbar.update(epoch)
             while epoch<num_epochs:
                 self.step()
