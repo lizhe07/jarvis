@@ -176,27 +176,50 @@ def cyclic_scheduler(
     return scheduler
 
 
-def numpy_dict(t_state_dict: dict) -> dict:
-    n_state_dict = {}
-    for key, val in t_state_dict.items():
-        if isinstance(val, dict):
-            n_state_dict[key] = numpy_dict(val)
-        elif isinstance(val, Tensor):
-            n_state_dict[key] = ('_T', val.data.cpu().clone().numpy(), val.dtype)
-        else:
-            n_state_dict[key] = val
-    return n_state_dict
+def tensor2array(tensors):
+    r"""Converts pytorch tensors to numpy arrays.
 
-def tensor_dict(n_state_dict: dict, device='cpu') -> dict:
-    t_state_dict = {}
-    for key, val in n_state_dict.items():
-        if isinstance(val, dict):
-            t_state_dict[key] = tensor_dict(val, device)
-        elif isinstance(val, tuple) and len(val)==3 and val[0]=='_T':
-            t_state_dict[key] = torch.tensor(val[1], dtype=val[2], device=device)
-        else:
-            t_state_dict[key] = val
-    return t_state_dict
+    To save tensors with 'pickle' without warning, tensors or containers with
+    them need to be converted. Each tensor will be replaced by a tuple like
+    `('_T', vals, dtype)`.
+
+    """
+    if isinstance(tensors, Tensor):
+        return ('_T', tensors.data.cpu().clone().numpy(), tensors.dtype)
+    elif isinstance(tensors, dict):
+        return {k: tensor2array(v) for k, v in tensors.items()}
+    elif isinstance(tensors, (list, tuple, set)):
+        arrays = [tensor2array(vals) for vals in tensors]
+        if isinstance(tensors, list):
+            return arrays
+        elif isinstance(tensors, tuple):
+            return tuple(arrays)
+        elif isinstance(tensors, set):
+            return set(arrays)
+    else:
+        return tensors
+
+def array2tensor(arrays, device='cpu'):
+    r"""Reverts numpy arrays back to tensors.
+
+    To convert the arrays returned by `tensor2array` back to tensors, with given
+    tensor device.
+
+    """
+    if isinstance(arrays, tuple) and len(arrays)==3 and arrays[0]=='_T':
+        return torch.tensor(arrays[1], dtype=arrays[2], device=device)
+    elif isinstance(arrays, dict):
+        return {k: array2tensor(v) for k, v in arrays.items()}
+    elif isinstance(arrays, (list, tuple, set)):
+        tensors = [array2tensor(vals) for vals in arrays]
+        if isinstance(arrays, list):
+            return tensors
+        elif isinstance(arrays, tuple):
+            return tuple(tensors)
+        elif isinstance(arrays, set):
+            return set(tensors)
+    else:
+        return arrays
 
 
 def create_mlp_layers(
