@@ -290,9 +290,10 @@ class Archive:
                     os.remove(store_path)
 
     def migrate(self,
-        dst_dir: str,
+        dst_dir: Path,
         keys: set[str]|None = None,
         overwrite: bool = False,
+        pbar_kw: dict|None = None,
     ):
         r"""Clones the archive to a new directory.
 
@@ -307,6 +308,7 @@ class Archive:
 
         """
         os.makedirs(dst_dir, exist_ok=True)
+        pbar_kw = Config(pbar_kw).fill({'unit': 'file', 'leave': False})
         # check key consistency
         path_len = []
         for depth in range(1, self.key_len+1):
@@ -317,8 +319,9 @@ class Archive:
             raise RuntimeError(f"Multiple hierarchies detected in {dst_dir}")
         elif len(path_len)==1:
             dst_path_len = path_len[0]
+            # check for one record
             file_name =  next(iter(self._file_names(dst_dir, dst_path_len)), None)
-            records = self._safe_read(f'{dst_dir}/{file_name}')
+            records = self._safe_read(dst_dir/file_name)
             key = next(iter(records.keys()))
             assert self._is_valid_key(key), f"Invalid key detected in {dst_dir} ({key})"
         else:
@@ -330,11 +333,11 @@ class Archive:
             src_paths = set()
             for key in keys:
                 src_paths.add(self._store_path(key))
-            src_paths = list(src_paths)
+            src_paths: list[Path] = list(src_paths)
         # copy records to destination directory
         if dst_path_len>=self.path_len:
             random.shuffle(src_paths)
-            for src_path in tqdm(src_paths, unit='file', leave=False):
+            for src_path in tqdm(src_paths, **pbar_kw):
                 src_records = self._safe_read(src_path)
                 src_keys = [k for k in src_records if keys is None or k in keys]
                 key_dicts = {} # keys grouped by files in dst_dir
@@ -345,7 +348,7 @@ class Archive:
                     else:
                         key_dicts[_key] = [key]
                 for dst_keys in key_dicts.values():
-                    dst_path = f'{dst_dir}/{self._file_name(dst_keys[0], dst_path_len)}'
+                    dst_path = dst_dir/self._file_name(dst_keys[0], dst_path_len)
                     if os.path.exists(dst_path):
                         dst_records = self._safe_read(dst_path)
                         modified = False
