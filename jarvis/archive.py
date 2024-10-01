@@ -506,7 +506,7 @@ class ConfigArchive(HashableRecordArchive):
         ]
         return shared, diffs
 
-    def filter(self, cond: dict) -> Iterator[str]:
+    def filter(self, cond: dict) -> Iterator[tuple[str, Config]]:
         r"""Generator of matching record key.
 
         Args
@@ -529,4 +529,4 @@ class ConfigArchive(HashableRecordArchive):
                     matched = False
                     break
             if matched:
-                yield key
+                yield key, config
