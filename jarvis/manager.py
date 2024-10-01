@@ -1,7 +1,7 @@
-import time
+import os, time, random, shutil, tarfile
 from pathlib import Path
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from .config import Config
@@ -192,3 +192,177 @@ class Manager:
                         raise
                 if w_count==num_works:
                     break
+
+    def completed(self,
+        min_epoch: int = 0,
+        recent: float|None = None,
+        cond: dict|None = None,
+    ) -> Iterator[tuple[str, Config]]:
+        r"""A generator for completed works.
+
+        Args
+        ----
+        min_epoch:
+            Minimum number of processed epochs.
+        recent:
+            How recent works are considered, in unit of hours. For example, if
+            only the ones modified within one day is needed, use `recent=24`.
+        cond:
+            Conditioned value of work configurations, see `ConfigArchive.filter`
+            for more details.
+
+        """
+        for key, config in self.configs.filter(cond):
+            stat = self.get_stat(key)
+            if stat['epoch']>=min_epoch and (recent is None or time.time()-stat['t_modified']<=recent):
+                yield key, config
+
+    def _export_dir(self,
+        dst_dir: Path|str,
+        *,
+        keys: set|None = None,
+        min_epoch: int = 0,
+        recent: float|None = None,
+        cond: dict|None = None,
+    ) -> None:
+        r"""Exports manager data to a directory.
+
+        Args
+        ----
+        dst_dir:
+            Destination directory.
+        keys:
+            Keys of works that will be potentially exported. If ``None``, all
+            works satisfying the criterion will be exported.
+        min_epoch, recent, cond:
+            Filters of the work, see `completed` for more details.
+
+        """
+        dst_manager = Manager(dst_dir)
+        self.configs.max_try = 1
+        self.configs.pause = 0.
+        _keys = set(key for key, _ in self.completed(min_epoch, recent, cond))
+        if keys is not None:
+            _keys.intersection_update(keys)
+        self.configs.migrate(dst_manager.configs.store_dir, _keys, pbar_kw={'desc': "Copying 'configs'"})
+        self.stats.migrate(dst_manager.stats.store_dir, _keys, pbar_kw={'desc': "Copying 'stats'"})
+        self.ckpts.migrate(dst_manager.ckpts.store_dir, _keys, pbar_kw={'desc': "Copying 'ckpts'"})
+
+    def export_tar(self,
+        tar_path: str = 'store.tar.gz',
+        compresslevel: int = 1,
+        **kwargs,
+    ) -> None:
+        r"""Exports manager data to a tar file.
+
+        Args
+        ----
+        tar_path:
+            Path of the file to export to.
+        compressionlevel:
+            Compression level of gzip.
+        kwargs:
+            Keyword arguments for `_export_dir`.
+
+        """
+        tmp_dir = self.store_dir/'tmp_{}'.format(self.configs._random_key())
+        try:
+            self._export_dir(tmp_dir, **kwargs)
+            with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as tar:
+                full_paths = []
+                for root, _, files in os.walk(tmp_dir):
+                    for file in files:
+                        full_paths.append(Path(root)/file)
+                random.shuffle(full_paths)
+                for full_path in tqdm(full_paths, desc='Adding files to tar', unit='file'):
+                    tar.add(full_path, arcname=os.path.relpath(full_path, tmp_dir))
+        except:
+            raise
+        finally:
+            shutil.rmtree(tmp_dir)
+
+    def _load_dir(self,
+        src_dir: Path|str,
+        *,
+        newer_only: bool = True,
+        overwrite: bool = False,
+    ) -> None:
+        r"""Loads manager data from a directory.
+
+        Args
+        ----
+        src_dir:
+            Source directory.
+        newer_only:
+            Whether to import newer records only, determined by 'epoch' field in
+            the work status.
+        overwrite:
+            Whether to overwrite existing records, see `Archive.migrate` for
+            more details.
+
+        """
+        src_manager = Manager(src_dir)
+        # divide works into 'cloning' group and 'adding' group
+        _old_configs = {k: v for k, v in self.configs.items()}
+        _old_keys = {self.configs._to_hashable(v): k for k, v in self.configs.items()}
+        _old_stats = {k: v for k, v in self.stats.items()}
+        _new_configs = {k: v for k, v in src_manager.configs.items()}
+        _new_stats = {k: v for k, v in src_manager.stats.items()}
+        clone_keys, add_keys = set(), set()
+        for new_key, config in _new_configs.items():
+            old_key = _old_keys.get(self.configs._to_hashable(config))
+            if old_key is None:
+                if new_key in _old_configs:
+                    add_keys.add(new_key)
+                else:
+                    clone_keys.add(new_key)
+            else:
+                if newer_only and (
+                    new_key in _new_stats and old_key in _old_stats and
+                    _new_stats[new_key]['epoch']<=_old_stats[old_key]['epoch']
+                ):
+                    continue
+                if new_key==old_key:
+                    clone_keys.add(new_key)
+                else:
+                    add_keys.add(new_key)
+        # use 'migrate' to add 'cloning' group directly
+        src_manager.configs.migrate(self.configs.store_dir, clone_keys, overwrite=True)
+        src_manager.stats.migrate(self.stats.store_dir, clone_keys, overwrite=overwrite)
+        src_manager.ckpts.migrate(self.ckpts.store_dir, clone_keys, overwrite=overwrite)
+        # use 'add' to insert 'adding' group one by one
+        for src_key in add_keys:
+            dst_key = self.configs.add(_new_configs[src_key])
+            self.stats[dst_key] = _new_stats[src_key]
+            self.ckpts[dst_key] = src_manager.ckpts[src_key]
+
+    def load_tar(self, tar_path: str, compresslevel: int = 1, **kwargs):
+        r"""Loads manager data from a tar file.
+
+        Args
+        ----
+        tar_path:
+            Path of the file to load from.
+        compressionlevel:
+            Compression level of gzip.
+        kwargs:
+            Keyword arguments for `_load_dir`.
+
+        """
+        tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
+        try:
+            with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as tar:
+                members = tar.getmembers()
+                total_size = sum(member.size for member in members if member.isfile())
+                with tqdm(
+                    total=total_size, desc='Extracting files from tar',
+                    unit='B', unit_scale=True, unit_divisor=1024,
+                ) as pbar:
+                    for member in members:
+                        tar.extract(member, tmp_dir)
+                        pbar.update(member.size if member.isfile() else 0)
+            self._load_dir(tmp_dir, **kwargs)
+        except:
+            raise
+        finally:
+            shutil.rmtree(tmp_dir)
