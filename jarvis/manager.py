@@ -270,12 +270,13 @@ class Manager:
         tmp_dir = self.store_dir/'tmp_{}'.format(self.configs._random_key())
         try:
             self._export_dir(tmp_dir, **kwargs)
+            full_paths = []
+            for root, _, files in os.walk(tmp_dir):
+                for file in files:
+                    full_paths.append(Path(root)/file)
+            assert len(full_paths)>0, "No records are exported."
+            random.shuffle(full_paths)
             with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as tar:
-                full_paths = []
-                for root, _, files in os.walk(tmp_dir):
-                    for file in files:
-                        full_paths.append(Path(root)/file)
-                random.shuffle(full_paths)
                 for full_path in tqdm(full_paths, desc='Adding files to tar', unit='file'):
                     tar.add(full_path, arcname=os.path.relpath(full_path, tmp_dir))
         except:
