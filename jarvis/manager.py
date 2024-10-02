@@ -214,7 +214,9 @@ class Manager:
         """
         for key, config in self.configs.filter(cond):
             stat = self.get_stat(key)
-            if stat['epoch']>=min_epoch and (recent is None or time.time()-stat['t_modified']<=recent):
+            if stat['epoch']>=min_epoch and (
+                recent is None or time.time()-stat['t_modified']<=3600.*recent
+            ):
                 yield key, config
 
     def _export_dir(self,
@@ -327,9 +329,15 @@ class Manager:
                 else:
                     add_keys.add(new_key)
         # use 'migrate' to add 'cloning' group directly
-        src_manager.configs.migrate(self.configs.store_dir, clone_keys, overwrite=True)
-        src_manager.stats.migrate(self.stats.store_dir, clone_keys, overwrite=overwrite)
-        src_manager.ckpts.migrate(self.ckpts.store_dir, clone_keys, overwrite=overwrite)
+        src_manager.configs.migrate(
+            self.configs.store_dir, clone_keys, overwrite=True, pbar_kw={'desc': "Copying 'configs'"},
+        )
+        src_manager.stats.migrate(
+            self.stats.store_dir, clone_keys, overwrite=overwrite, pbar_kw={'desc': "Copying 'stats'"},
+        )
+        src_manager.ckpts.migrate(
+            self.ckpts.store_dir, clone_keys, overwrite=overwrite, pbar_kw={'desc': "Copying 'ckpts'"},
+        )
         # use 'add' to insert 'adding' group one by one
         for src_key in add_keys:
             dst_key = self.configs.add(_new_configs[src_key])
