@@ -167,10 +167,12 @@ class Archive:
             parts = list(store_path.parts)[-self.path_len:]
             parts[-1] = parts[-1][0]
             head = ''.join(parts)
+            to_rm = [] # remove items do not exist any more
             for key in self.buffer:
                 if key.startswith(head) and key not in records:
-                    # remove values do not exist any more
-                    self.buffer.pop(key)
+                    to_rm.append(key)
+            for key in to_rm:
+                self.buffer.pop(key)
             self.buffer.update(records)
         return records
 
