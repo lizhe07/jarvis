@@ -2,7 +2,7 @@ import os, pickle, random, time
 from pathlib import Path
 import numpy as np
 from typing import Any
-from collections.abc import Iterator
+from collections.abc import Iterator, Callable
 
 from .config import Config
 from .utils import tqdm
@@ -535,3 +535,42 @@ class ConfigArchive(HashableRecordArchive):
                     break
             if matched:
                 yield key, config
+
+    def group(self,
+        configs: list[Config],
+        to_ignore: Callable[[str], bool]|None = None,
+    ) -> list[list[Config]]:
+        r"""Groups configs by ignoring random seeds.
+
+        Args
+        ----
+        configs:
+            The list of configs to group. They do not have to be in the current
+            archive.
+        to_ignore:
+            A function that decides whether to ignore a configuration key. The
+            default function is to ignore every key that ends with 'seed'.
+
+        Returns
+        -------
+        groups:
+            A list for all groups of configs, each element is a list containing
+            configs that differ only in relevant keys.
+
+        """
+        groups = {}
+        for config in configs:
+            f_config = config.flatten()
+            to_pop = []
+            for k in f_config:
+                if (to_ignore is not None and to_ignore(k)) or k.endswith('seed'):
+                    to_pop.append(k)
+            for k in to_pop:
+                f_config.pop(k)
+            g_key = HashableRecordArchive._to_hashable(f_config)
+            if g_key in groups:
+                groups[g_key].add(HashableRecordArchive._to_hashable(config))
+            else:
+                groups[g_key] = set([HashableRecordArchive._to_hashable(config)])
+        groups = [[self._to_native(val) for val in groups[g_key]] for g_key in groups]
+        return groups
