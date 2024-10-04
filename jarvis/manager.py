@@ -160,7 +160,7 @@ class Manager:
             total = len(configs)
         else:
             total = min(num_works, len(configs))
-        pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': False})
+        pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True})
         process_kw = Config(process_kw).fill({'pbar_kw.leave': False})
 
         w_count = 0 # counter for processed works
