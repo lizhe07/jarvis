@@ -193,6 +193,21 @@ class Manager:
                 if w_count==num_works:
                     break
 
+    def prune(self):
+        r"""Remove corrupted records."""
+        self.configs.prune()
+        s_keys, _ = self.stats.prune()
+        c_keys, _ = self.ckpts.prune()
+        keys = s_keys&c_keys
+        if len(s_keys)>len(keys):
+            for key in s_keys-keys:
+                self.stats.pop(key)
+            print("{} records removed from 'stats'".format(len(s_keys)-len(keys)))
+        if len(c_keys)>len(keys):
+            for key in c_keys-keys:
+                self.ckpts.pop(key)
+            print("{} records removed from 'ckpts'".format(len(c_keys)-len(keys)))
+
     def completed(self,
         min_epoch: int = 0,
         recent: float|None = None,
@@ -288,7 +303,7 @@ class Manager:
         src_dir: Path|str,
         *,
         newer_only: bool = True,
-        overwrite: bool = False,
+        overwrite: bool = True,
     ) -> None:
         r"""Loads manager data from a directory.
 

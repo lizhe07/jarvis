@@ -211,17 +211,32 @@ class Archive:
         for store_path in self._store_paths():
             os.remove(store_path)
 
-    def _prune(self) -> None:
-        r"""Removes corrupted files."""
+    def prune(self) -> tuple[set[str], int]:
+        r"""Removes corrupted files.
+
+        Returns
+        -------
+        keys:
+            Remaining keys after pruning.
+        count:
+            Number of files removed.
+
+        """
         max_try, pause = self.max_try, self.pause
         self.max_try, self.pause = 1, 0.
         if self.buffer is not None:
             self.buffer = {}
+        keys, count = set(), 0
         for store_path in tqdm(
-            list(self._store_paths()), desc='Pruning', unit='file',
+            list(self._store_paths()), desc='Pruning', unit='file', leave=False,
         ):
-            self._safe_read(store_path) # corrupted files are removed in `_safe_read`
+            records = self._safe_read(store_path) # corrupted files are removed in `_safe_read`
+            if len(records)>0:
+                keys.update(set(records.keys()))
+            else:
+                count += 1
         self.max_try, self.pause = max_try, pause
+        return keys, count
 
     def keys(self) -> Iterator[str]:
         r"""A generator for keys."""

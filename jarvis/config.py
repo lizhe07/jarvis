@@ -2,6 +2,7 @@ import sys, yaml, time, random
 import numpy as np
 from pathlib import Path
 from importlib import import_module
+from typing import Any
 from collections.abc import Callable
 
 def _format(val):
@@ -98,7 +99,7 @@ class Config(dict):
                 super().pop(key_head)
             return val
 
-    def flatten(self) -> dict:
+    def flatten(self) -> dict[str, Any]:
         r"""Returns a flattened dictionary."""
         f_dict = {}
         for p_key, p_val in self.items(): # parent key and value
@@ -109,7 +110,7 @@ class Config(dict):
                 f_dict[p_key] = p_val
         return f_dict
 
-    def asdict(self) -> dict:
+    def asdict(self) -> dict[str, Any]:
         r"""Returns basic dict version."""
         # TODO deal with list and set
         n_dict = {}
@@ -120,7 +121,7 @@ class Config(dict):
                 n_dict[key] = val
         return n_dict
 
-    def update(self, config: dict|Path|str|None):
+    def update(self, config: dict|Path|str|None) -> None:
         r"""Overwrites from a new config."""
         config = _load_dict(config)
         for key, val in config.flatten().items():
@@ -142,7 +143,7 @@ class Config(dict):
         r"""Returns a clone of the configuration."""
         return Config(self.flatten())
 
-    def instantiate(self, **kwargs):
+    def instantiate(self, **kwargs) -> Any:
         return instantiate(dict(
             **{k: self[k] for k in self if k not in kwargs}, **kwargs,
         ))
