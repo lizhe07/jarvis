@@ -163,7 +163,8 @@ class Manager:
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True})
         process_kw = Config(process_kw).fill({'pbar_kw.leave': False})
 
-        w_count = 0 # counter for processed works
+        c_count = 0 # counter for completed works
+        r_count = 0 # counter for running works
         e_count = 0 # counter for runtime errors
         with tqdm(total=total, **pbar_kw) as pbar:
             while len(configs)>0:
@@ -176,12 +177,18 @@ class Manager:
                     continue
                 if (time.time()-stat['t_modified'])/3600<self.patience:
                     configs.append(config)
-                    continue
+                    r_count += 1
+                    if r_count%total==0: # wait after each round of queue
+                        time.sleep(self.patience*60)
+                    if r_count>10*total: # break loop after too many rounds
+                        break
+                    else:
+                        continue
                 stat['t_modified'] = time.time()
                 self.stats[key] = stat
                 try:
                     self.process(config, num_epochs, **process_kw)
-                    w_count += 1
+                    c_count += 1
                     pbar.update()
                 except KeyboardInterrupt:
                     raise
@@ -190,7 +197,7 @@ class Manager:
                     if e_count>max_errors:
                         print(f"\nMax number of errors {max_errors} reached (current work '{key}')")
                         raise
-                if w_count==num_works:
+                if c_count==num_works:
                     break
 
     def prune(self):
