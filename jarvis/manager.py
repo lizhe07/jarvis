@@ -178,9 +178,9 @@ class Manager:
                 if (time.time()-stat['t_modified'])/3600<self.patience:
                     configs.append(config)
                     r_count += 1
-                    if r_count%total==0: # wait after each round of queue
+                    if r_count%len(configs)==0: # wait after each round of queue
                         time.sleep(self.patience*60)
-                    if r_count>10*total: # break loop after too many rounds
+                    if r_count>10*len(configs): # break loop after too many rounds
                         break
                     else:
                         continue
