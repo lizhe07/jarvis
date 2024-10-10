@@ -156,31 +156,28 @@ class Manager:
 
         """
         configs = deque(configs)
-        if num_works is None:
-            total = len(configs)
-        else:
-            total = min(num_works, len(configs))
+        total = len(configs)
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True})
         process_kw = Config(process_kw).fill({'pbar_kw.leave': False})
 
         c_count = 0 # counter for completed works
         r_count = 0 # counter for running works
         e_count = 0 # counter for runtime errors
-        with tqdm(total=total, **pbar_kw) as pbar:
+        with tqdm(total=total if num_works is None else min(num_works, total), **pbar_kw) as pbar:
             while len(configs)>0:
                 config = configs.popleft()
                 key = self.configs.add(config)
                 stat = self.get_stat(key)
                 if stat['complete'] or (num_epochs is not None and stat['epoch']>=num_epochs):
-                    if num_works is None:
+                    if num_works is None: # update progress even for skipping
                         pbar.update()
                     continue
                 if (time.time()-stat['t_modified'])/3600<self.patience:
                     configs.append(config)
                     r_count += 1
-                    if r_count%len(configs)==0: # wait after each round of queue
+                    if r_count%total==0: # wait after each round of queue
                         time.sleep(self.patience*60)
-                    if r_count>10*len(configs): # break loop after too many rounds
+                    if r_count>10*total: # break loop after too many rounds
                         break
                     else:
                         continue
