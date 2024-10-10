@@ -167,6 +167,8 @@ class Manager:
             while len(configs)>0:
                 config = configs.popleft()
                 key = self.configs.add(config)
+                pbar.set_description(f'{r_count} skipped, {e_count} errors')
+                pbar.update(0)
                 stat = self.get_stat(key)
                 if stat['complete'] or (num_epochs is not None and stat['epoch']>=num_epochs):
                     if num_works is None: # update progress even for skipping
