@@ -176,7 +176,7 @@ class Manager:
                     configs.append(config)
                     r_count += 1
                     if r_count%total==0: # wait after each round of queue
-                        print('{} round waited'.format(r_count//total))
+                        print('Wait round {}'.format(r_count//total))
                         time.sleep(self.patience*60)
                     if r_count>10*total: # break loop after too many rounds
                         break
