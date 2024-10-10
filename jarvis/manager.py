@@ -167,7 +167,7 @@ class Manager:
             while len(configs)>0:
                 config = configs.popleft()
                 key = self.configs.add(config)
-                pbar.set_description(f'{r_count} skipped, {e_count} errors')
+                pbar.set_description(key)
                 pbar.update(0)
                 stat = self.get_stat(key)
                 if stat['complete'] or (num_epochs is not None and stat['epoch']>=num_epochs):
@@ -176,14 +176,16 @@ class Manager:
                     continue
                 if (time.time()-stat['t_modified'])/3600<self.patience:
                     configs.append(config)
-                    r_count += 1
-                    if r_count%total==0: # wait after each round of queue
-                        print('Wait round {}'.format(r_count//total))
-                        time.sleep(self.patience*60)
-                    if r_count>10*total: # break loop after too many rounds
-                        break
-                    else:
-                        continue
+                    time.sleep(1.)
+                    continue
+                    # r_count += 1
+                    # if r_count%total==0: # wait after each round of queue
+                    #     print('Wait round {}'.format(r_count//total))
+                    #     time.sleep(self.patience*60)
+                    # if r_count>10*total: # break loop after too many rounds
+                    #     break
+                    # else:
+                    #     continue
                 stat['t_modified'] = time.time()
                 self.stats[key] = stat
                 try:
