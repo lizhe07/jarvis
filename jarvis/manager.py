@@ -216,7 +216,7 @@ class Manager:
 
     def completed(self,
         min_epoch: int = 0,
-        recent: float|None = None,
+        period: tuple[float]|float|None = None,
         cond: dict|None = None,
     ) -> Iterator[tuple[str, Config]]:
         r"""A generator for completed works.
@@ -225,28 +225,33 @@ class Manager:
         ----
         min_epoch:
             Minimum number of processed epochs.
-        recent:
-            How recent works are considered, in unit of hours. For example, if
-            only the ones modified within one day is needed, use `recent=24`.
+        period:
+            Time range of recent modified works, in hours. If it is a tuple like
+            `(t_from, t_to)`, it defines a period from `t_from` hours ago to
+            `t_to` hours ago. If it is a single float `t_from`, it defines a
+            period from `t_from` to current time. If not provided, there is no
+            constraint on modified time.
         cond:
             Conditioned value of work configurations, see `ConfigArchive.filter`
             for more details.
 
         """
+        if period is None:
+            period = (float('inf'), 0)
+        elif isinstance(period, float):
+            period = (period, 0)
+        t_from, t_to = period
+        assert t_from>t_to>=0
         for key, config in self.configs.filter(cond):
             stat = self.get_stat(key)
-            if stat['epoch']>=min_epoch and (
-                recent is None or time.time()-stat['t_modified']<=3600.*recent
-            ):
+            if stat['epoch']>=min_epoch and t_to<=(time.time()-stat['t_modified'])/3600<=t_from:
                 yield key, config
 
     def _export_dir(self,
         dst_dir: Path|str,
         *,
         keys: set|None = None,
-        min_epoch: int = 0,
-        recent: float|None = None,
-        cond: dict|None = None,
+        **kwargs,
     ) -> None:
         r"""Exports manager data to a directory.
 
@@ -257,14 +262,14 @@ class Manager:
         keys:
             Keys of works that will be potentially exported. If ``None``, all
             works satisfying the criterion will be exported.
-        min_epoch, recent, cond:
-            Filters of the work, see `completed` for more details.
+        kwargs:
+            Keyword arguments for `self.completed`.
 
         """
         dst_manager = Manager(dst_dir)
         self.configs.max_try = 1
         self.configs.pause = 0.
-        _keys = set(key for key, _ in self.completed(min_epoch, recent, cond))
+        _keys = set(key for key, _ in self.completed(**kwargs))
         if keys is not None:
             _keys.intersection_update(keys)
         self.configs.migrate(dst_manager.configs.store_dir, _keys, pbar_kw={'desc': "Copying 'configs'"})
