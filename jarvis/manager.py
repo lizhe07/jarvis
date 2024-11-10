@@ -56,6 +56,8 @@ class Manager:
         self.save_interval = save_interval
         self.patience = patience
 
+        self.default: dict|Path|str|None = None # default config of a work
+
     def get_stat(self, key: str) -> dict:
         r"""Returns status of one work."""
         default = {
@@ -94,7 +96,7 @@ class Manager:
             Latest checkpoint of the processed work.
 
         """
-        config = Config(config)
+        config = Config(config).fill(self.default)
         key = self.configs.add(config)
         pbar_kw = Config(pbar_kw).fill({
             'desc': key if self.pbar_desc is None else self.pbar_desc(config),
@@ -165,7 +167,7 @@ class Manager:
         e_count = 0 # counter for runtime errors
         with tqdm(total=total if num_works is None else min(num_works, total), **pbar_kw) as pbar:
             while len(configs)>0:
-                config = configs.popleft()
+                config = configs.popleft().fill(self.default)
                 key = self.configs.add(config)
                 stat = self.get_stat(key)
                 if stat['complete'] or (num_epochs is not None and stat['epoch']>=num_epochs):
