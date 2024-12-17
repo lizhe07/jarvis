@@ -9,7 +9,7 @@ authors = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "numpy", "torch", "pyyaml", "tqdm",
+    "numpy", "torch", "pyyaml", "tqdm", "ipywidgets",
 ]
 requires-python = ">=3.9"
 
