@@ -1,5 +1,7 @@
 import random, torch
 import numpy as np
+import inspect
+from collections.abc import Callable
 
 from .alias import Tensor, Module, Optimizer, Scheduler
 
@@ -246,3 +248,13 @@ def create_mlp_layers(
             nonlinearity() if l_idx<len(num_features) or not last_linear else torch.nn.Identity(),
         ))
     return layers
+
+
+def get_defaults(func: Callable) -> dict:
+    r"""Returns default arguments of a callable object."""
+    sig = inspect.signature(func)
+    defaults = {}
+    for param in sig.parameters.values():
+        if param.default is not inspect.Parameter.empty:
+            defaults[param.name] = param.default
+    return defaults
