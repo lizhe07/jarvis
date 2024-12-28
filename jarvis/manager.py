@@ -163,7 +163,7 @@ class Manager:
         process_kw = Config(process_kw).fill({'pbar_kw.leave': False})
 
         c_count = 0 # counter for completed works
-        r_count = 0 # counter for running works
+        r_count = 0 # counter for encountered running works
         e_count = 0 # counter for runtime errors
         with tqdm(total=total if num_works is None else min(num_works, total), **pbar_kw) as pbar:
             while len(configs)>0:
@@ -179,7 +179,7 @@ class Manager:
                     r_count += 1
                     if r_count%total==0: # wait after each round of queue
                         pbar.set_description('Wait round {}'.format(r_count//total))
-                        pbar.update(0)
+                        pbar.update(0) # render progress bar
                         time.sleep(self.patience*60)
                     if r_count>60*total: # break loop after too many rounds
                         break
