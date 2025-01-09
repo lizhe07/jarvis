@@ -25,14 +25,15 @@ class Manager:
     save_interval:
         Number of epochs between two successive saves.
     patience:
-        The time to wait for a running work to finish, in hours.
+        The time to wait for a running work to finish, in hours. The suggested
+        value is the time between two saves multiplied by 2.
 
     """
 
     # hooks need to be provided by user
     setup: Callable[[Config], int] # sets up workspace and returns max number of epochs
     reset: Callable[[], None] # resets when a work initiates, i.e. epoch=0
-    step: Callable[[], None] # runs one epoch
+    step: Callable[[], str|None] # runs one epoch
     get_ckpt: Callable[[], Any] # prepares checkpoint data
     load_ckpt: Callable[[Any], int] # loads checkpoint data and returns actual epoch
     pbar_desc: Callable[[Config], str]|None = None # description of a work
@@ -98,9 +99,9 @@ class Manager:
         """
         config = Config(config).fill(self.default)
         key = self.configs.add(config)
+        desc_head = key if self.pbar_desc is None else self.pbar_desc(config)
         pbar_kw = Config(pbar_kw).fill({
-            'desc': key if self.pbar_desc is None else self.pbar_desc(config),
-            'unit': 'epoch', 'leave': True,
+            'desc': desc_head, 'unit': 'epoch', 'leave': True,
         })
         max_epochs = self.setup(config)
         if num_epochs is None:
@@ -119,10 +120,12 @@ class Manager:
         with tqdm(total=num_epochs, **pbar_kw) as pbar:
             pbar.update(epoch)
             while epoch<num_epochs:
-                self.step()
+                desc_tail = self.step()
                 epoch += 1
                 if epoch%self.save_interval==0 or epoch==num_epochs:
                     self.save_ckpt(key, epoch, max_epochs)
+                if desc_tail is not None:
+                    pbar.set_description(desc_head+'|'+desc_tail)
                 pbar.update()
         return self.ckpts[key]
 
