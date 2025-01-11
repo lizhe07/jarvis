@@ -23,9 +23,9 @@ class dummy_tqdm:
             yield obj
 
 if auto_tqdm==asyncio_tqdm:
-    tqdm_kwargs = {'ncols': 80, 'ascii': True}
+    tqdm_kwargs = {'ncols': 100, 'ascii': True}
 else:
-    tqdm_kwargs = {'ncols': 600}
+    tqdm_kwargs = {'ncols': 800}
 def tqdm(*args, **kwargs):
     for key, val in tqdm_kwargs.items():
         if key not in kwargs:
