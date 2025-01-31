@@ -250,11 +250,12 @@ def create_mlp_layers(
     return layers
 
 
-def get_defaults(func: Callable) -> dict:
+def get_defaults(func: Callable, keys: list[str]|None = None) -> dict:
     r"""Returns default arguments of a callable object."""
     sig = inspect.signature(func)
     defaults = {}
     for param in sig.parameters.values():
         if param.default is not inspect.Parameter.empty:
-            defaults[param.name] = param.default
+            if keys is None or param.name in keys:
+                defaults[param.name] = param.default
     return defaults
