@@ -220,7 +220,7 @@ class Manager:
             print("{} records removed from 'ckpts'".format(len(c_keys)-len(keys)))
 
     def completed(self,
-        min_epoch: int = 0,
+        min_epoch: int|None = None,
         period: tuple[float]|float|None = None,
         cond: dict|None = None,
     ) -> Iterator[tuple[str, Config]]:
@@ -229,7 +229,8 @@ class Manager:
         Args
         ----
         min_epoch:
-            Minimum number of processed epochs.
+            Minimum number of processed epochs. If ``None``, use `stat['completed']`
+            to determine whether a work is completed.
         period:
             Time range of recent modified works, in hours. If it is a tuple like
             `(t_from, t_to)`, it defines a period from `t_from` hours ago to
@@ -249,13 +250,15 @@ class Manager:
         assert t_from>t_to>=0
         for key, config in self.configs.filter(cond):
             stat = self.get_stat(key)
-            if stat['epoch']>=min_epoch and t_to<=(time.time()-stat['t_modified'])/3600<=t_from:
+            completed = stat['complete'] if min_epoch is None else stat['epoch']>=min_epoch
+            if completed and t_to<=(time.time()-stat['t_modified'])/3600<=t_from:
                 yield key, config
 
     def _export_dir(self,
         dst_dir: Path|str,
         *,
         keys: set|None = None,
+        min_epoch: int|None = 0,
         **kwargs,
     ) -> None:
         r"""Exports manager data to a directory.
@@ -274,7 +277,7 @@ class Manager:
         dst_manager = Manager(dst_dir)
         self.configs.max_try = 1
         self.configs.pause = 0.
-        _keys = set(key for key, _ in self.completed(**kwargs))
+        _keys = set(key for key, _ in self.completed(min_epoch, **kwargs))
         if keys is not None:
             _keys.intersection_update(keys)
         self.configs.migrate(dst_manager.configs.store_dir, _keys, pbar_kw={'desc': "Copying 'configs'"})
