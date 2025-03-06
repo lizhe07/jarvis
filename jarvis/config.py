@@ -127,16 +127,19 @@ class Config(dict):
         for key, val in config.flatten().items():
             self[key] = val
 
-    def fill(self, config: dict|Path|str|None):
+    def fill(self, default: dict|Path|str|None):
         r"""Fills value from a new config."""
-        config = _load_dict(config)
-        if not('_target_' in self and '_target_' in config and self._target_!=config._target_):
-            for key, val in config.items():
-                if key in self:
-                    if isinstance(self[key], Config) and isinstance(val, Config):
-                        self[key].fill(val)
-                else:
-                    self[key] = val
+        default = _load_dict(default)
+        if '_target_' in self and '_target_' in default:
+            assert self._target_==default._target_, (
+                f"Inconsistent '_target_' detected ({self._target_}!={default._target_})"
+            )
+        for key, val in default.items():
+            if key in self:
+                if isinstance(self[key], Config) and isinstance(val, Config):
+                    self[key].fill(val)
+            else:
+                self[key] = val
         return self
 
     def clone(self):
@@ -212,7 +215,11 @@ def instantiate(spec):
         return spec
 
 
-def choices2configs(choices: dict|Path|str, num_configs: int|None = None) -> list[Config]:
+def choices2configs(
+    choices: dict|Path|str,
+    num_configs: int|None = None,
+    default: dict|Path|str|None = None,
+) -> list[Config]:
     r"""Generates configs on a mesh grid.
 
     Args
@@ -224,6 +231,8 @@ def choices2configs(choices: dict|Path|str, num_configs: int|None = None) -> lis
     num_configs:
         The number of configs to return. If not provided, will return all
         possible combinations of choices.
+    default:
+        Default config to be filled in each returned item.
 
     Returns
     -------
@@ -247,5 +256,5 @@ def choices2configs(choices: dict|Path|str, num_configs: int|None = None) -> lis
         config = Config()
         for i, key in enumerate(keys):
             config[key] = vals[i][sub_idxs[i]]
-        configs.append(config)
+        configs.append(config.fill(default))
     return configs
