@@ -130,16 +130,13 @@ class Config(dict):
     def fill(self, default: dict|Path|str|None):
         r"""Fills value from a new config."""
         default = _load_dict(default)
-        if '_target_' in self and '_target_' in default:
-            assert self._target_==default._target_, (
-                f"Inconsistent '_target_' detected ({self._target_}!={default._target_})"
-            )
-        for key, val in default.items():
-            if key in self:
-                if isinstance(self[key], Config) and isinstance(val, Config):
-                    self[key].fill(val)
-            else:
-                self[key] = val
+        if not ('_target_' in self and '_target_' in default and self._target_!=default._target_):
+            for key, val in default.items():
+                if key in self:
+                    if isinstance(self[key], Config) and isinstance(val, Config):
+                        self[key].fill(val)
+                else:
+                    self[key] = val
         return self
 
     def clone(self):
