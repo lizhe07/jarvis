@@ -13,11 +13,11 @@ class MaxTryIOError(RuntimeError):
     r"""Raised when too many attempts to open an file fail."""
 
     def __init__(self,
-        store_path: str, count: int,
+        store_path: Path, count: int,
     ):
         self.store_path = store_path
         self.count = count
-        msg = f"Max number ({count}) of reading tried and failed on {store_path}."
+        msg = f"Max number ({count}) of reading tried and failed on {str(store_path)}."
         super().__init__(msg)
 
 
