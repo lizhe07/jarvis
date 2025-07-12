@@ -221,7 +221,7 @@ class Manager:
 
     def completed(self,
         min_epoch: int|None = None,
-        period: tuple[float]|float|None = None,
+        period: tuple[float]|float|int|None = None,
         cond: dict|None = None,
     ) -> Iterator[tuple[str, Config]]:
         r"""A generator for completed works.
@@ -244,7 +244,7 @@ class Manager:
         """
         if period is None:
             period = (float('inf'), 0)
-        elif isinstance(period, float):
+        elif isinstance(period, (float, int)):
             period = (period, 0)
         t_from, t_to = period
         assert t_from>t_to>=0
