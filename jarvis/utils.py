@@ -259,3 +259,8 @@ def get_defaults(func: Callable, keys: list[str]|None = None) -> dict:
             if keys is None or param.name in keys:
                 defaults[param.name] = param.default
     return defaults
+
+
+def cls_name(x) -> str:
+    r"""Returns class name of an object."""
+    return '{}.{}'.format(x.__class__.__module__, x.__class__.__qualname__)
