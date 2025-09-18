@@ -250,6 +250,31 @@ def create_mlp_layers(
     return layers
 
 
+def init_mlp_layers(
+    layers: torch.nn.ModuleList,
+    rng: np.random.Generator|int|None = None,
+) -> None:
+    r"""Initializes MLP layers with numpy random generator.
+
+    Args
+    ----
+    layers:
+        A list of layer returned by `create_mlp_layers`.
+    rng:
+        Random number generator or random seed.
+
+    """
+    rng = np.random.default_rng(rng)
+    for layer in layers:
+        fout, fin = layer[0].weight.shape
+        layer[0].weight.data = torch.tensor(
+            rng.normal(size=(fout, fin))/fin**0.5,
+        ).to(layer[0].weight)
+        layer[0].bias.data = torch.tensor(
+            rng.uniform(-1, 1, size=(fout,))/fin**0.5,
+        ).to(layer[0].bias)
+
+
 def get_defaults(func: Callable, keys: list[str]|None = None) -> dict:
     r"""Returns default arguments of a callable object."""
     sig = inspect.signature(func)
