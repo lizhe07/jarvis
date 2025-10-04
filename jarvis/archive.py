@@ -1,4 +1,7 @@
-import os, pickle, random, time
+import os
+import pickle
+import random
+import time
 from pathlib import Path
 import numpy as np
 from typing import Any
@@ -13,11 +16,11 @@ class MaxTryIOError(RuntimeError):
     r"""Raised when too many attempts to open an file fail."""
 
     def __init__(self,
-        store_path: Path, count: int,
+        store_pth: Path, count: int,
     ):
-        self.store_path = store_path
+        self.store_pth = store_pth
         self.count = count
-        msg = f"Max number ({count}) of reading tried and failed on {str(store_path)}."
+        msg = f"Max number ({count}) of reading tried and failed on {str(store_pth)}."
         super().__init__(msg)
 
 
@@ -30,7 +33,7 @@ class Archive:
         The directory for storing data.
     key_len:
         The length of keys.
-    path_len:
+    pth_len:
         The length of external file names, should be no greater than `key_len`.
     max_try:
         The maximum number of trying to read/write external files.
@@ -48,37 +51,37 @@ class Archive:
     def __init__(self,
         store_dir: str,
         key_len: int = 8,
-        path_len: int = 4,
+        pth_len: int = 4,
         max_try: int = 30,
         pause: float = 0.5,
         use_buffer: bool = False,
     ):
         self.store_dir, self.key_len = Path(store_dir), key_len
-        assert key_len>=path_len, "File name length should be no greater than key length."
+        assert key_len>=pth_len, "File name length should be no greater than key length."
         os.makedirs(self.store_dir, exist_ok=True)
-        self.path_len, self.max_try, self.pause = path_len, max_try, pause
+        self.pth_len, self.max_try, self.pause = pth_len, max_try, pause
         self.buffer = {} if use_buffer else None
 
     def __repr__(self) -> str:
         return f"Archive object stored in {self.store_dir}."
 
     def __setitem__(self, key: str, val: Any):
-        store_path = self._store_path(key)
-        records = self._safe_read(store_path) if os.path.exists(store_path) else {}
+        store_pth = self._store_pth(key)
+        records = self._safe_read(store_pth) if os.path.exists(store_pth) else {}
         if self.buffer is not None:
             if key in self.buffer:
                 raise RuntimeError(f"Trying to overwrite an existing key {key} in buffer mode.")
             else:
                 self.buffer[key] = val
         records[key] = val
-        self._safe_write(records, store_path)
+        self._safe_write(records, store_pth)
 
     def __getitem__(self, key: str) -> Any:
-        store_path = self._store_path(key)
+        store_pth = self._store_pth(key)
         if self.buffer is None or key not in self.buffer:
-            if not os.path.exists(store_path):
+            if not os.path.exists(store_pth):
                 raise KeyError(key)
-            records = self._safe_read(store_path)
+            records = self._safe_read(store_pth)
         return records[key] if self.buffer is None else self.buffer[key]
 
     def __contains__(self, key: str) -> bool:
@@ -105,14 +108,14 @@ class Archive:
         return True
 
     @staticmethod
-    def _file_name(key: str, path_len: int) -> str:
-        return '/'.join(key[:path_len])+'.axv'
+    def _file_name(key: str, pth_len: int) -> str:
+        return '/'.join(key[:pth_len])+'.axv'
 
-    def _store_path(self, key: str) -> Path:
+    def _store_pth(self, key: str) -> Path:
         r"""Returns the path of external file associated with a key."""
         if not self._is_valid_key(key):
             raise KeyError(key)
-        return self.store_dir/self._file_name(key, self.path_len)
+        return self.store_dir/self._file_name(key, self.pth_len)
 
     @staticmethod
     def _file_names(store_dir: Path, depth: int) -> Iterator[str]:
@@ -130,16 +133,16 @@ class Archive:
                 for file_name in Archive._file_names(store_dir/subdir_name, depth-1):
                     yield f'{subdir_name}/{file_name}'
 
-    def _store_paths(self) -> Iterator[Path]:
+    def _store_pths(self) -> Iterator[Path]:
         r"""Returns all valid external files in the directory."""
-        for file_name in self._file_names(self.store_dir, self.path_len):
+        for file_name in self._file_names(self.store_dir, self.pth_len):
             yield self.store_dir/file_name
 
     def _sleep(self):
         r"""Waits for a random period of time."""
         time.sleep(self.pause*(0.8+random.random()*0.4))
 
-    def _safe_read(self, store_path: Path) -> dict:
+    def _safe_read(self, store_pth: Path) -> dict:
         r"""Safely reads a file.
 
         This is designed for cluster use, if too many tries have failed, try to
@@ -150,7 +153,7 @@ class Archive:
         count = 0
         while count<self.max_try:
             try:
-                with open(store_path, 'rb') as f:
+                with open(store_pth, 'rb') as f:
                     records = pickle.load(f)
             except KeyboardInterrupt as e:
                 raise e
@@ -160,11 +163,11 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            if os.path.exists(store_path):
-                os.remove(store_path)
+            if os.path.exists(store_pth):
+                os.remove(store_pth)
             records = {}
         if self.buffer is not None:
-            parts = list(store_path.parts)[-self.path_len:]
+            parts = list(store_pth.parts)[-self.pth_len:]
             parts[-1] = parts[-1][0]
             head = ''.join(parts)
             to_rm = [] # remove items do not exist any more
@@ -176,13 +179,13 @@ class Archive:
             self.buffer.update(records)
         return records
 
-    def _safe_write(self, records: dict, store_path: Path):
+    def _safe_write(self, records: dict, store_pth: Path):
         r"""Safely writes a file."""
         count = 0
         while count<self.max_try:
             try:
-                os.makedirs(store_path.parent, exist_ok=True)
-                with open(store_path, 'wb') as f:
+                os.makedirs(store_pth.parent, exist_ok=True)
+                with open(store_pth, 'wb') as f:
                     pickle.dump(records, f)
             except KeyboardInterrupt as e:
                 raise e
@@ -192,7 +195,7 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            raise MaxTryIOError(store_path, count)
+            raise MaxTryIOError(store_pth, count)
 
     def _random_key(self) -> str:
         r"""Returns a random key."""
@@ -208,8 +211,8 @@ class Archive:
 
     def _clear(self):
         r"""Removes all data."""
-        for store_path in self._store_paths():
-            os.remove(store_path)
+        for store_pth in self._store_pths():
+            os.remove(store_pth)
 
     def prune(self) -> tuple[set[str], int]:
         r"""Removes corrupted files.
@@ -227,10 +230,10 @@ class Archive:
         if self.buffer is not None:
             self.buffer = {}
         keys, count = set(), 0
-        for store_path in tqdm(
-            list(self._store_paths()), desc='Pruning', unit='file', leave=False,
+        for store_pth in tqdm(
+            list(self._store_pths()), desc='Pruning', unit='file', leave=False,
         ):
-            records = self._safe_read(store_path) # corrupted files are removed in `_safe_read`
+            records = self._safe_read(store_pth) # corrupted files are removed in `_safe_read`
             if len(records)>0:
                 keys.update(set(records.keys()))
             else:
@@ -240,22 +243,22 @@ class Archive:
 
     def keys(self) -> Iterator[str]:
         r"""A generator for keys."""
-        for store_path in self._store_paths():
-            records = self._safe_read(store_path)
+        for store_pth in self._store_pths():
+            records = self._safe_read(store_pth)
             for key in records.keys():
                 yield key
 
     def values(self) -> Any:
         r"""A generator for values."""
-        for store_path in self._store_paths():
-            records = self._safe_read(store_path)
+        for store_pth in self._store_pths():
+            records = self._safe_read(store_pth)
             for val in records.values():
                 yield val
 
     def items(self) -> Iterator[tuple[str, Any]]:
         r"""A generator for items."""
-        for store_path in self._store_paths():
-            records = self._safe_read(store_path)
+        for store_pth in self._store_pths():
+            records = self._safe_read(store_pth)
             for key, val in records.items():
                 yield key, val
 
@@ -269,42 +272,42 @@ class Archive:
         r"""Removes a specified key and return its value."""
         if self.buffer is not None:
             raise RuntimeError("Attempting to pop values in buffer mode.")
-        store_path = self._store_path(key)
-        if not os.path.exists(store_path):
+        store_pth = self._store_pth(key)
+        if not os.path.exists(store_pth):
             return None
-        records = self._safe_read(store_path)
+        records = self._safe_read(store_pth)
         val = records.pop(key, None)
         if records:
-            self._safe_write(records, store_path)
-        elif os.path.exists(store_path):
-            os.remove(store_path) # remove empty external file
+            self._safe_write(records, store_pth)
+        elif os.path.exists(store_pth):
+            os.remove(store_pth) # remove empty external file
         return val
 
     def delete(self, keys: list[str]) -> None:
         r"""Removes keys in batch processing."""
         if self.buffer is not None:
             raise RuntimeError("Attempting to delete keys in buffer mode.")
-        to_remove = {}
+        to_rm = {}
         for key in keys:
-            store_path = self._store_path(key)
-            if store_path in to_remove:
-                to_remove[store_path].append(key)
+            store_pth = self._store_pth(key)
+            if store_pth in to_rm:
+                to_rm[store_pth].append(key)
             else:
-                to_remove[store_path] = [key]
-        for store_path in tqdm(to_remove, unit='file', leave=False):
-            if not os.path.exists(store_path):
+                to_rm[store_pth] = [key]
+        for store_pth in tqdm(to_rm, unit='file', leave=False):
+            if not os.path.exists(store_pth):
                 continue
-            records = self._safe_read(store_path)
+            records = self._safe_read(store_pth)
             modified = False
-            for key in to_remove[store_path]:
+            for key in to_rm[store_pth]:
                 if key in records:
                     records.pop(key)
                     modified = True
             if modified:
                 if records:
-                    self._safe_write(records, store_path)
-                elif os.path.exists(store_path):
-                    os.remove(store_path)
+                    self._safe_write(records, store_pth)
+                elif os.path.exists(store_pth):
+                    os.remove(store_pth)
 
     def migrate(self,
         dst_dir: Path,
@@ -327,47 +330,47 @@ class Archive:
         os.makedirs(dst_dir, exist_ok=True)
         pbar_kw = Config(pbar_kw).fill({'unit': 'file', 'leave': False})
         # check key consistency
-        path_len = []
+        pth_len = []
         for depth in range(1, self.key_len+1):
             file_name =  next(iter(self._file_names(dst_dir, depth)), None)
             if file_name is not None:
-                path_len.append(depth)
-        if len(path_len)>1:
+                pth_len.append(depth)
+        if len(pth_len)>1:
             raise RuntimeError(f"Multiple hierarchies detected in {dst_dir}")
-        elif len(path_len)==1:
-            dst_path_len = path_len[0]
+        elif len(pth_len)==1:
+            dst_pth_len = pth_len[0]
             # check for one record
-            file_name =  next(iter(self._file_names(dst_dir, dst_path_len)), None)
+            file_name =  next(iter(self._file_names(dst_dir, dst_pth_len)), None)
             records = self._safe_read(dst_dir/file_name)
             key = next(iter(records.keys()))
             assert self._is_valid_key(key), f"Invalid key detected in {dst_dir} ({key})"
         else:
-            dst_path_len = self.path_len
+            dst_pth_len = self.pth_len
         # prepare generator of source file paths
         if keys is None:
-            src_paths = list(self._store_paths())
+            src_pths = list(self._store_pths())
         else:
-            src_paths = set()
+            src_pths = set()
             for key in keys:
-                src_paths.add(self._store_path(key))
-            src_paths: list[Path] = list(src_paths)
+                src_pths.add(self._store_pth(key))
+            src_pths: list[Path] = list(src_pths)
         # copy records to destination directory
-        if dst_path_len>=self.path_len:
-            random.shuffle(src_paths)
-            for src_path in tqdm(src_paths, **pbar_kw):
-                src_records = self._safe_read(src_path)
+        if dst_pth_len>=self.pth_len:
+            random.shuffle(src_pths)
+            for src_pth in tqdm(src_pths, **pbar_kw):
+                src_records = self._safe_read(src_pth)
                 src_keys = [k for k in src_records if keys is None or k in keys]
                 key_dicts = {} # keys grouped by files in dst_dir
                 for key in src_keys:
-                    _key = key[:dst_path_len]
+                    _key = key[:dst_pth_len]
                     if _key in key_dicts:
                         key_dicts[_key].append(key)
                     else:
                         key_dicts[_key] = [key]
                 for dst_keys in key_dicts.values():
-                    dst_path = dst_dir/self._file_name(dst_keys[0], dst_path_len)
-                    if os.path.exists(dst_path):
-                        dst_records = self._safe_read(dst_path)
+                    dst_pth = dst_dir/self._file_name(dst_keys[0], dst_pth_len)
+                    if os.path.exists(dst_pth):
+                        dst_records = self._safe_read(dst_pth)
                         modified = False
                     else:
                         dst_records = {}
@@ -377,7 +380,7 @@ class Archive:
                             dst_records[key] = src_records[key]
                             modified = True
                     if modified:
-                        self._safe_write(dst_records, dst_path)
+                        self._safe_write(dst_records, dst_pth)
         else:
             raise NotImplementedError("Files from src_dir needs to be merged.")
 

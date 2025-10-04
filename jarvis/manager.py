@@ -1,4 +1,8 @@
-import os, time, random, shutil, tarfile
+import os
+import time
+import random
+import shutil
+import tarfile
 from pathlib import Path
 from collections import deque
 from collections.abc import Callable, Iterator
@@ -46,13 +50,13 @@ class Manager:
     ):
         self.store_dir = Path(store_dir)
         self.configs = ConfigArchive(
-            self.store_dir/'configs', path_len=3, pause=s_pause,
+            self.store_dir/'configs', pth_len=3, pause=s_pause,
         )
         self.stats = Archive(
-            self.store_dir/'stats', path_len=3, pause=s_pause,
+            self.store_dir/'stats', pth_len=3, pause=s_pause,
         )
         self.ckpts = Archive(
-            self.store_dir/'ckpts', path_len=4, pause=l_pause,
+            self.store_dir/'ckpts', pth_len=4, pause=l_pause,
         )
         self.save_interval = save_interval
         self.patience = patience
@@ -76,7 +80,7 @@ class Manager:
         }
 
     def process(self,
-        config: dict, num_epochs: int|None = None,
+        config: dict, n_epochs: int|None = None,
         pbar_kw: dict|None = None,
     ) -> Any:
         r"""Processes a work for given number of epochs.
@@ -85,7 +89,7 @@ class Manager:
         ----
         config:
             Configuration of the work.
-        num_epochs:
+        n_epochs:
             Number of epochs of an incremental work. If not provided, will use
             `max_epochs` returned by `self.setup`.
         pbar_kw:
@@ -104,10 +108,10 @@ class Manager:
             'desc': desc_head, 'unit': 'epoch', 'leave': True,
         })
         max_epochs = self.setup(config)
-        if num_epochs is None:
-            num_epochs = max_epochs
+        if n_epochs is None:
+            n_epochs = max_epochs
         else:
-            num_epochs = min(num_epochs, max_epochs)
+            n_epochs = min(n_epochs, max_epochs)
         try:
             ckpt = self.ckpts[key]
             epoch = self.load_ckpt(ckpt)
@@ -115,14 +119,14 @@ class Manager:
             self.reset()
             epoch = 0
             self.save_ckpt(key, epoch, max_epochs)
-        if epoch>=num_epochs:
+        if epoch>=n_epochs:
             return self.ckpts[key]
-        with tqdm(total=num_epochs, **pbar_kw) as pbar:
+        with tqdm(total=n_epochs, **pbar_kw) as pbar:
             pbar.update(epoch)
-            while epoch<num_epochs:
+            while epoch<n_epochs:
                 desc_tail = self.step()
                 epoch += 1
-                if epoch%self.save_interval==0 or epoch==num_epochs:
+                if epoch%self.save_interval==0 or epoch==n_epochs:
                     self.save_ckpt(key, epoch, max_epochs)
                 if desc_tail is not None:
                     pbar.set_description(desc_head+'|'+desc_tail)
@@ -131,8 +135,8 @@ class Manager:
 
     def batch(self,
         configs: list[Config],
-        num_epochs: int|None = None,
-        num_works: int|None = None,
+        n_epochs: int|None = None,
+        n_works: int|None = None,
         max_errors: int = 0,
         pbar_kw: dict|None = None,
         process_kw: dict|None = None,
@@ -144,9 +148,9 @@ class Manager:
         configs:
             An list containing work configurations. Some are potentially
             processed already.
-        num_epochs:
+        n_epochs:
             Number of epochs of each work, see `self.process` for more details.
-        num_works:
+        n_works:
             Number of works to process. If `None`, the batch processing stops
             only when no work is left pending in `configs`, and the progress bar
             will update for complete works in this mode.
@@ -168,13 +172,13 @@ class Manager:
         c_count = 0 # counter for completed works
         r_count = 0 # counter for encountered running works
         e_count = 0 # counter for runtime errors
-        with tqdm(total=total if num_works is None else min(num_works, total), **pbar_kw) as pbar:
+        with tqdm(total=total if n_works is None else min(n_works, total), **pbar_kw) as pbar:
             while len(configs)>0:
                 config = configs.popleft().fill(self.default)
                 key = self.configs.add(config)
                 stat = self.get_stat(key)
-                if stat['complete'] or (num_epochs is not None and stat['epoch']>=num_epochs):
-                    if num_works is None: # update progress even for skipping
+                if stat['complete'] or (n_epochs is not None and stat['epoch']>=n_epochs):
+                    if n_works is None: # update progress even for skipping
                         pbar.update()
                     continue
                 if (time.time()-stat['t_modified'])/3600<self.patience:
@@ -191,7 +195,7 @@ class Manager:
                 stat['t_modified'] = time.time()
                 self.stats[key] = stat
                 try:
-                    self.process(config, num_epochs, **process_kw)
+                    self.process(config, n_epochs, **process_kw)
                     c_count += 1
                     pbar.update()
                 except KeyboardInterrupt:
@@ -201,7 +205,7 @@ class Manager:
                     if e_count>max_errors:
                         print(f"\nMax number of errors {max_errors} reached (current work '{key}')")
                         raise
-                if c_count==num_works:
+                if c_count==n_works:
                     break
 
     def prune(self):
@@ -285,7 +289,7 @@ class Manager:
         self.ckpts.migrate(dst_manager.ckpts.store_dir, _keys, pbar_kw={'desc': "Copying 'ckpts'"})
 
     def export_tar(self,
-        tar_path: str = 'store.tar.gz',
+        tar_pth: str = 'store.tar.gz',
         compresslevel: int = 1,
         **kwargs,
     ) -> None:
@@ -293,7 +297,7 @@ class Manager:
 
         Args
         ----
-        tar_path:
+        tar_pth:
             Path of the file to export to.
         compressionlevel:
             Compression level of gzip.
@@ -304,15 +308,15 @@ class Manager:
         tmp_dir = self.store_dir/'tmp_{}'.format(self.configs._random_key())
         try:
             self._export_dir(tmp_dir, **kwargs)
-            full_paths = []
+            full_pths = []
             for root, _, files in os.walk(tmp_dir):
                 for file in files:
-                    full_paths.append(Path(root)/file)
-            assert len(full_paths)>0, "No records are exported."
-            random.shuffle(full_paths)
-            with tarfile.open(tar_path, 'w:gz', compresslevel=compresslevel) as tar:
-                for full_path in tqdm(full_paths, desc='Adding files to tar', unit='file'):
-                    tar.add(full_path, arcname=os.path.relpath(full_path, tmp_dir))
+                    full_pths.append(Path(root)/file)
+            assert len(full_pths)>0, "No records are exported."
+            random.shuffle(full_pths)
+            with tarfile.open(tar_pth, 'w:gz', compresslevel=compresslevel) as tar:
+                for full_pth in tqdm(full_pths, desc='Adding files to tar', unit='file'):
+                    tar.add(full_pth, arcname=os.path.relpath(full_pth, tmp_dir))
         except:
             raise
         finally:
@@ -379,12 +383,12 @@ class Manager:
             self.stats[dst_key] = _new_stats[src_key]
             self.ckpts[dst_key] = src_manager.ckpts[src_key]
 
-    def load_tar(self, tar_path: str, compresslevel: int = 1, **kwargs):
+    def load_tar(self, tar_pth: str, compresslevel: int = 1, **kwargs):
         r"""Loads manager data from a tar file.
 
         Args
         ----
-        tar_path:
+        tar_pth:
             Path of the file to load from.
         compressionlevel:
             Compression level of gzip.
@@ -394,7 +398,7 @@ class Manager:
         """
         tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
         try:
-            with tarfile.open(tar_path, 'r:gz', compresslevel=compresslevel) as tar:
+            with tarfile.open(tar_pth, 'r:gz', compresslevel=compresslevel) as tar:
                 members = tar.getmembers()
                 total_size = sum(member.size for member in members if member.isfile())
                 with tqdm(
