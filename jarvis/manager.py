@@ -43,23 +43,29 @@ class Manager:
     pbar_desc: Callable[[Config], str]|None = None # description of a work
 
     def __init__(self,
-        store_dir: Path|str,
+        store_dir: Path|str|None,
         *,
         s_pause: float = 1., l_pause: float = 5.,
         save_interval: int = 1, patience: float = 1.,
     ):
-        self.store_dir = Path(store_dir)
-        self.configs = ConfigArchive(
-            self.store_dir/'configs', pth_len=3, pause=s_pause,
-        )
-        self.stats = Archive(
-            self.store_dir/'stats', pth_len=3, pause=s_pause,
-        )
-        self.ckpts = Archive(
-            self.store_dir/'ckpts', pth_len=4, pause=l_pause,
-        )
-        self.save_interval = save_interval
-        self.patience = patience
+        if store_dir is None:
+            self.store_dir = None
+            self.configs = ConfigArchive(None)
+            self.stats = Archive(None)
+            self.ckpts = Archive(None)
+        else:
+            self.store_dir = Path(store_dir)
+            self.configs = ConfigArchive(
+                self.store_dir/'configs', pth_len=3, pause=s_pause,
+            )
+            self.stats = Archive(
+                self.store_dir/'stats', pth_len=3, pause=s_pause,
+            )
+            self.ckpts = Archive(
+                self.store_dir/'ckpts', pth_len=4, pause=l_pause,
+            )
+            self.save_interval = save_interval
+            self.patience = patience
 
         self.default: dict|Path|str|None = None # default config of a work
 

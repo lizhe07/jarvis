@@ -49,23 +49,33 @@ class Archive:
     _alphabet = ['{:X}'.format(i) for i in range(16)]
 
     def __init__(self,
-        store_dir: str,
+        store_dir: Path|str|None,
         key_len: int = 8,
         pth_len: int = 4,
         max_try: int = 30,
         pause: float = 0.5,
         use_buffer: bool = False,
     ):
-        self.store_dir, self.key_len = Path(store_dir), key_len
-        assert key_len>=pth_len, "File name length should be no greater than key length."
-        os.makedirs(self.store_dir, exist_ok=True)
-        self.pth_len, self.max_try, self.pause = pth_len, max_try, pause
-        self.buffer = {} if use_buffer else None
+        self.key_len = key_len
+        if store_dir is None:
+            self.store_dir = None
+            self.records = {}
+        else:
+            self.store_dir = Path(store_dir)
+            assert key_len>=pth_len, "File name length should be no greater than key length."
+            os.makedirs(self.store_dir, exist_ok=True)
+            self.pth_len, self.max_try, self.pause = pth_len, max_try, pause
+            self.buffer = {} if use_buffer else None
 
     def __repr__(self) -> str:
+        if self.store_dir is None:
+            return "Archive object without external storage"
         return f"Archive object stored in {self.store_dir}."
 
     def __setitem__(self, key: str, val: Any):
+        if self.store_dir is None:
+            self.records[key] = val
+            return
         store_pth = self._store_pth(key)
         records = self._safe_read(store_pth) if os.path.exists(store_pth) else {}
         if self.buffer is not None:
@@ -77,6 +87,8 @@ class Archive:
         self._safe_write(records, store_pth)
 
     def __getitem__(self, key: str) -> Any:
+        if self.store_dir is None:
+            return self.records[key]
         store_pth = self._store_pth(key)
         if self.buffer is None or key not in self.buffer:
             if not os.path.exists(store_pth):
@@ -225,6 +237,8 @@ class Archive:
             Number of files removed.
 
         """
+        if self.store_dir is None:
+            return set(), 0
         max_try, pause = self.max_try, self.pause
         self.max_try, self.pause = 1, 0.
         if self.buffer is not None:
@@ -243,33 +257,51 @@ class Archive:
 
     def keys(self) -> Iterator[str]:
         r"""A generator for keys."""
-        for store_pth in self._store_pths():
-            records = self._safe_read(store_pth)
-            for key in records.keys():
+        if self.store_dir is None:
+            for key in self.records.keys():
                 yield key
+        else:
+            for store_pth in self._store_pths():
+                records = self._safe_read(store_pth)
+                for key in records.keys():
+                    yield key
 
     def values(self) -> Any:
         r"""A generator for values."""
-        for store_pth in self._store_pths():
-            records = self._safe_read(store_pth)
-            for val in records.values():
+        if self.store_dir is None:
+            for val in self.records.values():
                 yield val
+        else:
+            for store_pth in self._store_pths():
+                records = self._safe_read(store_pth)
+                for val in records.values():
+                    yield val
 
     def items(self) -> Iterator[tuple[str, Any]]:
         r"""A generator for items."""
-        for store_pth in self._store_pths():
-            records = self._safe_read(store_pth)
-            for key, val in records.items():
+        if self.store_dir is None:
+            for key, val in self.records.items():
                 yield key, val
+        else:
+            for store_pth in self._store_pths():
+                records = self._safe_read(store_pth)
+                for key, val in records.items():
+                    yield key, val
 
-    def get(self, key: str, val: Any = None) -> Any:
+    def get(self, key: str, default: Any = None) -> Any:
         try:
             return self[key]
         except:
-            return val
+            return default
 
     def pop(self, key: str) -> Any:
-        r"""Removes a specified key and return its value."""
+        r"""Removes a specified key and return its value.
+
+        ``None`` is returned if `key` does not exist.
+
+        """
+        if self.store_dir is None:
+            return self.records.pop(key, None)
         if self.buffer is not None:
             raise RuntimeError("Attempting to pop values in buffer mode.")
         store_pth = self._store_pth(key)
@@ -285,6 +317,10 @@ class Archive:
 
     def delete(self, keys: list[str]) -> None:
         r"""Removes keys in batch processing."""
+        if self.store_dir is None:
+            for key in keys:
+                self.records.pop(key)
+            return
         if self.buffer is not None:
             raise RuntimeError("Attempting to delete keys in buffer mode.")
         to_rm = {}
@@ -449,7 +485,7 @@ class HashableRecordArchive(Archive):
     def get_key(self, n_val) -> str|None:
         r"""Returns the key of a record."""
         h_val = self._to_hashable(n_val)
-        if self.buffer is not None: # search in buffer first
+        if self.store_dir is None and self.buffer is not None: # search in buffer first
             for key, val in self.buffer.items():
                 if val==h_val:
                     return key
