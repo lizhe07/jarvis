@@ -1,3 +1,4 @@
+.vscode
 jarvis.egg-info
 build
 *.pyc
