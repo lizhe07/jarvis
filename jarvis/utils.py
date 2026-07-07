@@ -208,7 +208,7 @@ def array2tensor(arrays, device='cpu'):
     tensor device.
 
     """
-    if isinstance(arrays, tuple) and len(arrays)==3 and arrays[0]=='_T':
+    if isinstance(arrays, tuple) and len(arrays)==3 and isinstance(arrays[0], str) and arrays[0]=='_T':
         return torch.tensor(arrays[1], dtype=arrays[2], device=device)
     elif isinstance(arrays, dict):
         return {k: array2tensor(v, device) for k, v in arrays.items()}
