@@ -1,27 +1,13 @@
 import os
-import pickle
 import random
-import time
 from pathlib import Path
 import numpy as np
 from typing import Any
 from collections.abc import Iterator, Callable
 
 from .config import Config
-from .utils import tqdm
+from .utils import tqdm, MaxTryIOError, safe_read, safe_write
 from .alias import Array
-
-
-class MaxTryIOError(RuntimeError):
-    r"""Raised when too many attempts to open an file fail."""
-
-    def __init__(self,
-        store_pth: Path, count: int,
-    ):
-        self.store_pth = store_pth
-        self.count = count
-        msg = f"Max number ({count}) of reading tried and failed on {str(store_pth)}."
-        super().__init__(msg)
 
 
 class Archive:
@@ -151,10 +137,6 @@ class Archive:
         for file_name in self._file_names(self.store_dir, self.pth_len):
             yield self.store_dir/file_name
 
-    def _sleep(self):
-        r"""Waits for a random period of time."""
-        time.sleep(self.pause*(0.8+random.random()*0.4))
-
     def _safe_read(self, store_pth: Path) -> dict:
         r"""Safely reads a file.
 
@@ -163,22 +145,13 @@ class Archive:
         time a file is read.
 
         """
-        count = 0
-        while count<self.max_try:
-            try:
-                with open(store_pth, 'rb') as f:
-                    records = pickle.load(f)
-            except KeyboardInterrupt as e:
-                raise e
-            except:
-                count += 1
-                self._sleep()
-            else:
-                break
-        if count==self.max_try:
+        try:
+            records = safe_read(store_pth, self.max_try, self.pause)
+        except (FileNotFoundError, MaxTryIOError):
             if store_pth.exists():
-                os.remove(store_pth)
-            records = {}
+                records = {}
+        else:
+            raise
         if self.cache is not None:
             parts = list(store_pth.parts)[-self.pth_len:]
             parts[-1] = parts[-1][0]
@@ -194,21 +167,7 @@ class Archive:
 
     def _safe_write(self, records: dict, store_pth: Path):
         r"""Safely writes a file."""
-        count = 0
-        while count<self.max_try:
-            try:
-                os.makedirs(store_pth.parent, exist_ok=True)
-                with open(store_pth, 'wb') as f:
-                    pickle.dump(records, f)
-            except KeyboardInterrupt as e:
-                raise e
-            except:
-                count += 1
-                self._sleep()
-            else:
-                break
-        if count==self.max_try:
-            raise MaxTryIOError(store_pth, count)
+        safe_write(records, store_pth, self.max_try, self.pause)
 
     def _random_key(self) -> str:
         r"""Returns a random key."""

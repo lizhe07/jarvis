@@ -1,5 +1,10 @@
-import random, torch
+import random
+import time
+import pickle
+import os
+from pathlib import Path
 import numpy as np
+import torch
 import inspect
 from collections.abc import Callable
 
@@ -289,3 +294,86 @@ def get_defaults(func: Callable, keys: list[str]|None = None) -> dict:
 def cls_name(x) -> str:
     r"""Returns class name of an object."""
     return '{}.{}'.format(x.__class__.__module__, x.__class__.__qualname__)
+
+
+class MaxTryIOError(RuntimeError):
+    r"""Raised when too many attempts to open an file fail."""
+
+    def __init__(self,
+        store_pth: Path, count: int,
+    ):
+        self.store_pth = store_pth
+        self.count = count
+        msg = f"Max number ({count}) of reading tried and failed on {str(store_pth)}."
+        super().__init__(msg)
+
+
+def _sleep(pause=3.):
+    time.sleep(pause*(0.8+random.random()*0.4))
+
+def safe_read(store_pth: Path, max_try: int = 10, pause: float = 1.):
+    r"""Safely reads a file.
+
+    Args
+    ----
+    store_pth:
+        Path of the file to read.
+    max_try:
+        Maximum number of attempts.
+    pause:
+        Pause time between each attempt, in seconds.
+
+    Returns
+    -------
+    stored:
+        Content stored in `store_pth`.
+
+    """
+    count = 0
+    while count<max_try:
+        try:
+            with open(store_pth, 'rb') as f:
+                stored = pickle.load(f)
+        except KeyboardInterrupt:
+            raise
+        except FileNotFoundError:
+            raise
+        except:
+            count += 1
+            _sleep(pause)
+        else:
+            break
+    if count==max_try:
+        raise MaxTryIOError(store_pth, max_try)
+    return stored
+
+def safe_write(to_store, store_pth: Path, max_try: int = 10, pause: float = 1.):
+    r"""Safely writes a file.
+
+    Args
+    ----
+    to_store:
+        Content to be stored in `store_pth`.
+    store_pth:
+        Path of the file to write.
+    max_try:
+        Maximum number of attempts.
+    pause:
+        Pause time between each attmpt, in seconds.
+
+    """
+    count = 0
+    while count<max_try:
+        try:
+            os.makedirs(store_pth.parent, exist_ok=True)
+            with open(store_pth, 'wb') as f:
+                pickle.dump(to_store, f)
+        except KeyboardInterrupt:
+            raise
+        except:
+            count += 1
+            _sleep(pause)
+        else:
+            break
+    if count==max_try:
+        raise MaxTryIOError(store_pth, max_try)
