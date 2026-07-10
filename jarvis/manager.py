@@ -19,7 +19,8 @@ class Manager:
     ----
     store_dir:
         Directory for storing configurations `configs`, status `stats` and
-        checkpoints `ckpts`.
+        checkpoints `ckpts`. If ``None``, all archive objects will be stored in
+        memory only.
     s_pause:
         Short pause time for `configs` and `stats`.
     l_pause:
@@ -43,21 +44,21 @@ class Manager:
     pbar_desc: Callable[[Config], str]|None = None # description of a work
 
     def __init__(self,
-        store_dir: Path|str,
+        store_dir: Path|str|None = None,
         *,
         s_pause: float = 1., l_pause: float = 5.,
         save_interval: int = 1, patience: float = 1.,
     ):
-        self.store_dir = Path(store_dir)
-        self.configs = ConfigArchive(
-            self.store_dir/'configs', pth_len=3, pause=s_pause,
-        )
-        self.stats = Archive(
-            self.store_dir/'stats', pth_len=3, pause=s_pause,
-        )
-        self.ckpts = Archive(
-            self.store_dir/'ckpts', pth_len=4, pause=l_pause,
-        )
+        if store_dir is None:
+            self.store_dir is None
+            self.configs = ConfigArchive()
+            self.stats = Archive()
+            self.ckpts = Archive()
+        else:
+            self.store_dir = Path(store_dir)
+            self.configs = ConfigArchive(self.store_dir/'configs', pth_len=3, pause=s_pause)
+            self.stats = Archive(self.store_dir/'stats', pth_len=3, pause=s_pause)
+            self.ckpts = Archive(self.store_dir/'ckpts', pth_len=4, pause=l_pause)
         self.save_interval = save_interval
         self.patience = patience
 

@@ -30,7 +30,8 @@ class Archive:
     Args
     ----
     store_dir:
-        The directory for storing data.
+        The directory for storing data. If ``None``, it is equivalent to the
+        internal dict `cache`.
     key_len:
         The length of keys.
     pth_len:
@@ -39,50 +40,62 @@ class Archive:
         The maximum number of trying to read/write external files.
     pause:
         The time (seconds) between two consecutive read/write attempts.
-    use_buffer:
-        Whether to use a buffer in memory. If ``True``, some methods will be
+    use_cache:
+        Whether to use a cache in memory. If ``True``, some methods will be
         attempted on an internal dict first before loading external files.
-        Overwriting will be disabled since many Archive objects may be running
-        at the same time.
+        Modifying existing values will be disabled since many Archive objects
+        may be in use at the same time.
 
     """
     _alphabet = ['{:X}'.format(i) for i in range(16)]
 
     def __init__(self,
-        store_dir: str,
+        store_dir: Path|str|None = None,
         key_len: int = 8,
         pth_len: int = 4,
         max_try: int = 30,
         pause: float = 0.5,
-        use_buffer: bool = False,
+        use_cache: bool = False,
     ):
-        self.store_dir, self.key_len = Path(store_dir), key_len
-        assert key_len>=pth_len, "File name length should be no greater than key length."
-        os.makedirs(self.store_dir, exist_ok=True)
-        self.pth_len, self.max_try, self.pause = pth_len, max_try, pause
-        self.buffer = {} if use_buffer else None
+        self.key_len = key_len
+        if store_dir is None:
+            self.store_dir = None
+        else:
+            self.store_dir = Path(store_dir)
+            assert key_len>=pth_len, "File name length should be no greater than key length."
+            os.makedirs(self.store_dir, exist_ok=True)
+            self.pth_len, self.max_try, self.pause = pth_len, max_try, pause
+        self.cache = {} if (store_dir is None or use_cache) else None
 
     def __repr__(self) -> str:
-        return f"Archive object stored in {self.store_dir}."
+        if self.store_dir is None:
+            return f"Archive object stored in memory."
+        else:
+            return f"Archive object stored in {self.store_dir}."
 
     def __setitem__(self, key: str, val: Any):
+        if self.store_dir is None:
+            self.cache[key] = val
+            return
         store_pth = self._store_pth(key)
-        records = self._safe_read(store_pth) if os.path.exists(store_pth) else {}
-        if self.buffer is not None:
-            if key in self.buffer:
-                raise RuntimeError(f"Trying to overwrite an existing key {key} in buffer mode.")
+        records = self._safe_read(store_pth) if store_pth.exists() else {}
+        if self.cache is not None:
+            if key in self.cache:
+                raise RuntimeError(f"Trying to overwrite an existing key {key} in cache mode.")
             else:
-                self.buffer[key] = val
+                self.cache[key] = val
         records[key] = val
         self._safe_write(records, store_pth)
 
     def __getitem__(self, key: str) -> Any:
+        if self.store_dir is None:
+            return self.cache[key]
         store_pth = self._store_pth(key)
-        if self.buffer is None or key not in self.buffer:
-            if not os.path.exists(store_pth):
+        if self.cache is None or key not in self.cache:
+            if not store_pth.exists():
                 raise KeyError(key)
             records = self._safe_read(store_pth)
-        return records[key] if self.buffer is None else self.buffer[key]
+        return records[key] if self.cache is None else self.cache[key]
 
     def __contains__(self, key: str) -> bool:
         try:
@@ -163,20 +176,20 @@ class Archive:
             else:
                 break
         if count==self.max_try:
-            if os.path.exists(store_pth):
+            if store_pth.exists():
                 os.remove(store_pth)
             records = {}
-        if self.buffer is not None:
+        if self.cache is not None:
             parts = list(store_pth.parts)[-self.pth_len:]
             parts[-1] = parts[-1][0]
             head = ''.join(parts)
             to_rm = [] # remove items do not exist any more
-            for key in self.buffer:
+            for key in self.cache:
                 if key.startswith(head) and key not in records:
                     to_rm.append(key)
             for key in to_rm:
-                self.buffer.pop(key)
-            self.buffer.update(records)
+                self.cache.pop(key)
+            self.cache.update(records)
         return records
 
     def _safe_write(self, records: dict, store_pth: Path):
@@ -209,11 +222,6 @@ class Archive:
                 break
         return key
 
-    def _clear(self):
-        r"""Removes all data."""
-        for store_pth in self._store_pths():
-            os.remove(store_pth)
-
     def prune(self) -> tuple[set[str], int]:
         r"""Removes corrupted files.
 
@@ -225,10 +233,12 @@ class Archive:
             Number of files removed.
 
         """
+        if self.store_dir is None:
+            return set(), 0
         max_try, pause = self.max_try, self.pause
-        self.max_try, self.pause = 1, 0.
-        if self.buffer is not None:
-            self.buffer = {}
+        self.max_try, self.pause = 1, 0. # temporary values
+        if self.cache is not None:
+            self.cache = {}
         keys, count = set(), 0
         for store_pth in tqdm(
             list(self._store_pths()), desc='Pruning', unit='file', leave=False,
@@ -238,29 +248,42 @@ class Archive:
                 keys.update(set(records.keys()))
             else:
                 count += 1
+        # TODO remove empty folders
         self.max_try, self.pause = max_try, pause
         return keys, count
 
     def keys(self) -> Iterator[str]:
         r"""A generator for keys."""
-        for store_pth in self._store_pths():
-            records = self._safe_read(store_pth)
-            for key in records.keys():
+        if self.store_dir is None:
+            for key in self.cache.keys():
                 yield key
+        else:
+            for store_pth in self._store_pths():
+                records = self._safe_read(store_pth)
+                for key in records.keys():
+                    yield key
 
     def values(self) -> Any:
         r"""A generator for values."""
-        for store_pth in self._store_pths():
-            records = self._safe_read(store_pth)
-            for val in records.values():
+        if self.store_dir is None:
+            for val in self.cache.values():
                 yield val
+        else:
+            for store_pth in self._store_pths():
+                records = self._safe_read(store_pth)
+                for val in records.values():
+                    yield val
 
     def items(self) -> Iterator[tuple[str, Any]]:
         r"""A generator for items."""
-        for store_pth in self._store_pths():
-            records = self._safe_read(store_pth)
-            for key, val in records.items():
+        if self.store_dir is None:
+            for key, val in self.cache.items():
                 yield key, val
+        else:
+            for store_pth in self._store_pths():
+                records = self._safe_read(store_pth)
+                for key, val in records.items():
+                    yield key, val
 
     def get(self, key: str, val: Any = None) -> Any:
         try:
@@ -270,23 +293,28 @@ class Archive:
 
     def pop(self, key: str) -> Any:
         r"""Removes a specified key and return its value."""
-        if self.buffer is not None:
-            raise RuntimeError("Attempting to pop values in buffer mode.")
+        if self.store_dir is None:
+            return self.cache.pop(key, None)
+        if self.cache is not None:
+            raise RuntimeError("Attempting to pop values in cache mode.")
         store_pth = self._store_pth(key)
-        if not os.path.exists(store_pth):
+        if not store_pth.exists():
             return None
         records = self._safe_read(store_pth)
         val = records.pop(key, None)
         if records:
             self._safe_write(records, store_pth)
-        elif os.path.exists(store_pth):
+        elif store_pth.exists():
             os.remove(store_pth) # remove empty external file
         return val
 
     def delete(self, keys: list[str]) -> None:
         r"""Removes keys in batch processing."""
-        if self.buffer is not None:
-            raise RuntimeError("Attempting to delete keys in buffer mode.")
+        if self.store_dir is None:
+            for key in keys:
+                self.cache.pop(key, None)
+        if self.cache is not None:
+            raise RuntimeError("Attempting to delete keys in cache mode.")
         to_rm = {}
         for key in keys:
             store_pth = self._store_pth(key)
@@ -295,7 +323,7 @@ class Archive:
             else:
                 to_rm[store_pth] = [key]
         for store_pth in tqdm(to_rm, unit='file', leave=False):
-            if not os.path.exists(store_pth):
+            if not store_pth.exists():
                 continue
             records = self._safe_read(store_pth)
             modified = False
@@ -306,7 +334,7 @@ class Archive:
             if modified:
                 if records:
                     self._safe_write(records, store_pth)
-                elif os.path.exists(store_pth):
+                elif store_pth.exists():
                     os.remove(store_pth)
 
     def migrate(self,
@@ -327,6 +355,8 @@ class Archive:
             Whether to overwrite existing keys.
 
         """
+        if self.store_dir is None:
+            raise NotImplementedError("'migrate' is not supported for in-memory archive object.")
         os.makedirs(dst_dir, exist_ok=True)
         pbar_kw = Config(pbar_kw).fill({'unit': 'file', 'leave': False})
         # check key consistency
@@ -388,8 +418,8 @@ class Archive:
 class HashableRecordArchive(Archive):
     r"""Archive class for hashable record."""
 
-    def __init__(self, *args, use_buffer: bool = True, **kwargs):
-        super().__init__(*args, use_buffer=use_buffer, **kwargs)
+    def __init__(self, *args, use_cache: bool = True, **kwargs):
+        super().__init__(*args, use_cache=use_cache, **kwargs)
 
     @classmethod
     def _to_hashable(cls, n_val):
@@ -449,13 +479,14 @@ class HashableRecordArchive(Archive):
     def get_key(self, n_val) -> str|None:
         r"""Returns the key of a record."""
         h_val = self._to_hashable(n_val)
-        if self.buffer is not None: # search in buffer first
-            for key, val in self.buffer.items():
+        if self.cache is not None: # search in buffer first
+            for key, val in self.cache.items():
                 if val==h_val:
                     return key
-        for key, val in super().items():
-            if val==h_val:
-                return key
+        if self.store_dir is not None:
+            for key, val in super().items():
+                if val==h_val:
+                    return key
         return None
 
     def add(self, val) -> str:
