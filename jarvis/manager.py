@@ -36,11 +36,11 @@ class Manager:
     """
 
     # hooks need to be provided by user
-    setup: Callable[[Config], int] # sets up workspace and returns max number of epochs
+    setup: Callable[[Config], int|None] # sets up workspace and returns max number of epochs
     reset: Callable[[], None] # resets when a work initiates, i.e. epoch=0
-    step: Callable[[], str|None] # runs one epoch
+    step: Callable[[], str|None] # runs one epoch, returns optional progress bar description
     get_ckpt: Callable[[], Any] # prepares checkpoint data
-    load_ckpt: Callable[[Any], int] # loads checkpoint data and returns actual epoch
+    load_ckpt: Callable[[Any], int] # loads checkpoint data and returns actual epoch, i.e. number of `step` calls
     pbar_desc: Callable[[Config], str]|None = None # description of a work
 
     def __init__(self,
@@ -50,7 +50,7 @@ class Manager:
         save_interval: int = 1, patience: float = 1.,
     ):
         if store_dir is None:
-            self.store_dir is None
+            self.store_dir = None
             self.configs = ConfigArchive()
             self.stats = Archive()
             self.ckpts = Archive()
@@ -80,6 +80,16 @@ class Manager:
             't_modified': time.time(),
         }
 
+    def standardize(self, config: dict) -> Config:
+        r"""Standardizes the configuration.
+
+        By default, `config` will be filled with default values. Other
+        operations can be applied as well, such as remove degeneracy. Make sure
+        the already standardized configuration will not be changed.
+
+        """
+        return Config(config).fill(self.default)
+
     def process(self,
         config: dict, n_epochs: int|None = None,
         pbar_kw: dict|None = None,
@@ -102,7 +112,7 @@ class Manager:
             Latest checkpoint of the processed work.
 
         """
-        config = Config(config).fill(self.default)
+        config = self.standardize(config)
         key = self.configs.add(config)
         desc_head = key if self.pbar_desc is None else self.pbar_desc(config)
         pbar_kw = Config(pbar_kw).fill({
@@ -112,6 +122,10 @@ class Manager:
         if n_epochs is None:
             n_epochs = max_epochs
         else:
+            assert max_epochs is not None, (
+                f"'n_epochs' needs to be specified when max epochs is not "
+                "returned by 'setup'"
+            )
             n_epochs = min(n_epochs, max_epochs)
         try:
             ckpt = self.ckpts[key]
@@ -130,7 +144,7 @@ class Manager:
                 if epoch%self.save_interval==0 or epoch==n_epochs:
                     self.save_ckpt(key, epoch, max_epochs)
                 if desc_tail is not None:
-                    pbar.set_description(desc_head+'|'+desc_tail)
+                    pbar.set_description(desc_head+'|'+desc_tail if len(desc_head)>0 else desc_tail)
                 pbar.update()
         return self.ckpts[key]
 
@@ -175,7 +189,7 @@ class Manager:
         e_count = 0 # counter for runtime errors
         with tqdm(total=total if n_works is None else min(n_works, total), **pbar_kw) as pbar:
             while len(configs)>0:
-                config = configs.popleft().fill(self.default)
+                config = self.standardize(configs.popleft())
                 key = self.configs.add(config)
                 stat = self.get_stat(key)
                 if stat['complete'] or (n_epochs is not None and stat['epoch']>=n_epochs):

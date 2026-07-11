@@ -150,8 +150,6 @@ class Archive:
         except (FileNotFoundError, MaxTryIOError):
             if store_pth.exists():
                 records = {}
-        else:
-            raise
         if self.cache is not None:
             parts = list(store_pth.parts)[-self.pth_len:]
             parts[-1] = parts[-1][0]
