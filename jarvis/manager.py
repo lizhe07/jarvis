@@ -179,6 +179,7 @@ class Manager:
             Keyword argument for `self.process`.
 
         """
+        random.shuffle(configs)
         configs = deque(configs)
         total = len(configs)
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True})
