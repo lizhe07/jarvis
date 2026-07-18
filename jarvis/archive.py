@@ -454,6 +454,12 @@ class HashableRecordArchive(Archive):
             self[key] = val
         return key
 
+    def pop(self, key: str) -> Any:
+        val = super().pop(key)
+        if val is not None:
+            val = self._to_native(val)
+        return val
+
     def get_duplicates(self) -> list[tuple[Any, list[str]]]:
         r"""Returns all duplicate records.
 
