@@ -153,6 +153,7 @@ class Manager:
         n_epochs: int|None = None,
         n_works: int|None = None,
         max_errors: int = 0,
+        random_order: bool = True,
         pbar_kw: dict|None = None,
         process_kw: dict|None = None,
     ):
@@ -173,13 +174,16 @@ class Manager:
             Maximum number of errors allowed. If `0`, the runtime error is
             immediately raised. `KeyboardInterrupt` error is always raised
             regardless of `max_errors` value.
+        random_order:
+            Whether to process all works in random order.
         pbar_kw:
             Keyword argument for progress bar of the batch.
         process_kw:
             Keyword argument for `self.process`.
 
         """
-        random.shuffle(configs)
+        if random_order:
+            random.shuffle(configs)
         configs = deque(configs)
         total = len(configs)
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True})
