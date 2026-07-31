@@ -92,6 +92,7 @@ class Manager:
 
     def process(self,
         config: dict, n_epochs: int|None = None,
+        from_scratch: bool = False,
         pbar_kw: dict|None = None,
     ) -> Any:
         r"""Processes a work for given number of epochs.
@@ -103,6 +104,8 @@ class Manager:
         n_epochs:
             Number of epochs of an incremental work. If not provided, will use
             `max_epochs` returned by `self.setup`.
+        from_scratch:
+            Whether to ignore existing results.
         pbar_kw:
             Keyword argument for progress bar of one work.
 
@@ -128,6 +131,7 @@ class Manager:
             )
             n_epochs = min(n_epochs, max_epochs)
         try:
+            assert not from_scratch
             ckpt = self.ckpts[key]
             epoch = self.load_ckpt(ckpt)
         except:
