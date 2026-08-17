@@ -21,9 +21,9 @@ class Manager:
         Directory for storing configurations `configs`, status `stats` and
         checkpoints `ckpts`. If ``None``, all archive objects will be stored in
         memory only.
-    s_pause:
+    pause_s:
         Short pause time for `configs` and `stats`.
-    l_pause:
+    pause_l:
         Long pause time for `ckpts`. Checkpoints usually take larger storage
         space, therefore they are separated into more files and have higher
         tolerance on I/O failure.
@@ -46,7 +46,8 @@ class Manager:
     def __init__(self,
         store_dir: Path|str|None = None,
         *,
-        s_pause: float = 1., l_pause: float = 5.,
+        pth_len_s: int = 3, pth_len_l: int = 4,
+        pause_s: float = 1., pause_l: float = 5.,
         save_interval: int = 1, patience: float = 1.,
     ):
         if store_dir is None:
@@ -56,9 +57,9 @@ class Manager:
             self.ckpts = Archive()
         else:
             self.store_dir = Path(store_dir)
-            self.configs = ConfigArchive(self.store_dir/'configs', pth_len=3, pause=s_pause)
-            self.stats = Archive(self.store_dir/'stats', pth_len=3, pause=s_pause)
-            self.ckpts = Archive(self.store_dir/'ckpts', pth_len=4, pause=l_pause)
+            self.configs = ConfigArchive(self.store_dir/'configs', pth_len=pth_len_s, pause=pause_s)
+            self.stats = Archive(self.store_dir/'stats', pth_len=pth_len_s, pause=pause_s)
+            self.ckpts = Archive(self.store_dir/'ckpts', pth_len=pth_len_l, pause=pause_l)
         self.save_interval = save_interval
         self.patience = patience
 
