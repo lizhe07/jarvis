@@ -296,6 +296,7 @@ class Archive:
 
     def migrate(self,
         dst_dir: Path,
+        dst_pth_len: int|None = None,
         keys: set[str]|None = None,
         overwrite: bool = False,
         pbar_kw: dict|None = None,
@@ -306,6 +307,11 @@ class Archive:
         ----
         dst_dir:
             Path to the new directory.
+        dst_pth_len:
+            `pth_len` of the destination Archive. If files already exist in
+            `dst_dir`, `pth_len` needs to be compatible with the directory
+            structure. If `dst_dir` is empty and `dst_pth_len` is ``None``, it
+            will use the same `pth_len` of current Archive.
         keys:
             Keys of the records to be cloned. Clone everything if is ``None``.
         overwrite:
@@ -325,13 +331,17 @@ class Archive:
         if len(pth_len)>1:
             raise RuntimeError(f"Multiple hierarchies detected in {dst_dir}")
         elif len(pth_len)==1:
+            assert dst_pth_len is None or pth_len[0]==dst_pth_len, (
+                f"The specified 'pth_len' ({dst_pth_len}) is inconsistent with "
+                f"the existing files (pth_len={pth_len[0]})."
+            )
             dst_pth_len = pth_len[0]
             # check for one record
             file_name =  next(iter(self._file_names(dst_dir, dst_pth_len)), None)
             records = self._safe_read(dst_dir/file_name)
             key = next(iter(records.keys()))
             assert self._is_valid_key(key), f"Invalid key detected in {dst_dir} ({key})"
-        else:
+        elif dst_pth_len is None:
             dst_pth_len = self.pth_len
         # prepare generator of source file paths
         if keys is None:
@@ -369,7 +379,12 @@ class Archive:
                     if modified:
                         self._safe_write(dst_records, dst_pth)
         else:
+
             raise NotImplementedError("Files from src_dir needs to be merged.")
+
+    def resize(self, pth_len: int) -> None:
+        # TODO change pth_len with migrate
+        raise NotImplementedError
 
 
 class HashableRecordArchive(Archive):

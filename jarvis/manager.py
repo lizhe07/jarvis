@@ -303,15 +303,15 @@ class Manager:
             Keyword arguments for `self.completed`.
 
         """
-        dst_manager = Manager(dst_dir)
+        dst_manager = Manager(dst_dir, pth_len_s=self.configs.pth_len, pth_len_l=self.ckpts.pth_len)
         self.configs.max_try = 1
         self.configs.pause = 0.
         _keys = set(key for key, _ in self.completed(min_epoch, **kwargs))
         if keys is not None:
             _keys.intersection_update(keys)
-        self.configs.migrate(dst_manager.configs.store_dir, _keys, pbar_kw={'desc': "Copying 'configs'"})
-        self.stats.migrate(dst_manager.stats.store_dir, _keys, pbar_kw={'desc': "Copying 'stats'"})
-        self.ckpts.migrate(dst_manager.ckpts.store_dir, _keys, pbar_kw={'desc': "Copying 'ckpts'"})
+        self.configs.migrate(dst_manager.configs.store_dir, keys=_keys, pbar_kw={'desc': "Copying 'configs'"})
+        self.stats.migrate(dst_manager.stats.store_dir, keys=_keys, pbar_kw={'desc': "Copying 'stats'"})
+        self.ckpts.migrate(dst_manager.ckpts.store_dir, keys=_keys, pbar_kw={'desc': "Copying 'ckpts'"})
 
     def export_tar(self,
         tar_pth: str = 'store.tar.gz',
@@ -367,7 +367,7 @@ class Manager:
             more details.
 
         """
-        src_manager = Manager(src_dir)
+        src_manager = Manager(src_dir, pth_len_s=self.configs.pth_len, pth_len_l=self.ckpts.pth_len)
         # divide works into 'cloning' group and 'adding' group
         _old_configs = {k: v for k, v in self.configs.items()}
         _old_keys = {self.configs._to_hashable(v): k for k, v in self.configs.items()}
@@ -394,13 +394,13 @@ class Manager:
                     add_keys.add(new_key)
         # use 'migrate' to add 'cloning' group directly
         src_manager.configs.migrate(
-            self.configs.store_dir, clone_keys, overwrite=True, pbar_kw={'desc': "Copying 'configs'"},
+            self.configs.store_dir, keys=clone_keys, overwrite=True, pbar_kw={'desc': "Copying 'configs'"},
         )
         src_manager.stats.migrate(
-            self.stats.store_dir, clone_keys, overwrite=overwrite, pbar_kw={'desc': "Copying 'stats'"},
+            self.stats.store_dir, keys=clone_keys, overwrite=overwrite, pbar_kw={'desc': "Copying 'stats'"},
         )
         src_manager.ckpts.migrate(
-            self.ckpts.store_dir, clone_keys, overwrite=overwrite, pbar_kw={'desc': "Copying 'ckpts'"},
+            self.ckpts.store_dir, keys=clone_keys, overwrite=overwrite, pbar_kw={'desc': "Copying 'ckpts'"},
         )
         # use 'add' to insert 'adding' group one by one
         for src_key in add_keys:
