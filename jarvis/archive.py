@@ -117,25 +117,46 @@ class Archive:
         return self.store_dir/self._file_name(key, self.pth_len)
 
     @staticmethod
-    def _file_names(store_dir: Path, depth: int) -> Iterator[str]:
-        r"""A generator for names of existing records file."""
-        if depth==1:
-            file_names = os.listdir(store_dir)
-            random.shuffle(file_names)
-            for file_name in file_names:
-                if len(file_name)==5 and file_name[0] in Archive._alphabet and file_name.endswith('.axv'):
-                    yield file_name
-        else:
-            subdir_names = [f for f in os.listdir(store_dir) if f in Archive._alphabet]
-            random.shuffle(subdir_names)
-            for subdir_name in subdir_names:
-                for file_name in Archive._file_names(store_dir/subdir_name, depth-1):
-                    yield f'{subdir_name}/{file_name}'
+    def _existing_file_names(store_dir: Path) -> Iterator[Path]:
+        r"""A generator for names of existing record files."""
+        for path, _, files in store_dir.walk():
+            for name in files:
+                yield (path/name).relative_to(store_dir)
 
-    def _store_pths(self) -> Iterator[Path]:
-        r"""Returns all valid external files in the directory."""
-        for file_name in self._file_names(self.store_dir, self.pth_len):
-            yield self.store_dir/file_name
+    def _check_file_name(self, file_name: Path) -> tuple[bool, int]:
+        r"""Checks the file name format.
+
+        Args
+        ----
+        file_name:
+            The relative path of a file, e.g., 'A/B/C.axv'.
+
+        Returns
+        -------
+        is_valid:
+            Whether the file extension is 'axv' and named with only characters
+            in the archive alphabet.
+        pth_len:
+            Depth of the file name.
+
+        """
+        parts = file_name.parts
+        pth_len = len(parts)
+        if not(len(parts[-1])==5 and parts[-1].endswith('.axv')):
+            is_valid = False
+            return is_valid, pth_len
+        parts = parts[:-1]+(parts[-1][0],)
+        is_valid = all(part in self._alphabet for part in parts)
+        return is_valid, pth_len
+
+    def _store_pths(self) -> list[Path]:
+        r"""Returns all valid external files in the directory in random order."""
+        store_pths = []
+        for file_name in self._existing_file_names(self.store_dir):
+            is_valid, pth_len = self._check_file_name(file_name)
+            if is_valid and pth_len==self.pth_len:
+                store_pths.append(self.store_dir/file_name)
+        random.shuffle(store_pths)
 
     def _safe_read(self, store_pth: Path) -> dict:
         r"""Safely reads a file.
@@ -198,7 +219,7 @@ class Archive:
             self.cache = {}
         keys, count = set(), 0
         for store_pth in tqdm(
-            list(self._store_pths()), desc='Pruning', unit='file', leave=False,
+            self._store_pths(), desc='Pruning', unit='file', leave=False,
         ):
             records = self._safe_read(store_pth) # corrupted files are removed in `_safe_read`
             if len(records)>0:
@@ -325,7 +346,7 @@ class Archive:
         # check key consistency
         pth_len = []
         for depth in range(1, self.key_len+1):
-            file_name =  next(iter(self._file_names(dst_dir, depth)), None)
+            file_name =  next(iter(self._existing_file_names(dst_dir, depth)), None)
             if file_name is not None:
                 pth_len.append(depth)
         if len(pth_len)>1:
@@ -337,7 +358,7 @@ class Archive:
             )
             dst_pth_len = pth_len[0]
             # check for one record
-            file_name =  next(iter(self._file_names(dst_dir, dst_pth_len)), None)
+            file_name =  next(iter(self._existing_file_names(dst_dir, dst_pth_len)), None)
             records = self._safe_read(dst_dir/file_name)
             key = next(iter(records.keys()))
             assert self._is_valid_key(key), f"Invalid key detected in {dst_dir} ({key})"
@@ -345,7 +366,7 @@ class Archive:
             dst_pth_len = self.pth_len
         # prepare generator of source file paths
         if keys is None:
-            src_pths = list(self._store_pths())
+            src_pths = self._store_pths()
         else:
             src_pths = set()
             for key in keys:
