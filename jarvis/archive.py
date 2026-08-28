@@ -172,9 +172,7 @@ class Archive:
             if store_pth.exists():
                 records = {}
         if self.cache is not None:
-            parts = list(store_pth.parts)[-self.pth_len:]
-            parts[-1] = parts[-1][0]
-            head = ''.join(parts)
+            head = ''.join(part[0] for part in store_pth.relative_to(self.store_dir).parts)
             to_rm = [] # remove items do not exist any more
             for key in self.cache:
                 if key.startswith(head) and key not in records:
