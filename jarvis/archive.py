@@ -1,4 +1,5 @@
 import os
+import shutil
 import random
 from pathlib import Path
 import numpy as np
@@ -438,8 +439,18 @@ class Archive:
                         self._safe_write(dst_records, dst_pth)
 
     def resize(self, pth_len: int) -> None:
-        # TODO change pth_len with migrate
-        raise NotImplementedError
+        r"""Restructures the record files using new path length."""
+        if pth_len==self.pth_len:
+            return
+        tmp_dir = self.store_dir.parent/'tmp_{}'.format(self._random_key())
+        try:
+            self.migrate(tmp_dir, pth_len)
+        except:
+            shutil.rmtree(tmp_dir)
+            raise
+        shutil.rmtree(self.store_dir)
+        tmp_dir.rename(self.store_dir)
+        self.pth_len = pth_len
 
 
 class HashableRecordArchive(Archive):
