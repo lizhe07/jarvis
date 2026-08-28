@@ -157,6 +157,7 @@ class Archive:
             if is_valid and pth_len==self.pth_len:
                 store_pths.append(self.store_dir/file_name)
         random.shuffle(store_pths)
+        return store_pths
 
     def _safe_read(self, store_pth: Path) -> dict:
         r"""Safely reads a file.
@@ -313,6 +314,15 @@ class Archive:
                 elif store_pth.exists():
                     os.remove(store_pth)
 
+    def _existing_pth_lens(self, store_dir: Path) -> set[int]:
+        r"""Returns path lengths of existing valid files."""
+        pth_lens = set()
+        for file_name in self._existing_file_names(store_dir):
+            is_valid, pth_len = self._check_file_name(file_name)
+            if is_valid:
+                pth_lens.add(pth_len)
+        return pth_lens
+
     def migrate(self,
         dst_dir: Path,
         dst_pth_len: int|None = None,
@@ -325,7 +335,7 @@ class Archive:
         Args
         ----
         dst_dir:
-            Path to the new directory.
+            Path to the destination directory.
         dst_pth_len:
             `pth_len` of the destination Archive. If files already exist in
             `dst_dir`, `pth_len` needs to be compatible with the directory
@@ -342,26 +352,26 @@ class Archive:
         os.makedirs(dst_dir, exist_ok=True)
         pbar_kw = Config(pbar_kw).fill({'unit': 'file', 'leave': False})
         # check key consistency
-        pth_len = []
-        for depth in range(1, self.key_len+1):
-            file_name =  next(iter(self._existing_file_names(dst_dir, depth)), None)
-            if file_name is not None:
-                pth_len.append(depth)
-        if len(pth_len)>1:
+        pth_lens = self._existing_pth_lens(dst_dir)
+        if len(pth_lens)>1:
             raise RuntimeError(f"Multiple hierarchies detected in {dst_dir}")
-        elif len(pth_len)==1:
-            assert dst_pth_len is None or pth_len[0]==dst_pth_len, (
-                f"The specified 'pth_len' ({dst_pth_len}) is inconsistent with "
-                f"the existing files (pth_len={pth_len[0]})."
-            )
-            dst_pth_len = pth_len[0]
-            # check for one record
-            file_name =  next(iter(self._existing_file_names(dst_dir, dst_pth_len)), None)
+        elif len(pth_lens)==0:
+            # empty destination directory
+            if dst_pth_len is None:
+                dst_pth_len = self.pth_len
+        elif len(pth_lens)==1:
+            if dst_pth_len is None:
+                dst_pth_len = next(iter(pth_lens))
+            else:
+                assert dst_pth_len in pth_lens, (
+                    f"The specified 'pth_len' ({dst_pth_len}) is inconsistent with "
+                    f"the existing files (pth_len={next(iter(pth_lens))})."
+                )
+            # check key validity for one record
+            file_name = next(iter(self._existing_file_names(dst_dir)))
             records = self._safe_read(dst_dir/file_name)
             key = next(iter(records.keys()))
             assert self._is_valid_key(key), f"Invalid key detected in {dst_dir} ({key})"
-        elif dst_pth_len is None:
-            dst_pth_len = self.pth_len
         # prepare generator of source file paths
         if keys is None:
             src_pths = self._store_pths()
@@ -373,19 +383,19 @@ class Archive:
         # copy records to destination directory
         if dst_pth_len>=self.pth_len:
             random.shuffle(src_pths)
-            for src_pth in tqdm(src_pths, **pbar_kw):
+            for src_pth in tqdm(src_pths, **pbar_kw): # split each source record file
                 src_records = self._safe_read(src_pth)
                 src_keys = [k for k in src_records if keys is None or k in keys]
-                key_dicts = {} # keys grouped by files in dst_dir
+                key_groups = {} # keys grouped by files in dst_dir
                 for key in src_keys:
-                    _key = key[:dst_pth_len]
-                    if _key in key_dicts:
-                        key_dicts[_key].append(key)
+                    head = key[:dst_pth_len]
+                    if head in key_groups:
+                        key_groups[head].append(key)
                     else:
-                        key_dicts[_key] = [key]
-                for dst_keys in key_dicts.values():
-                    dst_pth = dst_dir/self._file_name(dst_keys[0], dst_pth_len)
-                    if os.path.exists(dst_pth):
+                        key_groups[head] = [key]
+                for head, dst_keys in key_groups.items():
+                    dst_pth = dst_dir/self._file_name(head, dst_pth_len)
+                    if dst_pth.exists():
                         dst_records = self._safe_read(dst_pth)
                         modified = False
                     else:
@@ -398,8 +408,34 @@ class Archive:
                     if modified:
                         self._safe_write(dst_records, dst_pth)
         else:
-
-            raise NotImplementedError("Files from src_dir needs to be merged.")
+            src_groups = {} # merge source record files
+            for src_pth in src_pths:
+                head = ''.join(src_pth.relative_to(self.store_dir).parts[:dst_pth_len])
+                if head in src_groups:
+                    src_groups[head].append(src_pth)
+                else:
+                    src_groups[head] = [src_pth]
+            heads = list(src_groups.keys())
+            random.shuffle(heads)
+            with tqdm(total=len(src_pths), **pbar_kw) as pbar:
+                for head in heads:
+                    dst_pth = dst_dir/self._file_name(head, dst_pth_len)
+                    if dst_pth.exists():
+                        dst_records = self._safe_read(dst_pth)
+                        modified = False
+                    else:
+                        dst_records = {}
+                        modified = True
+                    random.shuffle(src_groups[head])
+                    for src_pth in src_groups[head]:
+                        src_records = self._safe_read(src_pth)
+                        for key in src_records:
+                            if (keys is None or key in keys) and (key not in dst_records or overwrite):
+                                dst_records[key] = src_records[key]
+                                modified = True
+                        pbar.update()
+                    if modified:
+                        self._safe_write(dst_records, dst_pth)
 
     def resize(self, pth_len: int) -> None:
         # TODO change pth_len with migrate
