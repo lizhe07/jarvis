@@ -286,10 +286,10 @@ class Manager:
     def _export_dir(self,
         dst_dir: Path|str,
         *,
-        keys: set|None = None,
+        keys: set[str]|None = None,
         min_epoch: int|None = 0,
         **kwargs,
-    ) -> None:
+    ) -> set[str]:
         r"""Exports manager data to a directory.
 
         Args
@@ -299,17 +299,26 @@ class Manager:
         keys:
             Keys of works that will be potentially exported. If ``None``, all
             works satisfying the criterion will be exported.
+        min_epoch:
+            Minimum number of epochs, see `self.completed` for more details.
         kwargs:
-            Keyword arguments for `self.completed`.
+            Additional keyword arguments for `self.completed`.
+
+        Returns
+        -------
+        keys:
+            Actual keys that are exported.
 
         """
         dst_manager = Manager(dst_dir, pth_len_s=self.configs.pth_len, pth_len_l=self.ckpts.pth_len)
         _keys = set(key for key, _ in self.completed(min_epoch, **kwargs))
         if keys is not None:
             _keys.intersection_update(keys)
-        self.configs.migrate(dst_manager.configs.store_dir, keys=_keys, pbar_kw={'desc': "Copying 'configs'"})
-        self.stats.migrate(dst_manager.stats.store_dir, keys=_keys, pbar_kw={'desc': "Copying 'stats'"})
-        self.ckpts.migrate(dst_manager.ckpts.store_dir, keys=_keys, pbar_kw={'desc': "Copying 'ckpts'"})
+        keys = _keys
+        self.configs.migrate(dst_manager.configs.store_dir, keys=keys, pbar_kw={'desc': "Copying 'configs'"})
+        self.stats.migrate(dst_manager.stats.store_dir, keys=keys, pbar_kw={'desc': "Copying 'stats'"})
+        self.ckpts.migrate(dst_manager.ckpts.store_dir, keys=keys, pbar_kw={'desc': "Copying 'ckpts'"})
+        return keys
 
     def export_tar(self,
         tar_pth: str = 'store.tar.gz',
@@ -376,7 +385,7 @@ class Manager:
         for new_key, config in _new_configs.items():
             old_key = _old_keys.get(self.configs._to_hashable(config))
             if old_key is None:
-                if new_key in _old_configs:
+                if new_key in _old_configs: # key conflict
                     add_keys.add(new_key)
                 else:
                     clone_keys.add(new_key)
