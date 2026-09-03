@@ -65,13 +65,13 @@ class Manager:
 
         self.default: dict|Path|str|None = None # default config of a work
 
+    DEFAULT_STAT = {
+        'complete': False, 'epoch': -1,
+        't_modified': -float('inf'),
+    }
     def get_stat(self, key: str) -> dict:
         r"""Returns status of one work."""
-        default = {
-            'complete': False, 'epoch': -1,
-            't_modified': -float('inf'),
-        }
-        return self.stats.get(key, default)
+        return self.stats.get(key, Manager.DEFAULT_STAT)
 
     def save_ckpt(self, key: str, epoch: int, max_epochs: int):
         r"""Saves checkpoint and updates status."""
@@ -277,8 +277,9 @@ class Manager:
             period = (period, 0)
         t_from, t_to = period
         assert t_from>t_to>=0
+        stats = {k: v for k, v in self.stats.items()}
         for key, config in self.configs.filter(cond):
-            stat = self.get_stat(key)
+            stat = stats.get(key, Manager.DEFAULT_STAT)
             completed = stat['complete'] if min_epoch is None else stat['epoch']>=min_epoch
             if completed and t_to<=(time.time()-stat['t_modified'])/3600<=t_from:
                 yield key, config
