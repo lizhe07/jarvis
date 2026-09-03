@@ -352,6 +352,7 @@ class Archive:
             raise NotImplementedError("'migrate' is not supported for in-memory archive object.")
         os.makedirs(dst_dir, exist_ok=True)
         pbar_kw = Config(pbar_kw).fill({'unit': 'file', 'leave': False})
+        max_try, pause = 1, 0. # no parallel running is expect for migrate method
         # check key consistency
         pth_lens = self._existing_pth_lens(dst_dir)
         if len(pth_lens)>1:
@@ -370,7 +371,7 @@ class Archive:
                 )
             # check key validity for one record
             file_name = next(iter(self._existing_file_names(dst_dir)))
-            records = self._safe_read(dst_dir/file_name)
+            records = safe_read(dst_dir/file_name, max_try, pause)
             key = next(iter(records.keys()))
             assert self._is_valid_key(key), f"Invalid key detected in {dst_dir} ({key})"
         # prepare generator of source file paths
@@ -385,7 +386,7 @@ class Archive:
         if dst_pth_len>=self.pth_len:
             random.shuffle(src_pths)
             for src_pth in tqdm(src_pths, **pbar_kw): # split each source record file
-                src_records = self._safe_read(src_pth)
+                src_records = safe_read(src_pth, max_try, pause)
                 src_keys = [k for k in src_records if keys is None or k in keys]
                 key_groups = {} # keys grouped by files in dst_dir
                 for key in src_keys:
@@ -397,7 +398,7 @@ class Archive:
                 for head, dst_keys in key_groups.items():
                     dst_pth = dst_dir/self._file_name(head, dst_pth_len)
                     if dst_pth.exists():
-                        dst_records = self._safe_read(dst_pth)
+                        dst_records = safe_read(dst_pth, max_try, pause)
                         modified = False
                     else:
                         dst_records = {}
@@ -407,7 +408,7 @@ class Archive:
                             dst_records[key] = src_records[key]
                             modified = True
                     if modified:
-                        self._safe_write(dst_records, dst_pth)
+                        safe_write(dst_records, dst_pth, max_try, pause)
         else:
             src_groups = {} # merge source record files
             for src_pth in src_pths:
@@ -422,21 +423,21 @@ class Archive:
                 for head in heads:
                     dst_pth = dst_dir/self._file_name(head, dst_pth_len)
                     if dst_pth.exists():
-                        dst_records = self._safe_read(dst_pth)
+                        dst_records = safe_read(dst_pth, max_try, pause)
                         modified = False
                     else:
                         dst_records = {}
                         modified = True
                     random.shuffle(src_groups[head])
                     for src_pth in src_groups[head]:
-                        src_records = self._safe_read(src_pth)
+                        src_records = safe_read(src_pth, max_try, pause)
                         for key in src_records:
                             if (keys is None or key in keys) and (key not in dst_records or overwrite):
                                 dst_records[key] = src_records[key]
                                 modified = True
                         pbar.update()
                     if modified:
-                        self._safe_write(dst_records, dst_pth)
+                        safe_write(dst_records, dst_pth, max_try, pause)
 
     def resize(self, pth_len: int) -> None:
         r"""Restructures the record files using new path length."""

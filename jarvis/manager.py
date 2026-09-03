@@ -304,8 +304,6 @@ class Manager:
 
         """
         dst_manager = Manager(dst_dir, pth_len_s=self.configs.pth_len, pth_len_l=self.ckpts.pth_len)
-        self.configs.max_try = 1
-        self.configs.pause = 0.
         _keys = set(key for key, _ in self.completed(min_epoch, **kwargs))
         if keys is not None:
             _keys.intersection_update(keys)
