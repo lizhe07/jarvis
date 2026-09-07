@@ -380,7 +380,9 @@ class Archive:
         else:
             src_pths = set()
             for key in keys:
-                src_pths.add(self._store_pth(key))
+                store_pth = self._store_pth(key)
+                if store_pth.exists():
+                    src_pths.add(self._store_pth(key))
             src_pths: list[Path] = list(src_pths)
         # copy records to destination directory
         if dst_pth_len>=self.pth_len:

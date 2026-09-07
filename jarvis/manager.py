@@ -429,7 +429,7 @@ class Manager:
             Keyword arguments for `_load_dir`.
 
         """
-        tmp_dir = '{}/tmp_{}'.format(self.store_dir, self.configs._random_key())
+        tmp_dir = self.store_dir/'tmp_{}'.format(self.configs._random_key())
         try:
             with tarfile.open(tar_pth, 'r:gz', compresslevel=compresslevel) as tar:
                 members = tar.getmembers()
