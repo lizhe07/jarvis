@@ -37,11 +37,11 @@ class Manager:
 
     # hooks need to be provided by user
     setup: Callable[[Config], int|None] # sets up workspace and returns max number of epochs
-    reset: Callable[[], None] # resets when a work initiates, i.e. epoch=0
-    step: Callable[[], str|None] # runs one epoch, returns optional progress bar description
-    get_ckpt: Callable[[], Any] # prepares checkpoint data
-    load_ckpt: Callable[[Any], int] # loads checkpoint data and returns actual epoch, i.e. number of `step` calls
-    pbar_desc: Callable[[Config], str]|None = None # description of a work
+    reset: Callable[[], None]           # resets when a work initiates, i.e. epoch=0
+    step: Callable[[], str|None]        # runs one epoch, returns optional progress bar description
+    get_ckpt: Callable[[], Any]         # returns current checkpoint
+    load_ckpt: Callable[[Any], int]     # loads checkpoint data and returns actual epoch, i.e. number of `step` calls
+    pbar_desc: Callable[[Config], str]|None = None  # description of a work
 
     def __init__(self,
         store_dir: Path|str|None = None,
@@ -69,17 +69,19 @@ class Manager:
         'complete': False, 'epoch': -1,
         't_modified': -float('inf'),
     }
-    def get_stat(self, key: str) -> dict:
-        r"""Returns status of one work."""
-        return self.stats.get(key, Manager.DEFAULT_STAT)
+    def get_stat(self) -> dict:
+        r"""Returns statistics of one work at each checkpoint."""
+        return {}
 
     def save_ckpt(self, key: str, epoch: int, max_epochs: int):
         r"""Saves checkpoint and updates status."""
         self.ckpts[key] = self.get_ckpt()
-        self.stats[key] = {
-            'complete': epoch>=max_epochs, 'epoch': epoch,
-            't_modified': time.time(),
-        }
+        stat = self.stats[key]
+        stat.update(self.get_stat())
+        stat.update({
+            'complete': epoch>=max_epochs, 'epoch': epoch, 't_modified': time.time(),
+        })
+        self.stats[key] = stat
 
     def standardize(self, config: dict) -> Config:
         r"""Standardizes the configuration.
@@ -201,7 +203,7 @@ class Manager:
             while len(configs)>0:
                 config = self.standardize(configs.popleft())
                 key = self.configs.add(config)
-                stat = self.get_stat(key)
+                stat = self.stats.get(key, Manager.DEFAULT_STAT)
                 if stat['complete'] or (n_epochs is not None and stat['epoch']>=n_epochs):
                     if n_works is None: # update progress even for skipping
                         pbar.update()
