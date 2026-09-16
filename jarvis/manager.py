@@ -76,7 +76,7 @@ class Manager:
     def save_ckpt(self, key: str, epoch: int, max_epochs: int):
         r"""Saves checkpoint and updates status."""
         self.ckpts[key] = self.get_ckpt()
-        stat = self.stats[key]
+        stat = self.stats.get(key, Manager.DEFAULT_STAT)
         stat.update(self.get_stat())
         stat.update({
             'complete': epoch>=max_epochs, 'epoch': epoch, 't_modified': time.time(),
