@@ -291,6 +291,7 @@ class Archive:
         if self.store_dir is None:
             for key in keys:
                 self.cache.pop(key, None)
+            return
         if self.cache is not None:
             raise RuntimeError("Attempting to delete keys in cache mode.")
         to_rm = {}
