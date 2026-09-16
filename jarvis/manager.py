@@ -193,8 +193,8 @@ class Manager:
             random.shuffle(configs)
         configs = deque(configs)
         total = len(configs)
-        pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True})
-        process_kw = Config(process_kw).fill({'pbar_kw.leave': False})
+        pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True, 'disable': total<=1})
+        process_kw = Config(process_kw).fill({'pbar_kw.leave': total<=1})
 
         c_count = 0 # counter for completed works
         r_count = 0 # counter for encountered running works
