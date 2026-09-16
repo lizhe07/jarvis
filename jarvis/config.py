@@ -214,7 +214,7 @@ def instantiate(spec):
 
 def choices2configs(
     choices: dict|Path|str,
-    num_configs: int|None = None,
+    n_configs: int|None = None,
     default: dict|Path|str|None = None,
 ) -> list[Config]:
     r"""Generates configs on a mesh grid.
@@ -225,9 +225,9 @@ def choices2configs(
         A config-like object, except the leaf nodes are list of value choices.
         The list of random configs will be constructed as the outer product. If
         a file path is provided, it is expected to be a yaml file.
-    num_configs:
+    n_configs:
         The number of configs to return. If not provided, will return all
-        possible combinations of choices.
+        possible combinations of choices with a fixed order.
     default:
         Default config to be filled in each returned item.
 
@@ -245,10 +245,14 @@ def choices2configs(
     vals = [list(choices[key]) for key in keys]
     dims = [len(val) for val in vals]
     total_num = np.prod(dims)
-    num_configs = total_num if num_configs is None else min(total_num, num_configs)
+    if n_configs is None:
+        idxs = range(total_num)
+    else:
+        n_configs = min(total_num, n_configs)
+        idxs = random.sample(range(total_num), n_configs)
 
     configs = []
-    for idx in random.sample(range(total_num), num_configs):
+    for idx in idxs:
         sub_idxs = np.unravel_index(idx, dims)
         config = Config()
         for i, key in enumerate(keys):
