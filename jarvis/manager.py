@@ -29,9 +29,6 @@ class Manager:
         tolerance on I/O failure.
     save_interval:
         Number of epochs between two successive saves.
-    patience:
-        The time to wait for a running work to finish, in hours. The suggested
-        value is the time between two saves multiplied by 2.
 
     """
 
@@ -48,7 +45,7 @@ class Manager:
         *,
         pth_len_s: int = 3, pth_len_l: int = 4,
         pause_s: float = 1., pause_l: float = 5.,
-        save_interval: int = 1, patience: float = 1.,
+        save_interval: int = 1,
     ):
         if store_dir is None:
             self.store_dir = None
@@ -61,7 +58,6 @@ class Manager:
             self.stats = Archive(self.store_dir/'stats', pth_len=pth_len_s, pause=pause_s)
             self.ckpts = Archive(self.store_dir/'ckpts', pth_len=pth_len_l, pause=pause_l)
         self.save_interval = save_interval
-        self.patience = patience
 
         self.default: dict|Path|str|None = None # default config of a work
 
@@ -159,6 +155,7 @@ class Manager:
         configs: list[Config],
         n_epochs: int|None = None,
         n_works: int|None = None,
+        patience: float = 1.,
         max_errors: int = 0,
         random_order: bool = True,
         pbar_kw: dict|None = None,
@@ -177,6 +174,9 @@ class Manager:
             Number of works to process. If `None`, the batch processing stops
             only when no work is left pending in `configs`, and the progress bar
             will update for complete works in this mode.
+        patience:
+            The time to wait for a running work to finish, in hours. The
+            recorecommended value is the time between two saves multiplied by 2.
         max_errors:
             Maximum number of errors allowed. If `0`, the runtime error is
             immediately raised. `KeyboardInterrupt` error is always raised
@@ -195,6 +195,7 @@ class Manager:
         total = len(configs)
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True, 'disable': total<=1})
         process_kw = Config(process_kw).fill({'pbar_kw.leave': total<=1})
+        # TODO implement automatic value of patience
 
         c_count = 0 # counter for completed works
         r_count = 0 # counter for encountered running works
@@ -208,13 +209,13 @@ class Manager:
                     if n_works is None: # update progress even for skipping
                         pbar.update()
                     continue
-                if (time.time()-stat['t_modified'])/3600<self.patience:
+                if (time.time()-stat['t_modified'])/3600<patience:
                     configs.append(config)
                     r_count += 1
                     if r_count%total==0: # wait after each round of queue
                         pbar.set_description('Wait round {}'.format(r_count//total))
                         pbar.update(0) # render progress bar
-                        time.sleep(self.patience*60)
+                        time.sleep(patience*60)
                     if r_count>60*total: # break loop after too many rounds
                         break
                     else:
