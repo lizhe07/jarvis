@@ -61,10 +61,12 @@ class Manager:
 
         self.default: dict|Path|str|None = None # default config of a work
 
-    DEFAULT_STAT = {
-        'complete': False, 'epoch': -1,
-        't_modified': -float('inf'),
-    }
+    @property
+    def _DEFAULT_STAT(self) -> dict:
+        return {
+            'complete': False, 'epoch': -1,
+            't_modified': -float('inf'),
+        }
     def get_stat(self) -> dict:
         r"""Returns statistics of one work at each checkpoint."""
         return {}
@@ -72,7 +74,7 @@ class Manager:
     def save_ckpt(self, key: str, epoch: int, max_epochs: int):
         r"""Saves checkpoint and updates status."""
         self.ckpts[key] = self.get_ckpt()
-        stat = self.stats.get(key, Manager.DEFAULT_STAT)
+        stat = self.stats.get(key, self._DEFAULT_STAT)
         stat.update(self.get_stat())
         stat.update({
             'complete': epoch>=max_epochs, 'epoch': epoch, 't_modified': time.time(),
@@ -204,7 +206,7 @@ class Manager:
             while len(configs)>0:
                 config = self.standardize(configs.popleft())
                 key = self.configs.add(config)
-                stat = self.stats.get(key, Manager.DEFAULT_STAT)
+                stat = self.stats.get(key, self._DEFAULT_STAT)
                 if stat['complete'] or (n_epochs is not None and stat['epoch']>=n_epochs):
                     if n_works is None: # update progress even for skipping
                         pbar.update()
@@ -282,7 +284,7 @@ class Manager:
         assert t_from>t_to>=0
         stats = {k: v for k, v in self.stats.items()}
         for key, config in self.configs.filter(cond):
-            stat = stats.get(key, Manager.DEFAULT_STAT)
+            stat = stats.get(key, self._DEFAULT_STAT)
             completed = stat['complete'] if min_epoch is None else stat['epoch']>=min_epoch
             if completed and t_to<=(time.time()-stat['t_modified'])/3600<=t_from:
                 yield key, config
