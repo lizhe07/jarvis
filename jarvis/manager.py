@@ -60,6 +60,7 @@ class Manager:
         self.save_interval = save_interval
 
         self.default: dict|Path|str|None = None # default config of a work
+        self._inter_ckpt_interval: float = None # estimated interval in hours
 
     @property
     def _DEFAULT_STAT(self) -> dict:
@@ -76,10 +77,18 @@ class Manager:
         self.ckpts[key] = self.get_ckpt()
         stat = self.stats.get(key, self._DEFAULT_STAT)
         stat.update(self.get_stat())
+        tic = stat['t_modified']
         stat.update({
             'complete': epoch>=max_epochs, 'epoch': epoch, 't_modified': time.time(),
         })
+        toc = stat['t_modified']
         self.stats[key] = stat
+
+        ici = (toc-tic)/3600
+        if self._inter_ckpt_interval is None:
+            self._inter_ckpt_interval = ici
+        else:
+            self._inter_ckpt_interval = 0.9*self._inter_ckpt_interval+0.1*ici
 
     def standardize(self, config: dict) -> Config:
         r"""Standardizes the configuration.
@@ -93,6 +102,7 @@ class Manager:
 
     def process(self,
         config: dict, n_epochs: int|None = None,
+        *,
         from_scratch: bool = False,
         pbar_kw: dict|None = None,
     ) -> Any:
@@ -156,8 +166,9 @@ class Manager:
     def batch(self,
         configs: list[Config],
         n_epochs: int|None = None,
-        n_works: int|None = None,
-        patience: float = 1.,
+        n_works: int|None = None, # TODO add option to include completed works
+        *,
+        patience: float|None = None,
         max_errors: int = 0,
         random_order: bool = True,
         pbar_kw: dict|None = None,
@@ -197,7 +208,6 @@ class Manager:
         total = len(configs)
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True, 'disable': total<=1})
         process_kw = Config(process_kw).fill({'pbar_kw.leave': total<=1})
-        # TODO implement automatic value of patience
 
         c_count = 0 # counter for completed works
         r_count = 0 # counter for encountered running works
@@ -211,13 +221,18 @@ class Manager:
                     if n_works is None: # update progress even for skipping
                         pbar.update()
                     continue
-                if (time.time()-stat['t_modified'])/3600<patience:
+
+                if patience is None:
+                    _patience = 0 if self._inter_ckpt_interval is None else 2*self._inter_ckpt_interval
+                else:
+                    _patience = patience
+                if (time.time()-stat['t_modified'])/3600<_patience:
                     configs.append(config)
                     r_count += 1
                     if r_count%total==0: # wait after each round of queue
                         pbar.set_description('Wait round {}'.format(r_count//total))
                         pbar.update(0) # render progress bar
-                        time.sleep(patience*60)
+                        time.sleep(_patience*60)
                     if r_count>60*total: # break loop after too many rounds
                         break
                     else:
