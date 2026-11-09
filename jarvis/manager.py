@@ -206,6 +206,8 @@ class Manager:
             random.shuffle(configs)
         configs = deque(configs)
         total = len(configs)
+        if n_works is not None:
+            total = min(n_works, total)
         pbar_kw = Config(pbar_kw).fill({'unit': 'work', 'leave': True, 'disable': total<=1})
         process_kw = Config(process_kw).fill({'pbar_kw.leave': total<=1})
 
@@ -213,8 +215,8 @@ class Manager:
         r_count = 0 # counter for encountered running works
         e_count = 0 # counter for runtime errors
         s_count = 0 # counter for skipped works
-        with tqdm(total=total if n_works is None else min(n_works, total), **pbar_kw) as pbar:
-            while len(configs)>0:
+        with tqdm(total=total, **pbar_kw) as pbar:
+            while len(configs)>0 and (n_works is None or c_count<n_works):
                 config = self.standardize(configs.popleft())
                 key = self.configs.add(config)
                 stat = self.stats.get(key, self._DEFAULT_STAT)
@@ -253,8 +255,6 @@ class Manager:
                     if e_count>max_errors:
                         print(f"\nMax number of errors {max_errors} reached (current work '{key}')")
                         raise
-                if c_count==n_works:
-                    break
 
     def prune(self):
         r"""Remove corrupted records."""
