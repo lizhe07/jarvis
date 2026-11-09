@@ -611,6 +611,8 @@ class ConfigArchive(HashableRecordArchive):
     def filter(self, cond: dict) -> Iterator[tuple[str, Config]]:
         r"""Generator of matching record key.
 
+        TODO when 'cond' key is not the leaf key
+
         Args
         ----
         cond:
