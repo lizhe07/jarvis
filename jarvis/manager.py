@@ -212,15 +212,18 @@ class Manager:
         c_count = 0 # counter for completed works
         r_count = 0 # counter for encountered running works
         e_count = 0 # counter for runtime errors
+        s_count = 0 # counter for skipped works
         with tqdm(total=total if n_works is None else min(n_works, total), **pbar_kw) as pbar:
             while len(configs)>0:
                 config = self.standardize(configs.popleft())
                 key = self.configs.add(config)
                 stat = self.stats.get(key, self._DEFAULT_STAT)
                 if stat['complete'] or (n_epochs is not None and stat['epoch']>=n_epochs):
-                    if n_works is None: # update progress even for skipping
-                        pbar.update()
+                    s_count += 1
                     continue
+                if s_count>0 and n_works is None: # update progress of skipped work
+                    pbar.update(s_count)
+                s_count = 0
 
                 if patience is None:
                     _patience = 0 if self._inter_ckpt_interval is None else 2*self._inter_ckpt_interval
