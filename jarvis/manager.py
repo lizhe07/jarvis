@@ -255,6 +255,8 @@ class Manager:
                     if e_count>max_errors:
                         print(f"\nMax number of errors {max_errors} reached (current work '{key}')")
                         raise
+            if s_count>0 and n_works is None:
+                pbar.update(s_count)
 
     def prune(self):
         r"""Remove corrupted records."""
