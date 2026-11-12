@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import numpy as np
 import torch
+from torch.nn import Module
 import inspect
 from collections.abc import Callable
 
@@ -232,12 +233,13 @@ def array2tensor(arrays, device='cpu'):
 def create_mlp_layers(
     in_features: int, out_features: int,
     num_features: list[int]|None = None,
-    nonlinearity: str = 'ReLU',
+    nonlinearity: str|Module = 'ReLU',
     last_linear: bool = True,
 ) -> torch.nn.ModuleList:
     if num_features is None:
         num_features = [4*int((in_features*out_features)**0.5)]
-    nonlinearity = getattr(torch.nn, nonlinearity)
+    if isinstance(nonlinearity, str):
+        nonlinearity = getattr(torch.nn, nonlinearity)()
     layers = torch.nn.ModuleList()
     for l_idx in range(len(num_features)+1):
         if l_idx==0:
@@ -250,7 +252,7 @@ def create_mlp_layers(
             _out_features = num_features[l_idx]
         layers.append(torch.nn.Sequential(
             torch.nn.Linear(_in_features, _out_features),
-            nonlinearity() if l_idx<len(num_features) or not last_linear else torch.nn.Identity(),
+            nonlinearity if l_idx<len(num_features) or not last_linear else torch.nn.Identity(),
         ))
     return layers
 
