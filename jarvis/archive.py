@@ -625,13 +625,15 @@ class ConfigArchive(HashableRecordArchive):
             f_config = config.flatten()
             matched = True
             for k, v in f_cond.items():
-                if not (
-                    k in f_config and (
-                        (callable(v) and v(f_config[k])==True) or f_config[k]==v
-                    )
-                ):
-                    matched = False
-                    break
+                if k not in f_config:
+                    matched = False; break
+                try:
+                    assert f_config[k]==v
+                except:
+                    try:
+                        assert v(f_config[k])
+                    except:
+                        matched = False; break
             if matched:
                 yield key, config
 
