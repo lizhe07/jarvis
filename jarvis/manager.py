@@ -132,6 +132,7 @@ class Manager:
         pbar_kw = Config(pbar_kw).fill({
             'desc': desc_head, 'unit': 'epoch', 'leave': True,
         })
+        desc_head = pbar_kw.desc
         max_epochs = self.setup(config)
         if n_epochs is None:
             n_epochs = max_epochs
